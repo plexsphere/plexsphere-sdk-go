@@ -72,6 +72,8 @@ type APIClient struct {
 
 	CapabilitiesAPI CapabilitiesAPI
 
+	CapacityAPI CapacityAPI
+
 	CloudAPI CloudAPI
 
 	HooksAPI HooksAPI
@@ -127,6 +129,7 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.BootstrapTokensAPI = (*BootstrapTokensAPIService)(&c.common)
 	c.BridgeAPI = (*BridgeAPIService)(&c.common)
 	c.CapabilitiesAPI = (*CapabilitiesAPIService)(&c.common)
+	c.CapacityAPI = (*CapacityAPIService)(&c.common)
 	c.CloudAPI = (*CloudAPIService)(&c.common)
 	c.HooksAPI = (*HooksAPIService)(&c.common)
 	c.IntegrityAPI = (*IntegrityAPIService)(&c.common)

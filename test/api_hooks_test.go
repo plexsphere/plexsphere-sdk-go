@@ -22,11 +22,96 @@ func Test_plexsphere_HooksAPIService(t *testing.T) {
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
 
+	t.Run("Test HooksAPIService DeleteManagedPush", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var domainId string
+
+		httpRes, err := apiClient.HooksAPI.DeleteManagedPush(context.Background(), domainId).Execute()
+
+		require.Nil(t, err)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
+	t.Run("Test HooksAPIService GetManagedHookPush", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var domainId string
+		var pushId string
+
+		resp, httpRes, err := apiClient.HooksAPI.GetManagedHookPush(context.Background(), domainId, pushId).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
+	t.Run("Test HooksAPIService GetManagedPush", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var domainId string
+
+		resp, httpRes, err := apiClient.HooksAPI.GetManagedPush(context.Background(), domainId).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
 	t.Run("Test HooksAPIService ListHooks", func(t *testing.T) {
 
 		t.Skip("skip test") // remove to run test
 
 		resp, httpRes, err := apiClient.HooksAPI.ListHooks(context.Background()).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
+	t.Run("Test HooksAPIService PushManagedHook", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var domainId string
+
+		resp, httpRes, err := apiClient.HooksAPI.PushManagedHook(context.Background(), domainId).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
+	t.Run("Test HooksAPIService PutManagedPush", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var domainId string
+
+		resp, httpRes, err := apiClient.HooksAPI.PutManagedPush(context.Background(), domainId).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
+	t.Run("Test HooksAPIService RollbackManagedHookPush", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var domainId string
+		var pushId string
+
+		resp, httpRes, err := apiClient.HooksAPI.RollbackManagedHookPush(context.Background(), domainId, pushId).Execute()
 
 		require.Nil(t, err)
 		require.NotNil(t, resp)

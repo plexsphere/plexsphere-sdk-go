@@ -16,9 +16,55 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 type HooksAPI interface {
+
+	/*
+		DeleteManagedPush Detach a Domain's managed-push target.
+
+		Detaches the managed-push target for a Domain, removing the sealed kubeconfig and disabling further managed pushes. The handler runs the managed-push write ReBAC check on the addressed Domain before the delete, then removes the target and returns 204. A Domain with no managed-push target receives 404 `managed_push_not_configured`.  DEFERRED-WIRING POSTURE: until the production composition root supplies the managed-push service bundle, every request returns 501.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@return ApiDeleteManagedPushRequest
+	*/
+	DeleteManagedPush(ctx context.Context, domainId string) ApiDeleteManagedPushRequest
+
+	// DeleteManagedPushExecute executes the request
+	DeleteManagedPushExecute(r ApiDeleteManagedPushRequest) (*http.Response, error)
+
+	/*
+		GetManagedHookPush Read a single recorded managed-hook push.
+
+		Returns the read projection of a single recorded managed-hook push by its identifier. The handler runs the managed-push read ReBAC check on the addressed Domain before the read; a push that does not exist on the Domain receives 404 `push_not_found`.  DEFERRED-WIRING POSTURE: until the production composition root supplies the managed-push service bundle, every request returns 501.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@param pushId Recorded managed-hook push identifier (UUIDv7). Bound on `/v1/domains/{domainId}/managed-push/hooks/{pushId}` and its `:rollback` sub-resource for the single-push read and rollback.
+		@return ApiGetManagedHookPushRequest
+	*/
+	GetManagedHookPush(ctx context.Context, domainId string, pushId string) ApiGetManagedHookPushRequest
+
+	// GetManagedHookPushExecute executes the request
+	//  @return ManagedHookPush
+	GetManagedHookPushExecute(r ApiGetManagedHookPushRequest) (*ManagedHookPush, *http.Response, error)
+
+	/*
+		GetManagedPush Read the managed-push target configured for a Domain.
+
+		Returns the read projection of the opt-in managed-push target a Domain operator attached for the Domain — the cluster the platform applies PlexdHook objects to on the operator's behalf. The projection is display-only: it carries the target's enabled flag, the API-server URL, a hex SHA-256 fingerprint of the kubeconfig plaintext, and the create/update timestamps. It NEVER carries the kubeconfig ciphertext or plaintext — the plaintext is sealed at rest and never echoed back over the API.  The handler:    1. Authenticates the caller and rejects requests without a      resolved Principal with 401.   2. Checks the managed-push read ReBAC relation on the addressed      Domain BEFORE reading the target so the endpoint cannot be      used as a Domain-id oracle; an unauthorised caller receives      403.   3. Returns the target projection with 200 when a target is      configured, or 404 `managed_push_not_configured` when the      Domain has no managed-push target.  DEFERRED-WIRING POSTURE: until the production composition root supplies the managed-push service bundle, every request returns 501 so log scrapers can alert on the deferred-wiring state.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@return ApiGetManagedPushRequest
+	*/
+	GetManagedPush(ctx context.Context, domainId string) ApiGetManagedPushRequest
+
+	// GetManagedPushExecute executes the request
+	//  @return ManagedPushTarget
+	GetManagedPushExecute(r ApiGetManagedPushRequest) (*ManagedPushTarget, *http.Response, error)
 
 	/*
 		ListHooks List discovered hooks across Domains.
@@ -33,10 +79,555 @@ type HooksAPI interface {
 	// ListHooksExecute executes the request
 	//  @return HookList
 	ListHooksExecute(r ApiListHooksRequest) (*HookList, *http.Response, error)
+
+	/*
+		PushManagedHook Apply a PlexdHook to a Domain's managed-push cluster.
+
+		Applies one PlexdHook object to the Domain's managed-push cluster on the operator's behalf, recording the push so it can be read back or rolled back. The handler runs the managed-push write ReBAC check on the addressed Domain before any cluster write, validates the PlexdHook spec, then applies it to the target cluster.  The response is the read projection of the recorded push; it NEVER echoes prior object content — only a `had_prior_state` boolean recording whether the apply replaced an existing object, so a subsequent rollback knows whether to restore or delete.  DEFERRED-WIRING POSTURE: until the production composition root supplies the managed-push service bundle, every request returns 501.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@return ApiPushManagedHookRequest
+	*/
+	PushManagedHook(ctx context.Context, domainId string) ApiPushManagedHookRequest
+
+	// PushManagedHookExecute executes the request
+	//  @return ManagedHookPush
+	PushManagedHookExecute(r ApiPushManagedHookRequest) (*ManagedHookPush, *http.Response, error)
+
+	/*
+		PutManagedPush Attach or replace a Domain's managed-push target.
+
+		Attaches the opt-in managed-push target for a Domain, or replaces the existing target's kubeconfig and enabled flag. The request carries a base64-encoded kubeconfig and the enabled flag; the plaintext is validated, sealed at rest, and NEVER echoed back — the 200 response is the display-only target projection.  The handler:    1. Authenticates the caller and rejects requests without a      resolved Principal with 401.   2. Checks the managed-push write ReBAC relation on the addressed      Domain BEFORE any persistence write; an unauthorised caller      receives 403.   3. Decodes and validates the kubeconfig. Only embedded, in-band      credentials are accepted: a token, or `client-certificate-data`      / `client-key-data`, with the CA supplied as      `certificate-authority-data`. An oversized payload is rejected      with 413 `kubeconfig_too_large`; a kubeconfig that fails      validation is rejected with 422 `kubeconfig_invalid`. Validation      rejects an `exec` or `auth-provider` credential plugin, any      file-path credential (`tokenFile`, `client-certificate`,      `client-key`), a `certificate-authority` file path, a      `proxy-url`, a non-https server, and `insecure-skip-tls-verify`      — the control plane never reads operator-named local files nor      dials an operator-supplied proxy.   4. Seals the plaintext and persists the target, returning the      display-only projection with 200.  DEFERRED-WIRING POSTURE: until the production composition root supplies the managed-push service bundle, every request returns 501.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@return ApiPutManagedPushRequest
+	*/
+	PutManagedPush(ctx context.Context, domainId string) ApiPutManagedPushRequest
+
+	// PutManagedPushExecute executes the request
+	//  @return ManagedPushTarget
+	PutManagedPushExecute(r ApiPutManagedPushRequest) (*ManagedPushTarget, *http.Response, error)
+
+	/*
+		RollbackManagedHookPush Roll back a recorded managed-hook push.
+
+		Rolls back a previously recorded managed-hook push: restores the prior object state when the apply replaced an existing object, or deletes the applied object when it had no prior state. The handler runs the managed-push write ReBAC check on the addressed Domain before the cluster write.  The `:rollback` colon-verb mirrors the `/v1/projects/{project_id}/executions:dispatch` idiom — rollback is a side-effecting cluster operation, not an idempotent field write. A push that has already been rolled back receives 409 `push_already_rolled_back`.  DEFERRED-WIRING POSTURE: until the production composition root supplies the managed-push service bundle, every request returns 501.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@param pushId Recorded managed-hook push identifier (UUIDv7). Bound on `/v1/domains/{domainId}/managed-push/hooks/{pushId}` and its `:rollback` sub-resource for the single-push read and rollback.
+		@return ApiRollbackManagedHookPushRequest
+	*/
+	RollbackManagedHookPush(ctx context.Context, domainId string, pushId string) ApiRollbackManagedHookPushRequest
+
+	// RollbackManagedHookPushExecute executes the request
+	//  @return ManagedHookPush
+	RollbackManagedHookPushExecute(r ApiRollbackManagedHookPushRequest) (*ManagedHookPush, *http.Response, error)
 }
 
 // HooksAPIService HooksAPI service
 type HooksAPIService service
+
+type ApiDeleteManagedPushRequest struct {
+	ctx        context.Context
+	ApiService HooksAPI
+	domainId   string
+}
+
+func (r ApiDeleteManagedPushRequest) Execute() (*http.Response, error) {
+	return r.ApiService.DeleteManagedPushExecute(r)
+}
+
+/*
+DeleteManagedPush Detach a Domain's managed-push target.
+
+Detaches the managed-push target for a Domain, removing the sealed kubeconfig and disabling further managed pushes. The handler runs the managed-push write ReBAC check on the addressed Domain before the delete, then removes the target and returns 204. A Domain with no managed-push target receives 404 `managed_push_not_configured`.  DEFERRED-WIRING POSTURE: until the production composition root supplies the managed-push service bundle, every request returns 501.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@return ApiDeleteManagedPushRequest
+*/
+func (a *HooksAPIService) DeleteManagedPush(ctx context.Context, domainId string) ApiDeleteManagedPushRequest {
+	return ApiDeleteManagedPushRequest{
+		ApiService: a,
+		ctx:        ctx,
+		domainId:   domainId,
+	}
+}
+
+// Execute executes the request
+func (a *HooksAPIService) DeleteManagedPushExecute(r ApiDeleteManagedPushRequest) (*http.Response, error) {
+	var (
+		localVarHTTPMethod = http.MethodDelete
+		localVarPostBody   interface{}
+		formFiles          []formFile
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "HooksAPIService.DeleteManagedPush")
+	if err != nil {
+		return nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/domains/{domainId}/managed-push"
+	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 501 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarHTTPResponse, newErr
+	}
+
+	return localVarHTTPResponse, nil
+}
+
+type ApiGetManagedHookPushRequest struct {
+	ctx        context.Context
+	ApiService HooksAPI
+	domainId   string
+	pushId     string
+}
+
+func (r ApiGetManagedHookPushRequest) Execute() (*ManagedHookPush, *http.Response, error) {
+	return r.ApiService.GetManagedHookPushExecute(r)
+}
+
+/*
+GetManagedHookPush Read a single recorded managed-hook push.
+
+Returns the read projection of a single recorded managed-hook push by its identifier. The handler runs the managed-push read ReBAC check on the addressed Domain before the read; a push that does not exist on the Domain receives 404 `push_not_found`.  DEFERRED-WIRING POSTURE: until the production composition root supplies the managed-push service bundle, every request returns 501.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@param pushId Recorded managed-hook push identifier (UUIDv7). Bound on `/v1/domains/{domainId}/managed-push/hooks/{pushId}` and its `:rollback` sub-resource for the single-push read and rollback.
+	@return ApiGetManagedHookPushRequest
+*/
+func (a *HooksAPIService) GetManagedHookPush(ctx context.Context, domainId string, pushId string) ApiGetManagedHookPushRequest {
+	return ApiGetManagedHookPushRequest{
+		ApiService: a,
+		ctx:        ctx,
+		domainId:   domainId,
+		pushId:     pushId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ManagedHookPush
+func (a *HooksAPIService) GetManagedHookPushExecute(r ApiGetManagedHookPushRequest) (*ManagedHookPush, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ManagedHookPush
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "HooksAPIService.GetManagedHookPush")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/domains/{domainId}/managed-push/hooks/{pushId}"
+	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"pushId"+"}", url.PathEscape(parameterValueToString(r.pushId, "pushId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 501 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiGetManagedPushRequest struct {
+	ctx        context.Context
+	ApiService HooksAPI
+	domainId   string
+}
+
+func (r ApiGetManagedPushRequest) Execute() (*ManagedPushTarget, *http.Response, error) {
+	return r.ApiService.GetManagedPushExecute(r)
+}
+
+/*
+GetManagedPush Read the managed-push target configured for a Domain.
+
+Returns the read projection of the opt-in managed-push target a Domain operator attached for the Domain — the cluster the platform applies PlexdHook objects to on the operator's behalf. The projection is display-only: it carries the target's enabled flag, the API-server URL, a hex SHA-256 fingerprint of the kubeconfig plaintext, and the create/update timestamps. It NEVER carries the kubeconfig ciphertext or plaintext — the plaintext is sealed at rest and never echoed back over the API.  The handler:    1. Authenticates the caller and rejects requests without a      resolved Principal with 401.   2. Checks the managed-push read ReBAC relation on the addressed      Domain BEFORE reading the target so the endpoint cannot be      used as a Domain-id oracle; an unauthorised caller receives      403.   3. Returns the target projection with 200 when a target is      configured, or 404 `managed_push_not_configured` when the      Domain has no managed-push target.  DEFERRED-WIRING POSTURE: until the production composition root supplies the managed-push service bundle, every request returns 501 so log scrapers can alert on the deferred-wiring state.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@return ApiGetManagedPushRequest
+*/
+func (a *HooksAPIService) GetManagedPush(ctx context.Context, domainId string) ApiGetManagedPushRequest {
+	return ApiGetManagedPushRequest{
+		ApiService: a,
+		ctx:        ctx,
+		domainId:   domainId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ManagedPushTarget
+func (a *HooksAPIService) GetManagedPushExecute(r ApiGetManagedPushRequest) (*ManagedPushTarget, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ManagedPushTarget
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "HooksAPIService.GetManagedPush")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/domains/{domainId}/managed-push"
+	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 501 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
 
 type ApiListHooksRequest struct {
 	ctx              context.Context
@@ -211,6 +802,616 @@ func (a *HooksAPIService) ListHooksExecute(r ApiListHooksRequest) (*HookList, *h
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiPushManagedHookRequest struct {
+	ctx                    context.Context
+	ApiService             HooksAPI
+	domainId               string
+	managedHookPushRequest *ManagedHookPushRequest
+}
+
+func (r ApiPushManagedHookRequest) ManagedHookPushRequest(managedHookPushRequest ManagedHookPushRequest) ApiPushManagedHookRequest {
+	r.managedHookPushRequest = &managedHookPushRequest
+	return r
+}
+
+func (r ApiPushManagedHookRequest) Execute() (*ManagedHookPush, *http.Response, error) {
+	return r.ApiService.PushManagedHookExecute(r)
+}
+
+/*
+PushManagedHook Apply a PlexdHook to a Domain's managed-push cluster.
+
+Applies one PlexdHook object to the Domain's managed-push cluster on the operator's behalf, recording the push so it can be read back or rolled back. The handler runs the managed-push write ReBAC check on the addressed Domain before any cluster write, validates the PlexdHook spec, then applies it to the target cluster.  The response is the read projection of the recorded push; it NEVER echoes prior object content — only a `had_prior_state` boolean recording whether the apply replaced an existing object, so a subsequent rollback knows whether to restore or delete.  DEFERRED-WIRING POSTURE: until the production composition root supplies the managed-push service bundle, every request returns 501.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@return ApiPushManagedHookRequest
+*/
+func (a *HooksAPIService) PushManagedHook(ctx context.Context, domainId string) ApiPushManagedHookRequest {
+	return ApiPushManagedHookRequest{
+		ApiService: a,
+		ctx:        ctx,
+		domainId:   domainId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ManagedHookPush
+func (a *HooksAPIService) PushManagedHookExecute(r ApiPushManagedHookRequest) (*ManagedHookPush, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ManagedHookPush
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "HooksAPIService.PushManagedHook")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/domains/{domainId}/managed-push/hooks"
+	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.managedHookPushRequest == nil {
+		return localVarReturnValue, nil, reportError("managedHookPushRequest is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.managedHookPushRequest
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 422 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 502 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 501 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiPutManagedPushRequest struct {
+	ctx                      context.Context
+	ApiService               HooksAPI
+	domainId                 string
+	managedPushAttachRequest *ManagedPushAttachRequest
+}
+
+func (r ApiPutManagedPushRequest) ManagedPushAttachRequest(managedPushAttachRequest ManagedPushAttachRequest) ApiPutManagedPushRequest {
+	r.managedPushAttachRequest = &managedPushAttachRequest
+	return r
+}
+
+func (r ApiPutManagedPushRequest) Execute() (*ManagedPushTarget, *http.Response, error) {
+	return r.ApiService.PutManagedPushExecute(r)
+}
+
+/*
+PutManagedPush Attach or replace a Domain's managed-push target.
+
+Attaches the opt-in managed-push target for a Domain, or replaces the existing target's kubeconfig and enabled flag. The request carries a base64-encoded kubeconfig and the enabled flag; the plaintext is validated, sealed at rest, and NEVER echoed back — the 200 response is the display-only target projection.  The handler:    1. Authenticates the caller and rejects requests without a      resolved Principal with 401.   2. Checks the managed-push write ReBAC relation on the addressed      Domain BEFORE any persistence write; an unauthorised caller      receives 403.   3. Decodes and validates the kubeconfig. Only embedded, in-band      credentials are accepted: a token, or `client-certificate-data`      / `client-key-data`, with the CA supplied as      `certificate-authority-data`. An oversized payload is rejected      with 413 `kubeconfig_too_large`; a kubeconfig that fails      validation is rejected with 422 `kubeconfig_invalid`. Validation      rejects an `exec` or `auth-provider` credential plugin, any      file-path credential (`tokenFile`, `client-certificate`,      `client-key`), a `certificate-authority` file path, a      `proxy-url`, a non-https server, and `insecure-skip-tls-verify`      — the control plane never reads operator-named local files nor      dials an operator-supplied proxy.   4. Seals the plaintext and persists the target, returning the      display-only projection with 200.  DEFERRED-WIRING POSTURE: until the production composition root supplies the managed-push service bundle, every request returns 501.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@return ApiPutManagedPushRequest
+*/
+func (a *HooksAPIService) PutManagedPush(ctx context.Context, domainId string) ApiPutManagedPushRequest {
+	return ApiPutManagedPushRequest{
+		ApiService: a,
+		ctx:        ctx,
+		domainId:   domainId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ManagedPushTarget
+func (a *HooksAPIService) PutManagedPushExecute(r ApiPutManagedPushRequest) (*ManagedPushTarget, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPut
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ManagedPushTarget
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "HooksAPIService.PutManagedPush")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/domains/{domainId}/managed-push"
+	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.managedPushAttachRequest == nil {
+		return localVarReturnValue, nil, reportError("managedPushAttachRequest is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.managedPushAttachRequest
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 413 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 422 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 501 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiRollbackManagedHookPushRequest struct {
+	ctx        context.Context
+	ApiService HooksAPI
+	domainId   string
+	pushId     string
+}
+
+func (r ApiRollbackManagedHookPushRequest) Execute() (*ManagedHookPush, *http.Response, error) {
+	return r.ApiService.RollbackManagedHookPushExecute(r)
+}
+
+/*
+RollbackManagedHookPush Roll back a recorded managed-hook push.
+
+Rolls back a previously recorded managed-hook push: restores the prior object state when the apply replaced an existing object, or deletes the applied object when it had no prior state. The handler runs the managed-push write ReBAC check on the addressed Domain before the cluster write.  The `:rollback` colon-verb mirrors the `/v1/projects/{project_id}/executions:dispatch` idiom — rollback is a side-effecting cluster operation, not an idempotent field write. A push that has already been rolled back receives 409 `push_already_rolled_back`.  DEFERRED-WIRING POSTURE: until the production composition root supplies the managed-push service bundle, every request returns 501.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@param pushId Recorded managed-hook push identifier (UUIDv7). Bound on `/v1/domains/{domainId}/managed-push/hooks/{pushId}` and its `:rollback` sub-resource for the single-push read and rollback.
+	@return ApiRollbackManagedHookPushRequest
+*/
+func (a *HooksAPIService) RollbackManagedHookPush(ctx context.Context, domainId string, pushId string) ApiRollbackManagedHookPushRequest {
+	return ApiRollbackManagedHookPushRequest{
+		ApiService: a,
+		ctx:        ctx,
+		domainId:   domainId,
+		pushId:     pushId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ManagedHookPush
+func (a *HooksAPIService) RollbackManagedHookPushExecute(r ApiRollbackManagedHookPushRequest) (*ManagedHookPush, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ManagedHookPush
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "HooksAPIService.RollbackManagedHookPush")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/domains/{domainId}/managed-push/hooks/{pushId}:rollback"
+	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"pushId"+"}", url.PathEscape(parameterValueToString(r.pushId, "pushId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 502 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 501 {
 			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
