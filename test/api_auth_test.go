@@ -57,6 +57,18 @@ func Test_plexsphere_AuthAPIService(t *testing.T) {
 
 	})
 
+	t.Run("Test AuthAPIService GetAuthIdPBindings", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		resp, httpRes, err := apiClient.AuthAPI.GetAuthIdPBindings(context.Background()).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
 	t.Run("Test AuthAPIService GetAuthTokens", func(t *testing.T) {
 
 		t.Skip("skip test") // remove to run test

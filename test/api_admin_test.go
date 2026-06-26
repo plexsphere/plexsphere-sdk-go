@@ -141,6 +141,18 @@ func Test_plexsphere_AdminAPIService(t *testing.T) {
 
 	})
 
+	t.Run("Test AdminAPIService GetAdminPlatformIdPList", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		resp, httpRes, err := apiClient.AdminAPI.GetAdminPlatformIdPList(context.Background()).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
 	t.Run("Test AdminAPIService GetAdminTokens", func(t *testing.T) {
 
 		t.Skip("skip test") // remove to run test
@@ -226,6 +238,18 @@ func Test_plexsphere_AdminAPIService(t *testing.T) {
 		t.Skip("skip test") // remove to run test
 
 		resp, httpRes, err := apiClient.AdminAPI.PostAdminIdP(context.Background()).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
+	t.Run("Test AdminAPIService PostAdminPlatformIdP", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		resp, httpRes, err := apiClient.AdminAPI.PostAdminPlatformIdP(context.Background()).Execute()
 
 		require.Nil(t, err)
 		require.NotNil(t, resp)

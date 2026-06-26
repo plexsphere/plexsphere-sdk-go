@@ -25,7 +25,7 @@ type Whoami struct {
 	Subject string `json:"subject"`
 	// Domain the principal belongs to.
 	DomainId *string `json:"domain_id,omitempty"`
-	// Primary email of the principal as projected by the upstream IdP at sign-in. Omitted when the IdP did not supply an `email` claim or the principal is a ServiceIdentity. The dashboard's SignedInBadge renders it as the human-readable identity label.
+	// Primary email of the principal as projected by the upstream IdP at sign-in. Omitted when the IdP did not supply an `email` claim or the principal is a ServiceIdentity. A browser client renders it as the human-readable identity label.
 	Email *string `json:"email,omitempty"`
 	// Authentication Context Class Reference, if available.
 	Acr *string `json:"acr,omitempty"`

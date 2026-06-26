@@ -35,8 +35,12 @@ type IdPBindingRequest struct {
 	// Required OIDC ACR values.
 	RequiredAcr []string `json:"required_acr,omitempty"`
 	// Required OIDC AMR values.
-	RequiredAmr          []string                   `json:"required_amr,omitempty"`
-	JitPolicy            IdPBindingRequestJitPolicy `json:"jit_policy"`
+	RequiredAmr []string                   `json:"required_amr,omitempty"`
+	JitPolicy   IdPBindingRequestJitPolicy `json:"jit_policy"`
+	// Optional human-friendly handle for the binding, unique per Domain among active bindings (e.g. `github`). Normalised to lowercase kebab-case, so an operator may submit mixed case.
+	Alias *string `json:"alias,omitempty"`
+	// Mark this binding as the Domain default a Domain-only login resolves to. At most one active primary per Domain; a second primary is rejected with 409 primary-conflict.
+	Primary              *bool `json:"primary,omitempty"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -305,6 +309,70 @@ func (o *IdPBindingRequest) SetJitPolicy(v IdPBindingRequestJitPolicy) {
 	o.JitPolicy = v
 }
 
+// GetAlias returns the Alias field value if set, zero value otherwise.
+func (o *IdPBindingRequest) GetAlias() string {
+	if o == nil || IsNil(o.Alias) {
+		var ret string
+		return ret
+	}
+	return *o.Alias
+}
+
+// GetAliasOk returns a tuple with the Alias field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *IdPBindingRequest) GetAliasOk() (*string, bool) {
+	if o == nil || IsNil(o.Alias) {
+		return nil, false
+	}
+	return o.Alias, true
+}
+
+// HasAlias returns a boolean if a field has been set.
+func (o *IdPBindingRequest) HasAlias() bool {
+	if o != nil && !IsNil(o.Alias) {
+		return true
+	}
+
+	return false
+}
+
+// SetAlias gets a reference to the given string and assigns it to the Alias field.
+func (o *IdPBindingRequest) SetAlias(v string) {
+	o.Alias = &v
+}
+
+// GetPrimary returns the Primary field value if set, zero value otherwise.
+func (o *IdPBindingRequest) GetPrimary() bool {
+	if o == nil || IsNil(o.Primary) {
+		var ret bool
+		return ret
+	}
+	return *o.Primary
+}
+
+// GetPrimaryOk returns a tuple with the Primary field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *IdPBindingRequest) GetPrimaryOk() (*bool, bool) {
+	if o == nil || IsNil(o.Primary) {
+		return nil, false
+	}
+	return o.Primary, true
+}
+
+// HasPrimary returns a boolean if a field has been set.
+func (o *IdPBindingRequest) HasPrimary() bool {
+	if o != nil && !IsNil(o.Primary) {
+		return true
+	}
+
+	return false
+}
+
+// SetPrimary gets a reference to the given bool and assigns it to the Primary field.
+func (o *IdPBindingRequest) SetPrimary(v bool) {
+	o.Primary = &v
+}
+
 func (o IdPBindingRequest) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -330,6 +398,12 @@ func (o IdPBindingRequest) ToMap() (map[string]interface{}, error) {
 		toSerialize["required_amr"] = o.RequiredAmr
 	}
 	toSerialize["jit_policy"] = o.JitPolicy
+	if !IsNil(o.Alias) {
+		toSerialize["alias"] = o.Alias
+	}
+	if !IsNil(o.Primary) {
+		toSerialize["primary"] = o.Primary
+	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -387,6 +461,8 @@ func (o *IdPBindingRequest) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "required_acr")
 		delete(additionalProperties, "required_amr")
 		delete(additionalProperties, "jit_policy")
+		delete(additionalProperties, "alias")
+		delete(additionalProperties, "primary")
 		o.AdditionalProperties = additionalProperties
 	}
 

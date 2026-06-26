@@ -64,7 +64,11 @@ type APIClient struct {
 
 	AuthzAPI AuthzAPI
 
+	BackupAPI BackupAPI
+
 	BlueprintAPI BlueprintAPI
+
+	BlueprintCatalogAPI BlueprintCatalogAPI
 
 	BootstrapTokensAPI BootstrapTokensAPI
 
@@ -89,6 +93,8 @@ type APIClient struct {
 	MetaAPI MetaAPI
 
 	NodesAPI NodesAPI
+
+	ObservabilityAPI ObservabilityAPI
 
 	PolicyAPI PolicyAPI
 
@@ -125,7 +131,9 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.AuditAPI = (*AuditAPIService)(&c.common)
 	c.AuthAPI = (*AuthAPIService)(&c.common)
 	c.AuthzAPI = (*AuthzAPIService)(&c.common)
+	c.BackupAPI = (*BackupAPIService)(&c.common)
 	c.BlueprintAPI = (*BlueprintAPIService)(&c.common)
+	c.BlueprintCatalogAPI = (*BlueprintCatalogAPIService)(&c.common)
 	c.BootstrapTokensAPI = (*BootstrapTokensAPIService)(&c.common)
 	c.BridgeAPI = (*BridgeAPIService)(&c.common)
 	c.CapabilitiesAPI = (*CapabilitiesAPIService)(&c.common)
@@ -138,6 +146,7 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.MeshAPI = (*MeshAPIService)(&c.common)
 	c.MetaAPI = (*MetaAPIService)(&c.common)
 	c.NodesAPI = (*NodesAPIService)(&c.common)
+	c.ObservabilityAPI = (*ObservabilityAPIService)(&c.common)
 	c.PolicyAPI = (*PolicyAPIService)(&c.common)
 	c.ProvisioningCredentialsAPI = (*ProvisioningCredentialsAPIService)(&c.common)
 	c.ResourceAPI = (*ResourceAPIService)(&c.common)

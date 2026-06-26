@@ -148,6 +148,20 @@ type AdminAPI interface {
 	GetAdminIdPListExecute(r ApiGetAdminIdPListRequest) ([]IdPBindingResponse, *http.Response, error)
 
 	/*
+		GetAdminPlatformIdPList List platform-scoped (shared) IdP bindings.
+
+		Returns every platform-scoped IdP binding, gated on the platform `read` permission. Per-Domain bindings are not included; use GET /v1/admin/idp for a Domain's effective set.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return ApiGetAdminPlatformIdPListRequest
+	*/
+	GetAdminPlatformIdPList(ctx context.Context) ApiGetAdminPlatformIdPListRequest
+
+	// GetAdminPlatformIdPListExecute executes the request
+	//  @return []IdPBindingResponse
+	GetAdminPlatformIdPListExecute(r ApiGetAdminPlatformIdPListRequest) ([]IdPBindingResponse, *http.Response, error)
+
+	/*
 		GetAdminTokens List API tokens for any owner (admin).
 
 		Returns API-token summaries for the principal addressed by `identity_ref` (e.g. `user:<uuid>` or `service:<uuid>`). Plaintext is never included. Gated on the `manage` relation against the owner's Domain so the same authz check governs both reads and mutations.
@@ -248,6 +262,20 @@ type AdminAPI interface {
 	// PostAdminIdPExecute executes the request
 	//  @return IdPBindingResponse
 	PostAdminIdPExecute(r ApiPostAdminIdPRequest) (*IdPBindingResponse, *http.Response, error)
+
+	/*
+		PostAdminPlatformIdP Create a platform-scoped (shared) IdP binding.
+
+		Creates a platform-scoped IdP binding owned by no Domain and usable by any Domain, gated on the platform `manage` permission. The response echoes the persisted aggregate with a null `domain_id` but never includes the client secret itself — only the opaque `client_secret_ref`.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return ApiPostAdminPlatformIdPRequest
+	*/
+	PostAdminPlatformIdP(ctx context.Context) ApiPostAdminPlatformIdPRequest
+
+	// PostAdminPlatformIdPExecute executes the request
+	//  @return IdPBindingResponse
+	PostAdminPlatformIdPExecute(r ApiPostAdminPlatformIdPRequest) (*IdPBindingResponse, *http.Response, error)
 
 	/*
 		PostAdminTokenRotate Rotate any API token (admin).
@@ -1605,6 +1633,138 @@ func (a *AdminAPIService) GetAdminIdPListExecute(r ApiGetAdminIdPListRequest) ([
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiGetAdminPlatformIdPListRequest struct {
+	ctx        context.Context
+	ApiService AdminAPI
+}
+
+func (r ApiGetAdminPlatformIdPListRequest) Execute() ([]IdPBindingResponse, *http.Response, error) {
+	return r.ApiService.GetAdminPlatformIdPListExecute(r)
+}
+
+/*
+GetAdminPlatformIdPList List platform-scoped (shared) IdP bindings.
+
+Returns every platform-scoped IdP binding, gated on the platform `read` permission. Per-Domain bindings are not included; use GET /v1/admin/idp for a Domain's effective set.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiGetAdminPlatformIdPListRequest
+*/
+func (a *AdminAPIService) GetAdminPlatformIdPList(ctx context.Context) ApiGetAdminPlatformIdPListRequest {
+	return ApiGetAdminPlatformIdPListRequest{
+		ApiService: a,
+		ctx:        ctx,
+	}
+}
+
+// Execute executes the request
+//
+//	@return []IdPBindingResponse
+func (a *AdminAPIService) GetAdminPlatformIdPListExecute(r ApiGetAdminPlatformIdPListRequest) ([]IdPBindingResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue []IdPBindingResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AdminAPIService.GetAdminPlatformIdPList")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/admin/platform-idp"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiGetAdminTokensRequest struct {
 	ctx         context.Context
 	ApiService  AdminAPI
@@ -2696,6 +2856,171 @@ func (a *AdminAPIService) PostAdminIdPExecute(r ApiPostAdminIdPRequest) (*IdPBin
 	}
 	// body params
 	localVarPostBody = r.idPBindingRequest
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiPostAdminPlatformIdPRequest struct {
+	ctx                       context.Context
+	ApiService                AdminAPI
+	platformIdPBindingRequest *PlatformIdPBindingRequest
+}
+
+func (r ApiPostAdminPlatformIdPRequest) PlatformIdPBindingRequest(platformIdPBindingRequest PlatformIdPBindingRequest) ApiPostAdminPlatformIdPRequest {
+	r.platformIdPBindingRequest = &platformIdPBindingRequest
+	return r
+}
+
+func (r ApiPostAdminPlatformIdPRequest) Execute() (*IdPBindingResponse, *http.Response, error) {
+	return r.ApiService.PostAdminPlatformIdPExecute(r)
+}
+
+/*
+PostAdminPlatformIdP Create a platform-scoped (shared) IdP binding.
+
+Creates a platform-scoped IdP binding owned by no Domain and usable by any Domain, gated on the platform `manage` permission. The response echoes the persisted aggregate with a null `domain_id` but never includes the client secret itself — only the opaque `client_secret_ref`.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiPostAdminPlatformIdPRequest
+*/
+func (a *AdminAPIService) PostAdminPlatformIdP(ctx context.Context) ApiPostAdminPlatformIdPRequest {
+	return ApiPostAdminPlatformIdPRequest{
+		ApiService: a,
+		ctx:        ctx,
+	}
+}
+
+// Execute executes the request
+//
+//	@return IdPBindingResponse
+func (a *AdminAPIService) PostAdminPlatformIdPExecute(r ApiPostAdminPlatformIdPRequest) (*IdPBindingResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *IdPBindingResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AdminAPIService.PostAdminPlatformIdP")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/admin/platform-idp"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.platformIdPBindingRequest == nil {
+		return localVarReturnValue, nil, reportError("platformIdPBindingRequest is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.platformIdPBindingRequest
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err

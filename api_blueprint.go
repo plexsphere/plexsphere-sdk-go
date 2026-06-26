@@ -49,6 +49,35 @@ type BlueprintAPI interface {
 	// ListBlueprintsExecute executes the request
 	//  @return BlueprintList
 	ListBlueprintsExecute(r ApiListBlueprintsRequest) (*BlueprintList, *http.Response, error)
+
+	/*
+		PublishBlueprintVersion Publish a Blueprint version.
+
+		Publishes an immutable version under an existing Blueprint. The service validates the request BEFORE any persistence write: the `provider_kinds` enum members, the `injection_strategy` enum, the `parameter_schema` document, and the structural XRD/Composition manifest pair are each checked, so a malformed payload never appends a `BlueprintVersionPublished` outbox row.  The handler authorises the caller against the `publish` permission on the addressed Blueprint (`blueprint#publish`) BEFORE invoking the service. The registrar of a Blueprint holds `owner`, which grants `publish`; the grant is written asynchronously after registration, so a publish issued in the same instant as the register may be refused until the tuple propagates.  A missing parent Blueprint surfaces as `404 blueprint_not_found`; a re-published `(blueprint, version)` pair surfaces as `409 blueprint_version_exists`. On success the handler emits a `blueprint.publish` audit row and the service appends a `BlueprintVersionPublished` outbox event in the same transaction.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param id Blueprint identifier (UUIDv7). Bound on `/v1/blueprints/{id}` for the read-only Blueprint Catalog surface.
+		@return ApiPublishBlueprintVersionRequest
+	*/
+	PublishBlueprintVersion(ctx context.Context, id string) ApiPublishBlueprintVersionRequest
+
+	// PublishBlueprintVersionExecute executes the request
+	//  @return BlueprintVersionResponse
+	PublishBlueprintVersionExecute(r ApiPublishBlueprintVersionRequest) (*BlueprintVersionResponse, *http.Response, error)
+
+	/*
+		RegisterBlueprint Register a Blueprint Catalog entry.
+
+		Registers a new Blueprint — the catalogue entry under which one or more immutable versions are later published. The aggregate enforces every catalogue invariant: kebab-case `slug`, non-empty `display_name`. A freshly registered Blueprint always carries `status: active`.  The handler authorises the caller against the platform-level `manage` relation (`platform#manage`) BEFORE invoking the service so an unauthorised caller never produces a `BlueprintRegistered` outbox row. A duplicate slug surfaces as `409 blueprint_slug_conflict`.  On success the handler emits a `blueprint.register` audit row and the service appends a `BlueprintRegistered` outbox event in the same transaction. The authz-sync consumer maps that event to a `blueprint:<id>#owner@<registrar>` tuple so the registrar gains `publish` on the new Blueprint — the grant is eventually consistent (see the `blueprint` tag description).
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return ApiRegisterBlueprintRequest
+	*/
+	RegisterBlueprint(ctx context.Context) ApiRegisterBlueprintRequest
+
+	// RegisterBlueprintExecute executes the request
+	//  @return BlueprintResponse
+	RegisterBlueprintExecute(r ApiRegisterBlueprintRequest) (*BlueprintResponse, *http.Response, error)
 }
 
 // BlueprintAPIService BlueprintAPI service
@@ -334,6 +363,373 @@ func (a *BlueprintAPIService) ListBlueprintsExecute(r ApiListBlueprintsRequest) 
 		}
 		if localVarHTTPResponse.StatusCode == 403 {
 			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiPublishBlueprintVersionRequest struct {
+	ctx                           context.Context
+	ApiService                    BlueprintAPI
+	id                            string
+	blueprintVersionCreateRequest *BlueprintVersionCreateRequest
+}
+
+func (r ApiPublishBlueprintVersionRequest) BlueprintVersionCreateRequest(blueprintVersionCreateRequest BlueprintVersionCreateRequest) ApiPublishBlueprintVersionRequest {
+	r.blueprintVersionCreateRequest = &blueprintVersionCreateRequest
+	return r
+}
+
+func (r ApiPublishBlueprintVersionRequest) Execute() (*BlueprintVersionResponse, *http.Response, error) {
+	return r.ApiService.PublishBlueprintVersionExecute(r)
+}
+
+/*
+PublishBlueprintVersion Publish a Blueprint version.
+
+Publishes an immutable version under an existing Blueprint. The service validates the request BEFORE any persistence write: the `provider_kinds` enum members, the `injection_strategy` enum, the `parameter_schema` document, and the structural XRD/Composition manifest pair are each checked, so a malformed payload never appends a `BlueprintVersionPublished` outbox row.  The handler authorises the caller against the `publish` permission on the addressed Blueprint (`blueprint#publish`) BEFORE invoking the service. The registrar of a Blueprint holds `owner`, which grants `publish`; the grant is written asynchronously after registration, so a publish issued in the same instant as the register may be refused until the tuple propagates.  A missing parent Blueprint surfaces as `404 blueprint_not_found`; a re-published `(blueprint, version)` pair surfaces as `409 blueprint_version_exists`. On success the handler emits a `blueprint.publish` audit row and the service appends a `BlueprintVersionPublished` outbox event in the same transaction.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id Blueprint identifier (UUIDv7). Bound on `/v1/blueprints/{id}` for the read-only Blueprint Catalog surface.
+	@return ApiPublishBlueprintVersionRequest
+*/
+func (a *BlueprintAPIService) PublishBlueprintVersion(ctx context.Context, id string) ApiPublishBlueprintVersionRequest {
+	return ApiPublishBlueprintVersionRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return BlueprintVersionResponse
+func (a *BlueprintAPIService) PublishBlueprintVersionExecute(r ApiPublishBlueprintVersionRequest) (*BlueprintVersionResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *BlueprintVersionResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "BlueprintAPIService.PublishBlueprintVersion")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/blueprints/{id}/versions"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.blueprintVersionCreateRequest == nil {
+		return localVarReturnValue, nil, reportError("blueprintVersionCreateRequest is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.blueprintVersionCreateRequest
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 413 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiRegisterBlueprintRequest struct {
+	ctx                    context.Context
+	ApiService             BlueprintAPI
+	blueprintCreateRequest *BlueprintCreateRequest
+}
+
+func (r ApiRegisterBlueprintRequest) BlueprintCreateRequest(blueprintCreateRequest BlueprintCreateRequest) ApiRegisterBlueprintRequest {
+	r.blueprintCreateRequest = &blueprintCreateRequest
+	return r
+}
+
+func (r ApiRegisterBlueprintRequest) Execute() (*BlueprintResponse, *http.Response, error) {
+	return r.ApiService.RegisterBlueprintExecute(r)
+}
+
+/*
+RegisterBlueprint Register a Blueprint Catalog entry.
+
+Registers a new Blueprint — the catalogue entry under which one or more immutable versions are later published. The aggregate enforces every catalogue invariant: kebab-case `slug`, non-empty `display_name`. A freshly registered Blueprint always carries `status: active`.  The handler authorises the caller against the platform-level `manage` relation (`platform#manage`) BEFORE invoking the service so an unauthorised caller never produces a `BlueprintRegistered` outbox row. A duplicate slug surfaces as `409 blueprint_slug_conflict`.  On success the handler emits a `blueprint.register` audit row and the service appends a `BlueprintRegistered` outbox event in the same transaction. The authz-sync consumer maps that event to a `blueprint:<id>#owner@<registrar>` tuple so the registrar gains `publish` on the new Blueprint — the grant is eventually consistent (see the `blueprint` tag description).
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiRegisterBlueprintRequest
+*/
+func (a *BlueprintAPIService) RegisterBlueprint(ctx context.Context) ApiRegisterBlueprintRequest {
+	return ApiRegisterBlueprintRequest{
+		ApiService: a,
+		ctx:        ctx,
+	}
+}
+
+// Execute executes the request
+//
+//	@return BlueprintResponse
+func (a *BlueprintAPIService) RegisterBlueprintExecute(r ApiRegisterBlueprintRequest) (*BlueprintResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *BlueprintResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "BlueprintAPIService.RegisterBlueprint")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/blueprints"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.blueprintCreateRequest == nil {
+		return localVarReturnValue, nil, reportError("blueprintCreateRequest is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.blueprintCreateRequest
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 413 {
+			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()

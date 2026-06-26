@@ -13,6 +13,7 @@ Method | HTTP request | Description
 [**GetAdminGroupMembers**](AdminAPI.md#GetAdminGroupMembers) | **Get** /v1/admin/groups/{id}/members | List members of a Group.
 [**GetAdminIdPByID**](AdminAPI.md#GetAdminIdPByID) | **Get** /v1/admin/idp/{id} | Read an IdP binding by identifier.
 [**GetAdminIdPList**](AdminAPI.md#GetAdminIdPList) | **Get** /v1/admin/idp | List IdP bindings (optionally filtered by Domain).
+[**GetAdminPlatformIdPList**](AdminAPI.md#GetAdminPlatformIdPList) | **Get** /v1/admin/platform-idp | List platform-scoped (shared) IdP bindings.
 [**GetAdminTokens**](AdminAPI.md#GetAdminTokens) | **Get** /v1/admin/tokens | List API tokens for any owner (admin).
 [**PatchAdminGroup**](AdminAPI.md#PatchAdminGroup) | **Patch** /v1/admin/groups/{id} | Update mutable fields on a Group.
 [**PatchAdminIdP**](AdminAPI.md#PatchAdminIdP) | **Patch** /v1/admin/idp/{id} | Partially update an IdP binding.
@@ -20,6 +21,7 @@ Method | HTTP request | Description
 [**PostAdminGroup**](AdminAPI.md#PostAdminGroup) | **Post** /v1/admin/groups | Create a Group within a Domain.
 [**PostAdminGroupMember**](AdminAPI.md#PostAdminGroupMember) | **Post** /v1/admin/groups/{id}/members | Add a principal to a Group.
 [**PostAdminIdP**](AdminAPI.md#PostAdminIdP) | **Post** /v1/admin/idp | Create an IdP binding for a Domain.
+[**PostAdminPlatformIdP**](AdminAPI.md#PostAdminPlatformIdP) | **Post** /v1/admin/platform-idp | Create a platform-scoped (shared) IdP binding.
 [**PostAdminTokenRotate**](AdminAPI.md#PostAdminTokenRotate) | **Post** /v1/admin/tokens/{id}/rotate | Rotate any API token (admin).
 [**PostAdminTokens**](AdminAPI.md#PostAdminTokens) | **Post** /v1/admin/tokens | Issue an API token on behalf of any principal (admin).
 
@@ -644,6 +646,67 @@ No authorization required
 [[Back to README]](../README.md)
 
 
+## GetAdminPlatformIdPList
+
+> []IdPBindingResponse GetAdminPlatformIdPList(ctx).Execute()
+
+List platform-scoped (shared) IdP bindings.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.AdminAPI.GetAdminPlatformIdPList(context.Background()).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `AdminAPI.GetAdminPlatformIdPList``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `GetAdminPlatformIdPList`: []IdPBindingResponse
+	fmt.Fprintf(os.Stdout, "Response from `AdminAPI.GetAdminPlatformIdPList`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+This endpoint does not need any parameter.
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiGetAdminPlatformIdPListRequest struct via the builder pattern
+
+
+### Return type
+
+[**[]IdPBindingResponse**](IdPBindingResponse.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
 ## GetAdminTokens
 
 > []APITokenSummary GetAdminTokens(ctx).IdentityRef(identityRef).Execute()
@@ -1111,6 +1174,72 @@ Other parameters are passed through a pointer to a apiPostAdminIdPRequest struct
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **idPBindingRequest** | [**IdPBindingRequest**](IdPBindingRequest.md) |  | 
+
+### Return type
+
+[**IdPBindingResponse**](IdPBindingResponse.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: application/json
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## PostAdminPlatformIdP
+
+> IdPBindingResponse PostAdminPlatformIdP(ctx).PlatformIdPBindingRequest(platformIdPBindingRequest).Execute()
+
+Create a platform-scoped (shared) IdP binding.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	platformIdPBindingRequest := *openapiclient.NewPlatformIdPBindingRequest("Issuer_example", "ClientId_example", "ClientSecretRef_example", "DiscoveryUrl_example", "JitPolicy_example") // PlatformIdPBindingRequest | 
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.AdminAPI.PostAdminPlatformIdP(context.Background()).PlatformIdPBindingRequest(platformIdPBindingRequest).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `AdminAPI.PostAdminPlatformIdP``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `PostAdminPlatformIdP`: IdPBindingResponse
+	fmt.Fprintf(os.Stdout, "Response from `AdminAPI.PostAdminPlatformIdP`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiPostAdminPlatformIdPRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **platformIdPBindingRequest** | [**PlatformIdPBindingRequest**](PlatformIdPBindingRequest.md) |  | 
 
 ### Return type
 

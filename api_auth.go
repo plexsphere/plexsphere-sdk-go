@@ -51,7 +51,7 @@ type AuthAPI interface {
 	/*
 		GetAuthCallback OIDC redirect callback — exchanges `code` for a session.
 
-		Receives the OIDC redirect after the end user completes sign-in at the IdP. Validates `state` and `nonce`, exchanges the authorization code for tokens, provisions/updates the user via the JIT policy, issues a plexsphere session cookie, and 303 See Other-redirects the browser to the SPA root (`/`). The endpoint is invoked exclusively via top-level browser navigation per RFC 6749 §4.1.2; clients that need a machine-readable session shape should call `GET /v1/auth/whoami` once the session cookie is set .  Failure responses are content-negotiated via the `Accept` request header:  - **Browser-leg failure** — when `Accept` is absent, `*_/_*`, or   includes `text/html`, the server responds with `303 See   Other` to `/?auth_error_kind=...&auth_error_status=...&auth_error_detail=...`   so the SPA can render the error inline next to the sign-in   form. No session cookie is issued. - **JSON-leg failure** — when `Accept` includes   `application/json` or `application/problem+json`, the server   returns the original status (`400`, `500`, or `502`) with an   `application/problem+json` body conforming to RFC 7807.
+		Receives the OIDC redirect after the end user completes sign-in at the IdP. Validates `state` and `nonce`, exchanges the authorization code for tokens, provisions/updates the user via the JIT policy, issues a plexsphere session cookie, and 303 See Other-redirects the browser to the application root (`/`). The endpoint is invoked exclusively via top-level browser navigation per RFC 6749 §4.1.2; clients that need a machine-readable session shape should call `GET /v1/auth/whoami` once the session cookie is set .  Failure responses are content-negotiated via the `Accept` request header:  - **Browser-leg failure** — when `Accept` is absent, `*_/_*`, or   includes `text/html`, the server responds with `303 See   Other` to `/?auth_error_kind=...&auth_error_status=...&auth_error_detail=...`   so the browser client can render the error inline next to the sign-in   form. No session cookie is issued. - **JSON-leg failure** — when `Accept` includes   `application/json` or `application/problem+json`, the server   returns the original status (`400`, `500`, or `502`) with an   `application/problem+json` body conforming to RFC 7807.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiGetAuthCallbackRequest
@@ -60,6 +60,20 @@ type AuthAPI interface {
 
 	// GetAuthCallbackExecute executes the request
 	GetAuthCallbackExecute(r ApiGetAuthCallbackRequest) (*http.Response, error)
+
+	/*
+		GetAuthIdPBindings List a Domain's effective IdP bindings for the sign-in chooser.
+
+		Unauthenticated, display-safe discovery surface the dashboard sign-in page calls once a Domain id is known (typed or supplied via a deep link) so it can render a provider chooser. Returns only the active bindings the Domain can sign in with — its own active bindings, falling back to the platform-scoped shared bindings when the Domain owns none — projected to non-secret fields and ordered primary-first.  The endpoint is intentionally a pre-auth enumeration surface and does not behave as a Domain-existence oracle: a Domain that does not exist returns the same shape (the applicable platform bindings, or an empty list) as a Domain that exists but owns no bindings, so an unauthenticated caller cannot distinguish the two. Responses are marked `Cache-Control: no-store`.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return ApiGetAuthIdPBindingsRequest
+	*/
+	GetAuthIdPBindings(ctx context.Context) ApiGetAuthIdPBindingsRequest
+
+	// GetAuthIdPBindingsExecute executes the request
+	//  @return []DomainIdPBinding
+	GetAuthIdPBindingsExecute(r ApiGetAuthIdPBindingsRequest) ([]DomainIdPBinding, *http.Response, error)
 
 	/*
 		GetAuthTokens List the caller's API tokens (no plaintext).
@@ -443,7 +457,7 @@ func (r ApiGetAuthCallbackRequest) Execute() (*http.Response, error) {
 /*
 GetAuthCallback OIDC redirect callback — exchanges `code` for a session.
 
-Receives the OIDC redirect after the end user completes sign-in at the IdP. Validates `state` and `nonce`, exchanges the authorization code for tokens, provisions/updates the user via the JIT policy, issues a plexsphere session cookie, and 303 See Other-redirects the browser to the SPA root (`/`). The endpoint is invoked exclusively via top-level browser navigation per RFC 6749 §4.1.2; clients that need a machine-readable session shape should call `GET /v1/auth/whoami` once the session cookie is set .  Failure responses are content-negotiated via the `Accept` request header:  - **Browser-leg failure** — when `Accept` is absent, `*_/_*`, or   includes `text/html`, the server responds with `303 See   Other` to `/?auth_error_kind=...&auth_error_status=...&auth_error_detail=...`   so the SPA can render the error inline next to the sign-in   form. No session cookie is issued. - **JSON-leg failure** — when `Accept` includes   `application/json` or `application/problem+json`, the server   returns the original status (`400`, `500`, or `502`) with an   `application/problem+json` body conforming to RFC 7807.
+Receives the OIDC redirect after the end user completes sign-in at the IdP. Validates `state` and `nonce`, exchanges the authorization code for tokens, provisions/updates the user via the JIT policy, issues a plexsphere session cookie, and 303 See Other-redirects the browser to the application root (`/`). The endpoint is invoked exclusively via top-level browser navigation per RFC 6749 §4.1.2; clients that need a machine-readable session shape should call `GET /v1/auth/whoami` once the session cookie is set .  Failure responses are content-negotiated via the `Accept` request header:  - **Browser-leg failure** — when `Accept` is absent, `*_/_*`, or   includes `text/html`, the server responds with `303 See   Other` to `/?auth_error_kind=...&auth_error_status=...&auth_error_detail=...`   so the browser client can render the error inline next to the sign-in   form. No session cookie is issued. - **JSON-leg failure** — when `Accept` includes   `application/json` or `application/problem+json`, the server   returns the original status (`400`, `500`, or `502`) with an   `application/problem+json` body conforming to RFC 7807.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiGetAuthCallbackRequest
@@ -557,6 +571,138 @@ func (a *AuthAPIService) GetAuthCallbackExecute(r ApiGetAuthCallbackRequest) (*h
 	}
 
 	return localVarHTTPResponse, nil
+}
+
+type ApiGetAuthIdPBindingsRequest struct {
+	ctx        context.Context
+	ApiService AuthAPI
+	domainId   *string
+}
+
+// Domain whose effective IdP bindings to list.
+func (r ApiGetAuthIdPBindingsRequest) DomainId(domainId string) ApiGetAuthIdPBindingsRequest {
+	r.domainId = &domainId
+	return r
+}
+
+func (r ApiGetAuthIdPBindingsRequest) Execute() ([]DomainIdPBinding, *http.Response, error) {
+	return r.ApiService.GetAuthIdPBindingsExecute(r)
+}
+
+/*
+GetAuthIdPBindings List a Domain's effective IdP bindings for the sign-in chooser.
+
+Unauthenticated, display-safe discovery surface the dashboard sign-in page calls once a Domain id is known (typed or supplied via a deep link) so it can render a provider chooser. Returns only the active bindings the Domain can sign in with — its own active bindings, falling back to the platform-scoped shared bindings when the Domain owns none — projected to non-secret fields and ordered primary-first.  The endpoint is intentionally a pre-auth enumeration surface and does not behave as a Domain-existence oracle: a Domain that does not exist returns the same shape (the applicable platform bindings, or an empty list) as a Domain that exists but owns no bindings, so an unauthenticated caller cannot distinguish the two. Responses are marked `Cache-Control: no-store`.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiGetAuthIdPBindingsRequest
+*/
+func (a *AuthAPIService) GetAuthIdPBindings(ctx context.Context) ApiGetAuthIdPBindingsRequest {
+	return ApiGetAuthIdPBindingsRequest{
+		ApiService: a,
+		ctx:        ctx,
+	}
+}
+
+// Execute executes the request
+//
+//	@return []DomainIdPBinding
+func (a *AuthAPIService) GetAuthIdPBindingsExecute(r ApiGetAuthIdPBindingsRequest) ([]DomainIdPBinding, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue []DomainIdPBinding
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthAPIService.GetAuthIdPBindings")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/auth/idp-bindings"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.domainId == nil {
+		return localVarReturnValue, nil, reportError("domainId is required and must be specified")
+	}
+
+	parameterAddToHeaderOrQuery(localVarQueryParams, "domain_id", r.domainId, "form", "")
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
 type ApiGetAuthTokensRequest struct {

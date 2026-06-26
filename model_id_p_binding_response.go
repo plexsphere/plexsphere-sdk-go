@@ -23,8 +23,8 @@ var _ MappedNullable = &IdPBindingResponse{}
 type IdPBindingResponse struct {
 	// Binding identifier (UUIDv7).
 	Id string `json:"id"`
-	// Owning Domain.
-	DomainId string `json:"domain_id"`
+	// Owning Domain, or null for a platform-scoped (shared) binding usable by any Domain.
+	DomainId *string `json:"domain_id,omitempty"`
 	// OIDC issuer URL.
 	Issuer string `json:"issuer"`
 	// OIDC client identifier.
@@ -34,13 +34,17 @@ type IdPBindingResponse struct {
 	// OIDC discovery document URL.
 	DiscoveryUrl string `json:"discovery_url"`
 	// Plexsphere claim → IdP claim mapping.
-	ClaimMappings        map[string]string           `json:"claim_mappings,omitempty"`
-	RequiredAcr          []string                    `json:"required_acr,omitempty"`
-	RequiredAmr          []string                    `json:"required_amr,omitempty"`
-	JitPolicy            IdPBindingResponseJitPolicy `json:"jit_policy"`
-	Status               IdPBindingResponseStatus    `json:"status"`
-	CreatedAt            time.Time                   `json:"created_at"`
-	UpdatedAt            time.Time                   `json:"updated_at"`
+	ClaimMappings map[string]string           `json:"claim_mappings,omitempty"`
+	RequiredAcr   []string                    `json:"required_acr,omitempty"`
+	RequiredAmr   []string                    `json:"required_amr,omitempty"`
+	JitPolicy     IdPBindingResponseJitPolicy `json:"jit_policy"`
+	Status        IdPBindingResponseStatus    `json:"status"`
+	// Human-friendly handle, unique per Domain among active bindings. Absent when the binding has no alias.
+	Alias *string `json:"alias,omitempty"`
+	// Whether this binding is the Domain default a Domain-only login resolves to.
+	Primary              bool      `json:"primary"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -50,16 +54,16 @@ type _IdPBindingResponse IdPBindingResponse
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewIdPBindingResponse(id string, domainId string, issuer string, clientId string, clientSecretRef string, discoveryUrl string, jitPolicy IdPBindingResponseJitPolicy, status IdPBindingResponseStatus, createdAt time.Time, updatedAt time.Time) *IdPBindingResponse {
+func NewIdPBindingResponse(id string, issuer string, clientId string, clientSecretRef string, discoveryUrl string, jitPolicy IdPBindingResponseJitPolicy, status IdPBindingResponseStatus, primary bool, createdAt time.Time, updatedAt time.Time) *IdPBindingResponse {
 	this := IdPBindingResponse{}
 	this.Id = id
-	this.DomainId = domainId
 	this.Issuer = issuer
 	this.ClientId = clientId
 	this.ClientSecretRef = clientSecretRef
 	this.DiscoveryUrl = discoveryUrl
 	this.JitPolicy = jitPolicy
 	this.Status = status
+	this.Primary = primary
 	this.CreatedAt = createdAt
 	this.UpdatedAt = updatedAt
 	return &this
@@ -97,28 +101,36 @@ func (o *IdPBindingResponse) SetId(v string) {
 	o.Id = v
 }
 
-// GetDomainId returns the DomainId field value
+// GetDomainId returns the DomainId field value if set, zero value otherwise.
 func (o *IdPBindingResponse) GetDomainId() string {
-	if o == nil {
+	if o == nil || IsNil(o.DomainId) {
 		var ret string
 		return ret
 	}
-
-	return o.DomainId
+	return *o.DomainId
 }
 
-// GetDomainIdOk returns a tuple with the DomainId field value
+// GetDomainIdOk returns a tuple with the DomainId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
 func (o *IdPBindingResponse) GetDomainIdOk() (*string, bool) {
-	if o == nil {
+	if o == nil || IsNil(o.DomainId) {
 		return nil, false
 	}
-	return &o.DomainId, true
+	return o.DomainId, true
 }
 
-// SetDomainId sets field value
+// HasDomainId returns a boolean if a field has been set.
+func (o *IdPBindingResponse) HasDomainId() bool {
+	if o != nil && !IsNil(o.DomainId) {
+		return true
+	}
+
+	return false
+}
+
+// SetDomainId gets a reference to the given string and assigns it to the DomainId field.
 func (o *IdPBindingResponse) SetDomainId(v string) {
-	o.DomainId = v
+	o.DomainId = &v
 }
 
 // GetIssuer returns the Issuer field value
@@ -361,6 +373,62 @@ func (o *IdPBindingResponse) SetStatus(v IdPBindingResponseStatus) {
 	o.Status = v
 }
 
+// GetAlias returns the Alias field value if set, zero value otherwise.
+func (o *IdPBindingResponse) GetAlias() string {
+	if o == nil || IsNil(o.Alias) {
+		var ret string
+		return ret
+	}
+	return *o.Alias
+}
+
+// GetAliasOk returns a tuple with the Alias field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *IdPBindingResponse) GetAliasOk() (*string, bool) {
+	if o == nil || IsNil(o.Alias) {
+		return nil, false
+	}
+	return o.Alias, true
+}
+
+// HasAlias returns a boolean if a field has been set.
+func (o *IdPBindingResponse) HasAlias() bool {
+	if o != nil && !IsNil(o.Alias) {
+		return true
+	}
+
+	return false
+}
+
+// SetAlias gets a reference to the given string and assigns it to the Alias field.
+func (o *IdPBindingResponse) SetAlias(v string) {
+	o.Alias = &v
+}
+
+// GetPrimary returns the Primary field value
+func (o *IdPBindingResponse) GetPrimary() bool {
+	if o == nil {
+		var ret bool
+		return ret
+	}
+
+	return o.Primary
+}
+
+// GetPrimaryOk returns a tuple with the Primary field value
+// and a boolean to check if the value has been set.
+func (o *IdPBindingResponse) GetPrimaryOk() (*bool, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.Primary, true
+}
+
+// SetPrimary sets field value
+func (o *IdPBindingResponse) SetPrimary(v bool) {
+	o.Primary = v
+}
+
 // GetCreatedAt returns the CreatedAt field value
 func (o *IdPBindingResponse) GetCreatedAt() time.Time {
 	if o == nil {
@@ -420,7 +488,9 @@ func (o IdPBindingResponse) MarshalJSON() ([]byte, error) {
 func (o IdPBindingResponse) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["id"] = o.Id
-	toSerialize["domain_id"] = o.DomainId
+	if !IsNil(o.DomainId) {
+		toSerialize["domain_id"] = o.DomainId
+	}
 	toSerialize["issuer"] = o.Issuer
 	toSerialize["client_id"] = o.ClientId
 	toSerialize["client_secret_ref"] = o.ClientSecretRef
@@ -436,6 +506,10 @@ func (o IdPBindingResponse) ToMap() (map[string]interface{}, error) {
 	}
 	toSerialize["jit_policy"] = o.JitPolicy
 	toSerialize["status"] = o.Status
+	if !IsNil(o.Alias) {
+		toSerialize["alias"] = o.Alias
+	}
+	toSerialize["primary"] = o.Primary
 	toSerialize["created_at"] = o.CreatedAt
 	toSerialize["updated_at"] = o.UpdatedAt
 
@@ -452,13 +526,13 @@ func (o *IdPBindingResponse) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"id",
-		"domain_id",
 		"issuer",
 		"client_id",
 		"client_secret_ref",
 		"discovery_url",
 		"jit_policy",
 		"status",
+		"primary",
 		"created_at",
 		"updated_at",
 	}
@@ -501,6 +575,8 @@ func (o *IdPBindingResponse) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "required_amr")
 		delete(additionalProperties, "jit_policy")
 		delete(additionalProperties, "status")
+		delete(additionalProperties, "alias")
+		delete(additionalProperties, "primary")
 		delete(additionalProperties, "created_at")
 		delete(additionalProperties, "updated_at")
 		o.AdditionalProperties = additionalProperties

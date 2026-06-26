@@ -48,4 +48,30 @@ func Test_plexsphere_BlueprintAPIService(t *testing.T) {
 
 	})
 
+	t.Run("Test BlueprintAPIService PublishBlueprintVersion", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var id string
+
+		resp, httpRes, err := apiClient.BlueprintAPI.PublishBlueprintVersion(context.Background(), id).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
+	t.Run("Test BlueprintAPIService RegisterBlueprint", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		resp, httpRes, err := apiClient.BlueprintAPI.RegisterBlueprint(context.Background()).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
 }

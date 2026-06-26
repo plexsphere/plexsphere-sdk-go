@@ -5,7 +5,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Id** | **string** | Binding identifier (UUIDv7). | 
-**DomainId** | **string** | Owning Domain. | 
+**DomainId** | Pointer to **string** | Owning Domain, or null for a platform-scoped (shared) binding usable by any Domain.  | [optional] 
 **Issuer** | **string** | OIDC issuer URL. | 
 **ClientId** | **string** | OIDC client identifier. | 
 **ClientSecretRef** | **string** | Opaque reference to the client secret. | 
@@ -15,6 +15,8 @@ Name | Type | Description | Notes
 **RequiredAmr** | Pointer to **[]string** |  | [optional] 
 **JitPolicy** | [**IdPBindingResponseJitPolicy**](IdPBindingResponseJitPolicy.md) |  | 
 **Status** | [**IdPBindingResponseStatus**](IdPBindingResponseStatus.md) |  | 
+**Alias** | Pointer to **string** | Human-friendly handle, unique per Domain among active bindings. Absent when the binding has no alias.  | [optional] 
+**Primary** | **bool** | Whether this binding is the Domain default a Domain-only login resolves to.  | 
 **CreatedAt** | **time.Time** |  | 
 **UpdatedAt** | **time.Time** |  | 
 
@@ -22,7 +24,7 @@ Name | Type | Description | Notes
 
 ### NewIdPBindingResponse
 
-`func NewIdPBindingResponse(id string, domainId string, issuer string, clientId string, clientSecretRef string, discoveryUrl string, jitPolicy IdPBindingResponseJitPolicy, status IdPBindingResponseStatus, createdAt time.Time, updatedAt time.Time, ) *IdPBindingResponse`
+`func NewIdPBindingResponse(id string, issuer string, clientId string, clientSecretRef string, discoveryUrl string, jitPolicy IdPBindingResponseJitPolicy, status IdPBindingResponseStatus, primary bool, createdAt time.Time, updatedAt time.Time, ) *IdPBindingResponse`
 
 NewIdPBindingResponse instantiates a new IdPBindingResponse object
 This constructor will assign default values to properties that have it defined,
@@ -76,6 +78,11 @@ and a boolean to check if the value has been set.
 
 SetDomainId sets DomainId field to given value.
 
+### HasDomainId
+
+`func (o *IdPBindingResponse) HasDomainId() bool`
+
+HasDomainId returns a boolean if a field has been set.
 
 ### GetIssuer
 
@@ -270,6 +277,51 @@ and a boolean to check if the value has been set.
 `func (o *IdPBindingResponse) SetStatus(v IdPBindingResponseStatus)`
 
 SetStatus sets Status field to given value.
+
+
+### GetAlias
+
+`func (o *IdPBindingResponse) GetAlias() string`
+
+GetAlias returns the Alias field if non-nil, zero value otherwise.
+
+### GetAliasOk
+
+`func (o *IdPBindingResponse) GetAliasOk() (*string, bool)`
+
+GetAliasOk returns a tuple with the Alias field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetAlias
+
+`func (o *IdPBindingResponse) SetAlias(v string)`
+
+SetAlias sets Alias field to given value.
+
+### HasAlias
+
+`func (o *IdPBindingResponse) HasAlias() bool`
+
+HasAlias returns a boolean if a field has been set.
+
+### GetPrimary
+
+`func (o *IdPBindingResponse) GetPrimary() bool`
+
+GetPrimary returns the Primary field if non-nil, zero value otherwise.
+
+### GetPrimaryOk
+
+`func (o *IdPBindingResponse) GetPrimaryOk() (*bool, bool)`
+
+GetPrimaryOk returns a tuple with the Primary field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetPrimary
+
+`func (o *IdPBindingResponse) SetPrimary(v bool)`
+
+SetPrimary sets Primary field to given value.
 
 
 ### GetCreatedAt

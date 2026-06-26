@@ -89,6 +89,20 @@ func Test_plexsphere_CloudAPIService(t *testing.T) {
 
 	})
 
+	t.Run("Test CloudAPIService IssueCloudCredential", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var id string
+
+		resp, httpRes, err := apiClient.CloudAPI.IssueCloudCredential(context.Background(), id).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
 	t.Run("Test CloudAPIService ListCloudCredentials", func(t *testing.T) {
 
 		t.Skip("skip test") // remove to run test

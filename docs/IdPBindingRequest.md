@@ -13,6 +13,8 @@ Name | Type | Description | Notes
 **RequiredAcr** | Pointer to **[]string** | Required OIDC ACR values. | [optional] 
 **RequiredAmr** | Pointer to **[]string** | Required OIDC AMR values. | [optional] 
 **JitPolicy** | [**IdPBindingRequestJitPolicy**](IdPBindingRequestJitPolicy.md) |  | 
+**Alias** | Pointer to **string** | Optional human-friendly handle for the binding, unique per Domain among active bindings (e.g. &#x60;github&#x60;). Normalised to lowercase kebab-case, so an operator may submit mixed case.  | [optional] 
+**Primary** | Pointer to **bool** | Mark this binding as the Domain default a Domain-only login resolves to. At most one active primary per Domain; a second primary is rejected with 409 primary-conflict.  | [optional] 
 
 ## Methods
 
@@ -227,6 +229,56 @@ and a boolean to check if the value has been set.
 
 SetJitPolicy sets JitPolicy field to given value.
 
+
+### GetAlias
+
+`func (o *IdPBindingRequest) GetAlias() string`
+
+GetAlias returns the Alias field if non-nil, zero value otherwise.
+
+### GetAliasOk
+
+`func (o *IdPBindingRequest) GetAliasOk() (*string, bool)`
+
+GetAliasOk returns a tuple with the Alias field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetAlias
+
+`func (o *IdPBindingRequest) SetAlias(v string)`
+
+SetAlias sets Alias field to given value.
+
+### HasAlias
+
+`func (o *IdPBindingRequest) HasAlias() bool`
+
+HasAlias returns a boolean if a field has been set.
+
+### GetPrimary
+
+`func (o *IdPBindingRequest) GetPrimary() bool`
+
+GetPrimary returns the Primary field if non-nil, zero value otherwise.
+
+### GetPrimaryOk
+
+`func (o *IdPBindingRequest) GetPrimaryOk() (*bool, bool)`
+
+GetPrimaryOk returns a tuple with the Primary field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetPrimary
+
+`func (o *IdPBindingRequest) SetPrimary(v bool)`
+
+SetPrimary sets Primary field to given value.
+
+### HasPrimary
+
+`func (o *IdPBindingRequest) HasPrimary() bool`
+
+HasPrimary returns a boolean if a field has been set.
 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
