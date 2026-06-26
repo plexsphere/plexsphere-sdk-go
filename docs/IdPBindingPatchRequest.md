@@ -9,6 +9,8 @@ Name | Type | Description | Notes
 **RequiredAcr** | Pointer to **[]string** | Required OIDC ACR values. | [optional] 
 **RequiredAmr** | Pointer to **[]string** | Required OIDC AMR values. | [optional] 
 **JitPolicy** | Pointer to [**IdPBindingRequestJitPolicy**](IdPBindingRequestJitPolicy.md) |  | [optional] 
+**Alias** | Pointer to **string** | Set or clear the binding alias. An empty string clears the alias; a non-empty value is normalised to lowercase kebab-case. The alias is unique per Domain among active bindings; a collision is rejected with 409 alias-conflict.  | [optional] 
+**Primary** | Pointer to **bool** | Promote (true) or demote (false) the binding as the Domain default. Promoting a second binding while another is primary returns 409 primary-conflict; demote the current primary first.  | [optional] 
 
 ## Methods
 
@@ -153,6 +155,56 @@ SetJitPolicy sets JitPolicy field to given value.
 `func (o *IdPBindingPatchRequest) HasJitPolicy() bool`
 
 HasJitPolicy returns a boolean if a field has been set.
+
+### GetAlias
+
+`func (o *IdPBindingPatchRequest) GetAlias() string`
+
+GetAlias returns the Alias field if non-nil, zero value otherwise.
+
+### GetAliasOk
+
+`func (o *IdPBindingPatchRequest) GetAliasOk() (*string, bool)`
+
+GetAliasOk returns a tuple with the Alias field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetAlias
+
+`func (o *IdPBindingPatchRequest) SetAlias(v string)`
+
+SetAlias sets Alias field to given value.
+
+### HasAlias
+
+`func (o *IdPBindingPatchRequest) HasAlias() bool`
+
+HasAlias returns a boolean if a field has been set.
+
+### GetPrimary
+
+`func (o *IdPBindingPatchRequest) GetPrimary() bool`
+
+GetPrimary returns the Primary field if non-nil, zero value otherwise.
+
+### GetPrimaryOk
+
+`func (o *IdPBindingPatchRequest) GetPrimaryOk() (*bool, bool)`
+
+GetPrimaryOk returns a tuple with the Primary field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetPrimary
+
+`func (o *IdPBindingPatchRequest) SetPrimary(v bool)`
+
+SetPrimary sets Primary field to given value.
+
+### HasPrimary
+
+`func (o *IdPBindingPatchRequest) HasPrimary() bool`
+
+HasPrimary returns a boolean if a field has been set.
 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

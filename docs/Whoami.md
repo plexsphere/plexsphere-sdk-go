@@ -7,7 +7,7 @@ Name | Type | Description | Notes
 **PrincipalType** | [**WhoamiPrincipalType**](WhoamiPrincipalType.md) |  | 
 **Subject** | **string** | Principal identifier (UUIDv7 serialised as a string). | 
 **DomainId** | Pointer to **string** | Domain the principal belongs to. | [optional] 
-**Email** | Pointer to **string** | Primary email of the principal as projected by the upstream IdP at sign-in. Omitted when the IdP did not supply an &#x60;email&#x60; claim or the principal is a ServiceIdentity. The dashboard&#39;s SignedInBadge renders it as the human-readable identity label.  | [optional] 
+**Email** | Pointer to **string** | Primary email of the principal as projected by the upstream IdP at sign-in. Omitted when the IdP did not supply an &#x60;email&#x60; claim or the principal is a ServiceIdentity. A browser client renders it as the human-readable identity label.  | [optional] 
 **Acr** | Pointer to **string** | Authentication Context Class Reference, if available. | [optional] 
 **Amr** | Pointer to **[]string** | Authentication Methods References (e.g. \&quot;pwd\&quot;, \&quot;mfa\&quot;). | [optional] 
 

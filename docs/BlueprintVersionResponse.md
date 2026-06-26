@@ -4,6 +4,7 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
+**Id** | **string** | Surrogate identifier of this immutable version (UUIDv7) — the handle a Resource references as &#x60;blueprint_version_id&#x60; when it is provisioned. The version is keyed for humans by its &#x60;version&#x60; string within the parent Blueprint; this id is the stable machine handle &#x60;resource create&#x60; consumes.  | 
 **Version** | **string** | Version identifier, unique within the parent Blueprint. | 
 **ProviderKinds** | [**[]BlueprintVersionResponseProviderKindsInner**](BlueprintVersionResponseProviderKindsInner.md) | Closed-set infrastructure substrates this version can target. Non-empty.  | 
 **InjectionStrategy** | [**BlueprintVersionResponseInjectionStrategy**](BlueprintVersionResponseInjectionStrategy.md) |  | 
@@ -14,7 +15,7 @@ Name | Type | Description | Notes
 
 ### NewBlueprintVersionResponse
 
-`func NewBlueprintVersionResponse(version string, providerKinds []BlueprintVersionResponseProviderKindsInner, injectionStrategy BlueprintVersionResponseInjectionStrategy, parameterSchema []BlueprintParameter, createdAt time.Time, ) *BlueprintVersionResponse`
+`func NewBlueprintVersionResponse(id string, version string, providerKinds []BlueprintVersionResponseProviderKindsInner, injectionStrategy BlueprintVersionResponseInjectionStrategy, parameterSchema []BlueprintParameter, createdAt time.Time, ) *BlueprintVersionResponse`
 
 NewBlueprintVersionResponse instantiates a new BlueprintVersionResponse object
 This constructor will assign default values to properties that have it defined,
@@ -28,6 +29,26 @@ will change when the set of required properties is changed
 NewBlueprintVersionResponseWithDefaults instantiates a new BlueprintVersionResponse object
 This constructor will only assign default values to properties that have it defined,
 but it doesn't guarantee that properties required by API are set
+
+### GetId
+
+`func (o *BlueprintVersionResponse) GetId() string`
+
+GetId returns the Id field if non-nil, zero value otherwise.
+
+### GetIdOk
+
+`func (o *BlueprintVersionResponse) GetIdOk() (*string, bool)`
+
+GetIdOk returns a tuple with the Id field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetId
+
+`func (o *BlueprintVersionResponse) SetId(v string)`
+
+SetId sets Id field to given value.
+
 
 ### GetVersion
 

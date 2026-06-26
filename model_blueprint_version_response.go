@@ -21,6 +21,8 @@ var _ MappedNullable = &BlueprintVersionResponse{}
 
 // BlueprintVersionResponse A single version of a Blueprint. A version is keyed by its parent Blueprint and its `version` string and carries the typed `parameter_schema` an operator fills in when provisioning a Resource. The Crossplane XRD and Composition manifests are storage-internal and are deliberately not exposed on this read surface.
 type BlueprintVersionResponse struct {
+	// Surrogate identifier of this immutable version (UUIDv7) — the handle a Resource references as `blueprint_version_id` when it is provisioned. The version is keyed for humans by its `version` string within the parent Blueprint; this id is the stable machine handle `resource create` consumes.
+	Id string `json:"id"`
 	// Version identifier, unique within the parent Blueprint.
 	Version string `json:"version"`
 	// Closed-set infrastructure substrates this version can target. Non-empty.
@@ -39,8 +41,9 @@ type _BlueprintVersionResponse BlueprintVersionResponse
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewBlueprintVersionResponse(version string, providerKinds []BlueprintVersionResponseProviderKindsInner, injectionStrategy BlueprintVersionResponseInjectionStrategy, parameterSchema []BlueprintParameter, createdAt time.Time) *BlueprintVersionResponse {
+func NewBlueprintVersionResponse(id string, version string, providerKinds []BlueprintVersionResponseProviderKindsInner, injectionStrategy BlueprintVersionResponseInjectionStrategy, parameterSchema []BlueprintParameter, createdAt time.Time) *BlueprintVersionResponse {
 	this := BlueprintVersionResponse{}
+	this.Id = id
 	this.Version = version
 	this.ProviderKinds = providerKinds
 	this.InjectionStrategy = injectionStrategy
@@ -55,6 +58,30 @@ func NewBlueprintVersionResponse(version string, providerKinds []BlueprintVersio
 func NewBlueprintVersionResponseWithDefaults() *BlueprintVersionResponse {
 	this := BlueprintVersionResponse{}
 	return &this
+}
+
+// GetId returns the Id field value
+func (o *BlueprintVersionResponse) GetId() string {
+	if o == nil {
+		var ret string
+		return ret
+	}
+
+	return o.Id
+}
+
+// GetIdOk returns a tuple with the Id field value
+// and a boolean to check if the value has been set.
+func (o *BlueprintVersionResponse) GetIdOk() (*string, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.Id, true
+}
+
+// SetId sets field value
+func (o *BlueprintVersionResponse) SetId(v string) {
+	o.Id = v
 }
 
 // GetVersion returns the Version field value
@@ -187,6 +214,7 @@ func (o BlueprintVersionResponse) MarshalJSON() ([]byte, error) {
 
 func (o BlueprintVersionResponse) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	toSerialize["id"] = o.Id
 	toSerialize["version"] = o.Version
 	toSerialize["provider_kinds"] = o.ProviderKinds
 	toSerialize["injection_strategy"] = o.InjectionStrategy
@@ -205,6 +233,7 @@ func (o *BlueprintVersionResponse) UnmarshalJSON(data []byte) (err error) {
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
+		"id",
 		"version",
 		"provider_kinds",
 		"injection_strategy",
@@ -239,6 +268,7 @@ func (o *BlueprintVersionResponse) UnmarshalJSON(data []byte) (err error) {
 	additionalProperties := make(map[string]interface{})
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "id")
 		delete(additionalProperties, "version")
 		delete(additionalProperties, "provider_kinds")
 		delete(additionalProperties, "injection_strategy")

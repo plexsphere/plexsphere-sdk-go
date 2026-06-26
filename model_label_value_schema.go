@@ -18,7 +18,7 @@ import (
 // checks if the LabelValueSchema type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &LabelValueSchema{}
 
-// LabelValueSchema Polymorphic descriptor of a Label Definition's value contract. Callers must set `kind` to one of the five supported values; the sibling fields that accompany each kind are optional on the wire but enforced by the aggregate:   * `string` — optional `max_len` (default 256 bytes).   * `enum` — required `values` (non-empty, unique,     non-blank).   * `numeric` — optional `min` / `max` (int64).   * `boolean` — no extra fields.   * `regex` — required `pattern` (Go regexp). The `kind` property doubles as the OpenAPI discriminator so the generated TypeScript client can fan out into per-kind narrowing.
+// LabelValueSchema Polymorphic descriptor of a Label Definition's value contract. Callers must set `kind` to one of the five supported values; the sibling fields that accompany each kind are optional on the wire but enforced by the aggregate:   * `string` — optional `max_len` (default 256 bytes).   * `enum` — required `values` (non-empty, unique,     non-blank).   * `numeric` — optional `min` / `max` (int64).   * `boolean` — no extra fields.   * `regex` — required `pattern` (Go regexp). The `kind` property doubles as the OpenAPI discriminator so a generated client can fan out into per-kind narrowing.
 type LabelValueSchema struct {
 	Kind ValueSchemaKind `json:"kind"`
 	// Maximum byte length for `kind=string` (default 256 when omitted; 0 is equivalent to the default).

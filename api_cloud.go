@@ -95,6 +95,21 @@ type CloudAPI interface {
 	GetCloudCredentialExecute(r ApiGetCloudCredentialRequest) (*CloudCredentialResponse, *http.Response, error)
 
 	/*
+		IssueCloudCredential Issue a new Cloud Credential under a Cloud.
+
+		Issues a new Cloud Credential owned by the Cloud identified by `{id}`. The handler runs a `manage` ReBAC check on the parent Cloud BEFORE decoding the request body, then delegates to the Cloud Credentials Custodian which writes the secret material to OpenBao KV-v2, persists the broker row, and appends a `CloudCredentialIssued` outbox event in a single transaction.  The response carries the metadata-only projection of the freshly issued credential — the same shape the read and revoke surfaces return. It NEVER echoes the payload, key-values, KV mount, KV path, or KV version: the request material is accepted inbound only and the storage location stays storage-internal.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param id Cloud identifier (UUIDv7). Bound on `/v1/clouds/{id}` for the Cloud Inventory CRUD surface.
+		@return ApiIssueCloudCredentialRequest
+	*/
+	IssueCloudCredential(ctx context.Context, id string) ApiIssueCloudCredentialRequest
+
+	// IssueCloudCredentialExecute executes the request
+	//  @return CloudCredentialResponse
+	IssueCloudCredentialExecute(r ApiIssueCloudCredentialRequest) (*CloudCredentialResponse, *http.Response, error)
+
+	/*
 		ListCloudCredentials List Cloud Credentials owned by a Cloud.
 
 		Returns a creation-ordered page of Cloud Credential lifecycle metadata for the Cloud identified by `{id}`. The handler runs a top-level `observe` ReBAC check on the parent Cloud BEFORE the persistence read, then layers a per-row `observe` filter on top so the response items are the subset of the persistence-level page the caller is authorised to see.  The projection is metadata-only: it carries the credential identity, version, lifecycle timestamps, and a derived status. It NEVER exposes the KV mount, KV path, KV version, or any secret material — the storage location is deliberately omitted as a storage-internal detail.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
@@ -978,6 +993,175 @@ func (a *CloudAPIService) GetCloudCredentialExecute(r ApiGetCloudCredentialReque
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiIssueCloudCredentialRequest struct {
+	ctx                         context.Context
+	ApiService                  CloudAPI
+	id                          string
+	cloudCredentialIssueRequest *CloudCredentialIssueRequest
+}
+
+func (r ApiIssueCloudCredentialRequest) CloudCredentialIssueRequest(cloudCredentialIssueRequest CloudCredentialIssueRequest) ApiIssueCloudCredentialRequest {
+	r.cloudCredentialIssueRequest = &cloudCredentialIssueRequest
+	return r
+}
+
+func (r ApiIssueCloudCredentialRequest) Execute() (*CloudCredentialResponse, *http.Response, error) {
+	return r.ApiService.IssueCloudCredentialExecute(r)
+}
+
+/*
+IssueCloudCredential Issue a new Cloud Credential under a Cloud.
+
+Issues a new Cloud Credential owned by the Cloud identified by `{id}`. The handler runs a `manage` ReBAC check on the parent Cloud BEFORE decoding the request body, then delegates to the Cloud Credentials Custodian which writes the secret material to OpenBao KV-v2, persists the broker row, and appends a `CloudCredentialIssued` outbox event in a single transaction.  The response carries the metadata-only projection of the freshly issued credential — the same shape the read and revoke surfaces return. It NEVER echoes the payload, key-values, KV mount, KV path, or KV version: the request material is accepted inbound only and the storage location stays storage-internal.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id Cloud identifier (UUIDv7). Bound on `/v1/clouds/{id}` for the Cloud Inventory CRUD surface.
+	@return ApiIssueCloudCredentialRequest
+*/
+func (a *CloudAPIService) IssueCloudCredential(ctx context.Context, id string) ApiIssueCloudCredentialRequest {
+	return ApiIssueCloudCredentialRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return CloudCredentialResponse
+func (a *CloudAPIService) IssueCloudCredentialExecute(r ApiIssueCloudCredentialRequest) (*CloudCredentialResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *CloudCredentialResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CloudAPIService.IssueCloudCredential")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/clouds/{id}/cloud-credentials"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.cloudCredentialIssueRequest == nil {
+		return localVarReturnValue, nil, reportError("cloudCredentialIssueRequest is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.cloudCredentialIssueRequest
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 413 {
 			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {

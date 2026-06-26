@@ -18,12 +18,14 @@ import (
 // checks if the DeviceCodeRequest type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &DeviceCodeRequest{}
 
-// DeviceCodeRequest Body for POST /v1/auth/device-code — initiates RFC 8628 device authorization against the resolved IdP binding.
+// DeviceCodeRequest Body for POST /v1/auth/device-code — initiates RFC 8628 device authorization against the resolved IdP binding. Only `domain_id` is required; the router resolves the binding from the Domain when `idp_binding_id` is omitted.
 type DeviceCodeRequest struct {
 	// Domain the caller is authenticating against.
 	DomainId string `json:"domain_id"`
-	// IdP binding within the Domain.
-	IdpBindingId string `json:"idp_binding_id"`
+	// Explicit IdP binding within the Domain. Optional: when omitted, the binding is resolved by alias, then the Domain's primary binding, then its single active binding. A Domain with two or more active bindings and no primary requires this field (or idp_binding_alias) to disambiguate.
+	IdpBindingId *string `json:"idp_binding_id,omitempty"`
+	// Human-friendly alias of an IdP binding within the Domain (e.g. `github`). Optional. Resolution precedence is explicit id, then alias, then the Domain's primary binding, then its single active binding. Mutually exclusive with idp_binding_id.
+	IdpBindingAlias *string `json:"idp_binding_alias,omitempty"`
 	// Optional OIDC client identifier override.
 	ClientId             *string `json:"client_id,omitempty"`
 	AdditionalProperties map[string]interface{}
@@ -35,10 +37,9 @@ type _DeviceCodeRequest DeviceCodeRequest
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewDeviceCodeRequest(domainId string, idpBindingId string) *DeviceCodeRequest {
+func NewDeviceCodeRequest(domainId string) *DeviceCodeRequest {
 	this := DeviceCodeRequest{}
 	this.DomainId = domainId
-	this.IdpBindingId = idpBindingId
 	return &this
 }
 
@@ -74,28 +75,68 @@ func (o *DeviceCodeRequest) SetDomainId(v string) {
 	o.DomainId = v
 }
 
-// GetIdpBindingId returns the IdpBindingId field value
+// GetIdpBindingId returns the IdpBindingId field value if set, zero value otherwise.
 func (o *DeviceCodeRequest) GetIdpBindingId() string {
-	if o == nil {
+	if o == nil || IsNil(o.IdpBindingId) {
 		var ret string
 		return ret
 	}
-
-	return o.IdpBindingId
+	return *o.IdpBindingId
 }
 
-// GetIdpBindingIdOk returns a tuple with the IdpBindingId field value
+// GetIdpBindingIdOk returns a tuple with the IdpBindingId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
 func (o *DeviceCodeRequest) GetIdpBindingIdOk() (*string, bool) {
-	if o == nil {
+	if o == nil || IsNil(o.IdpBindingId) {
 		return nil, false
 	}
-	return &o.IdpBindingId, true
+	return o.IdpBindingId, true
 }
 
-// SetIdpBindingId sets field value
+// HasIdpBindingId returns a boolean if a field has been set.
+func (o *DeviceCodeRequest) HasIdpBindingId() bool {
+	if o != nil && !IsNil(o.IdpBindingId) {
+		return true
+	}
+
+	return false
+}
+
+// SetIdpBindingId gets a reference to the given string and assigns it to the IdpBindingId field.
 func (o *DeviceCodeRequest) SetIdpBindingId(v string) {
-	o.IdpBindingId = v
+	o.IdpBindingId = &v
+}
+
+// GetIdpBindingAlias returns the IdpBindingAlias field value if set, zero value otherwise.
+func (o *DeviceCodeRequest) GetIdpBindingAlias() string {
+	if o == nil || IsNil(o.IdpBindingAlias) {
+		var ret string
+		return ret
+	}
+	return *o.IdpBindingAlias
+}
+
+// GetIdpBindingAliasOk returns a tuple with the IdpBindingAlias field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *DeviceCodeRequest) GetIdpBindingAliasOk() (*string, bool) {
+	if o == nil || IsNil(o.IdpBindingAlias) {
+		return nil, false
+	}
+	return o.IdpBindingAlias, true
+}
+
+// HasIdpBindingAlias returns a boolean if a field has been set.
+func (o *DeviceCodeRequest) HasIdpBindingAlias() bool {
+	if o != nil && !IsNil(o.IdpBindingAlias) {
+		return true
+	}
+
+	return false
+}
+
+// SetIdpBindingAlias gets a reference to the given string and assigns it to the IdpBindingAlias field.
+func (o *DeviceCodeRequest) SetIdpBindingAlias(v string) {
+	o.IdpBindingAlias = &v
 }
 
 // GetClientId returns the ClientId field value if set, zero value otherwise.
@@ -141,7 +182,12 @@ func (o DeviceCodeRequest) MarshalJSON() ([]byte, error) {
 func (o DeviceCodeRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["domain_id"] = o.DomainId
-	toSerialize["idp_binding_id"] = o.IdpBindingId
+	if !IsNil(o.IdpBindingId) {
+		toSerialize["idp_binding_id"] = o.IdpBindingId
+	}
+	if !IsNil(o.IdpBindingAlias) {
+		toSerialize["idp_binding_alias"] = o.IdpBindingAlias
+	}
 	if !IsNil(o.ClientId) {
 		toSerialize["client_id"] = o.ClientId
 	}
@@ -159,7 +205,6 @@ func (o *DeviceCodeRequest) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"domain_id",
-		"idp_binding_id",
 	}
 
 	allProperties := make(map[string]interface{})
@@ -191,6 +236,7 @@ func (o *DeviceCodeRequest) UnmarshalJSON(data []byte) (err error) {
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "domain_id")
 		delete(additionalProperties, "idp_binding_id")
+		delete(additionalProperties, "idp_binding_alias")
 		delete(additionalProperties, "client_id")
 		o.AdditionalProperties = additionalProperties
 	}

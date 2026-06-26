@@ -7,6 +7,7 @@ Method | HTTP request | Description
 [**DeleteAuthSession**](AuthAPI.md#DeleteAuthSession) | **Delete** /v1/auth/whoami | Sign the current caller out.
 [**DeleteAuthTokenByID**](AuthAPI.md#DeleteAuthTokenByID) | **Delete** /v1/auth/tokens/{id} | Immediately revoke an API token.
 [**GetAuthCallback**](AuthAPI.md#GetAuthCallback) | **Get** /v1/auth/callback | OIDC redirect callback — exchanges &#x60;code&#x60; for a session.
+[**GetAuthIdPBindings**](AuthAPI.md#GetAuthIdPBindings) | **Get** /v1/auth/idp-bindings | List a Domain&#39;s effective IdP bindings for the sign-in chooser.
 [**GetAuthTokens**](AuthAPI.md#GetAuthTokens) | **Get** /v1/auth/tokens | List the caller&#39;s API tokens (no plaintext).
 [**GetAuthWhoami**](AuthAPI.md#GetAuthWhoami) | **Get** /v1/auth/whoami | Describe the authenticated principal.
 [**PostAuthDeviceApprove**](AuthAPI.md#PostAuthDeviceApprove) | **Post** /v1/auth/device/approve | Approve a pending RFC 8628 device-authorization session.
@@ -207,6 +208,72 @@ No authorization required
 
 - **Content-Type**: Not defined
 - **Accept**: application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## GetAuthIdPBindings
+
+> []DomainIdPBinding GetAuthIdPBindings(ctx).DomainId(domainId).Execute()
+
+List a Domain's effective IdP bindings for the sign-in chooser.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Domain whose effective IdP bindings to list.
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.AuthAPI.GetAuthIdPBindings(context.Background()).DomainId(domainId).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `AuthAPI.GetAuthIdPBindings``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `GetAuthIdPBindings`: []DomainIdPBinding
+	fmt.Fprintf(os.Stdout, "Response from `AuthAPI.GetAuthIdPBindings`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiGetAuthIdPBindingsRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **domainId** | **string** | Domain whose effective IdP bindings to list. | 
+
+### Return type
+
+[**[]DomainIdPBinding**](DomainIdPBinding.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json, application/problem+json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
 [[Back to Model list]](../README.md#documentation-for-models)
@@ -422,7 +489,7 @@ import (
 )
 
 func main() {
-	deviceCodeRequest := *openapiclient.NewDeviceCodeRequest("DomainId_example", "IdpBindingId_example") // DeviceCodeRequest | 
+	deviceCodeRequest := *openapiclient.NewDeviceCodeRequest("DomainId_example") // DeviceCodeRequest | 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)

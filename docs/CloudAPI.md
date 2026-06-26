@@ -9,6 +9,7 @@ Method | HTTP request | Description
 [**DeleteCloud**](CloudAPI.md#DeleteCloud) | **Delete** /v1/clouds/{id} | Delete a Cloud.
 [**GetCloud**](CloudAPI.md#GetCloud) | **Get** /v1/clouds/{id} | Fetch a Cloud by identifier.
 [**GetCloudCredential**](CloudAPI.md#GetCloudCredential) | **Get** /v1/cloud-credentials/{id} | Fetch a Cloud Credential&#39;s lifecycle metadata.
+[**IssueCloudCredential**](CloudAPI.md#IssueCloudCredential) | **Post** /v1/clouds/{id}/cloud-credentials | Issue a new Cloud Credential under a Cloud.
 [**ListCloudCredentials**](CloudAPI.md#ListCloudCredentials) | **Get** /v1/clouds/{id}/cloud-credentials | List Cloud Credentials owned by a Cloud.
 [**ListClouds**](CloudAPI.md#ListClouds) | **Get** /v1/clouds | List Cloud Inventory entries.
 [**ListCredentialAssignments**](CloudAPI.md#ListCredentialAssignments) | **Get** /v1/projects/{id}/credential-assignments | List the Credential Assignments owned by a Project.
@@ -357,6 +358,78 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## IssueCloudCredential
+
+> CloudCredentialResponse IssueCloudCredential(ctx, id).CloudCredentialIssueRequest(cloudCredentialIssueRequest).Execute()
+
+Issue a new Cloud Credential under a Cloud.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud identifier (UUIDv7). Bound on `/v1/clouds/{id}` for the Cloud Inventory CRUD surface. 
+	cloudCredentialIssueRequest := *openapiclient.NewCloudCredentialIssueRequest("DisplayName_example", string(123)) // CloudCredentialIssueRequest | 
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.CloudAPI.IssueCloudCredential(context.Background(), id).CloudCredentialIssueRequest(cloudCredentialIssueRequest).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `CloudAPI.IssueCloudCredential``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `IssueCloudCredential`: CloudCredentialResponse
+	fmt.Fprintf(os.Stdout, "Response from `CloudAPI.IssueCloudCredential`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+**id** | **string** | Cloud identifier (UUIDv7). Bound on &#x60;/v1/clouds/{id}&#x60; for the Cloud Inventory CRUD surface.  | 
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiIssueCloudCredentialRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+
+ **cloudCredentialIssueRequest** | [**CloudCredentialIssueRequest**](CloudCredentialIssueRequest.md) |  | 
+
+### Return type
+
+[**CloudCredentialResponse**](CloudCredentialResponse.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: application/json
 - **Accept**: application/json, application/problem+json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
