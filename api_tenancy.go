@@ -65,6 +65,21 @@ type TenancyAPI interface {
 	CreateProjectExecute(r ApiCreateProjectRequest) (*ProjectResponse, *http.Response, error)
 
 	/*
+		CreateServiceIdentity Create a service identity on a Domain.
+
+		Provisions a new machine principal — an identity of kind `service-identity` — on the addressed Domain. The handler runs the `manage` ReBAC check on `domain:<id>` BEFORE the persistence write, so an unauthorised caller never produces a `ServiceIdentityProvisioned` outbox row. On success the service identity and its registration event are written in one transaction; the authz projection turns that event into the `serviceaccount:<id>#parent@domain:<id>` ReBAC edge that makes the new row visible on `GET /v1/domains/{id}/identities`.  Human users are NOT created through this endpoint — they arrive by accepting an Invitation (`POST /v1/domains/{id}/invitations`). This collection provisions service identities only.  The `201` body is the same `IdentitySummary` projection the listing surface returns, with `kind: service-identity` and the per-Domain `external_subject_pseudonym` populated, so the client renders the new row without a follow-up read. The plaintext `subject` is never echoed back.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param id Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface.
+		@return ApiCreateServiceIdentityRequest
+	*/
+	CreateServiceIdentity(ctx context.Context, id string) ApiCreateServiceIdentityRequest
+
+	// CreateServiceIdentityExecute executes the request
+	//  @return IdentitySummary
+	CreateServiceIdentityExecute(r ApiCreateServiceIdentityRequest) (*IdentitySummary, *http.Response, error)
+
+	/*
 		DeleteDomain Delete a Domain.
 
 		Deletes the Domain identified by `{id}`. The empty-aggregate guard runs inside the same transaction as the row delete; at least one persisted Project, Group, Identity, IdP binding, or Node forces `409 domain_not_empty` with the `DomainChildCounts` payload in the Problem detail so the operator knows which sub-aggregate to drain first. A concurrent INSERT racing the guard is caught by defense-in-depth — the foreign-key violation surfaces as the same `409` so the caller never observes a half-deleted Domain.
@@ -791,6 +806,186 @@ func (a *TenancyAPIService) CreateProjectExecute(r ApiCreateProjectRequest) (*Pr
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiCreateServiceIdentityRequest struct {
+	ctx                          context.Context
+	ApiService                   TenancyAPI
+	id                           string
+	serviceIdentityCreateRequest *ServiceIdentityCreateRequest
+}
+
+func (r ApiCreateServiceIdentityRequest) ServiceIdentityCreateRequest(serviceIdentityCreateRequest ServiceIdentityCreateRequest) ApiCreateServiceIdentityRequest {
+	r.serviceIdentityCreateRequest = &serviceIdentityCreateRequest
+	return r
+}
+
+func (r ApiCreateServiceIdentityRequest) Execute() (*IdentitySummary, *http.Response, error) {
+	return r.ApiService.CreateServiceIdentityExecute(r)
+}
+
+/*
+CreateServiceIdentity Create a service identity on a Domain.
+
+Provisions a new machine principal — an identity of kind `service-identity` — on the addressed Domain. The handler runs the `manage` ReBAC check on `domain:<id>` BEFORE the persistence write, so an unauthorised caller never produces a `ServiceIdentityProvisioned` outbox row. On success the service identity and its registration event are written in one transaction; the authz projection turns that event into the `serviceaccount:<id>#parent@domain:<id>` ReBAC edge that makes the new row visible on `GET /v1/domains/{id}/identities`.  Human users are NOT created through this endpoint — they arrive by accepting an Invitation (`POST /v1/domains/{id}/invitations`). This collection provisions service identities only.  The `201` body is the same `IdentitySummary` projection the listing surface returns, with `kind: service-identity` and the per-Domain `external_subject_pseudonym` populated, so the client renders the new row without a follow-up read. The plaintext `subject` is never echoed back.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface.
+	@return ApiCreateServiceIdentityRequest
+*/
+func (a *TenancyAPIService) CreateServiceIdentity(ctx context.Context, id string) ApiCreateServiceIdentityRequest {
+	return ApiCreateServiceIdentityRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return IdentitySummary
+func (a *TenancyAPIService) CreateServiceIdentityExecute(r ApiCreateServiceIdentityRequest) (*IdentitySummary, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *IdentitySummary
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "TenancyAPIService.CreateServiceIdentity")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/domains/{id}/service-identities"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.serviceIdentityCreateRequest == nil {
+		return localVarReturnValue, nil, reportError("serviceIdentityCreateRequest is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.serviceIdentityCreateRequest
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 413 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 503 {
 			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
