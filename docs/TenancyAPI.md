@@ -7,6 +7,7 @@ Method | HTTP request | Description
 [**CreateDomain**](TenancyAPI.md#CreateDomain) | **Post** /v1/domains | Create a tenancy Domain.
 [**CreateInvitation**](TenancyAPI.md#CreateInvitation) | **Post** /v1/domains/{id}/invitations | Stage a pending Invitation on a Domain.
 [**CreateProject**](TenancyAPI.md#CreateProject) | **Post** /v1/projects | Create a tenancy Project.
+[**CreateServiceIdentity**](TenancyAPI.md#CreateServiceIdentity) | **Post** /v1/domains/{id}/service-identities | Create a service identity on a Domain.
 [**DeleteDomain**](TenancyAPI.md#DeleteDomain) | **Delete** /v1/domains/{id} | Delete a Domain.
 [**DeleteProject**](TenancyAPI.md#DeleteProject) | **Delete** /v1/projects/{id} | Delete a Project.
 [**GetDomain**](TenancyAPI.md#GetDomain) | **Get** /v1/domains/{id} | Fetch a Domain by identifier.
@@ -212,6 +213,78 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**ProjectResponse**](ProjectResponse.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: application/json
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## CreateServiceIdentity
+
+> IdentitySummary CreateServiceIdentity(ctx, id).ServiceIdentityCreateRequest(serviceIdentityCreateRequest).Execute()
+
+Create a service identity on a Domain.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface. 
+	serviceIdentityCreateRequest := *openapiclient.NewServiceIdentityCreateRequest("DisplayName_example", "Subject_example", "Audience_example", openapiclient.ServiceFederationKind("oidc_cc")) // ServiceIdentityCreateRequest | 
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.TenancyAPI.CreateServiceIdentity(context.Background(), id).ServiceIdentityCreateRequest(serviceIdentityCreateRequest).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `TenancyAPI.CreateServiceIdentity``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `CreateServiceIdentity`: IdentitySummary
+	fmt.Fprintf(os.Stdout, "Response from `TenancyAPI.CreateServiceIdentity`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+**id** | **string** | Domain identifier (UUIDv7). Bound on &#x60;/v1/domains/{id}&#x60; for the tenancy CRUD surface.  | 
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiCreateServiceIdentityRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+
+ **serviceIdentityCreateRequest** | [**ServiceIdentityCreateRequest**](ServiceIdentityCreateRequest.md) |  | 
+
+### Return type
+
+[**IdentitySummary**](IdentitySummary.md)
 
 ### Authorization
 

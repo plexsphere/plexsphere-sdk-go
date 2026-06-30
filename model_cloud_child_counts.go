@@ -18,11 +18,13 @@ import (
 // checks if the CloudChildCounts type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &CloudChildCounts{}
 
-// CloudChildCounts Per-aggregate count of children still attached to a Cloud at the moment a `DeleteCloud` call ran. Returned in the Problem detail of a `409 cloud_not_empty` response so the operator knows how many credentials are still attached.
+// CloudChildCounts Per-aggregate count of children still attached to a Cloud at the moment a `DeleteCloud` call ran. Returned in the Problem detail of a `409 cloud_not_empty` response so the operator knows what is still attached and what to detach before retrying.
 type CloudChildCounts struct {
-	// Number of `CloudCredential` rows still attached.
-	CloudCredentials     int32 `json:"cloud_credentials"`
-	AdditionalProperties map[string]interface{}
+	// Number of `CloudCredential` rows whose home Cloud is this Cloud (the `cloud_credential.cloud_id` anchor).
+	CloudCredentials int32 `json:"cloud_credentials"`
+	// Number of usage edges that attach a `CloudCredential` homed on another Cloud to this Cloud. A delete blocked solely by usage edges reports `cloud_credentials: 0` here, so a machine consumer keys on this field to know it must detach usage edges rather than home credentials.
+	CloudCredentialUsages int32 `json:"cloud_credential_usages"`
+	AdditionalProperties  map[string]interface{}
 }
 
 type _CloudChildCounts CloudChildCounts
@@ -31,9 +33,10 @@ type _CloudChildCounts CloudChildCounts
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewCloudChildCounts(cloudCredentials int32) *CloudChildCounts {
+func NewCloudChildCounts(cloudCredentials int32, cloudCredentialUsages int32) *CloudChildCounts {
 	this := CloudChildCounts{}
 	this.CloudCredentials = cloudCredentials
+	this.CloudCredentialUsages = cloudCredentialUsages
 	return &this
 }
 
@@ -69,6 +72,30 @@ func (o *CloudChildCounts) SetCloudCredentials(v int32) {
 	o.CloudCredentials = v
 }
 
+// GetCloudCredentialUsages returns the CloudCredentialUsages field value
+func (o *CloudChildCounts) GetCloudCredentialUsages() int32 {
+	if o == nil {
+		var ret int32
+		return ret
+	}
+
+	return o.CloudCredentialUsages
+}
+
+// GetCloudCredentialUsagesOk returns a tuple with the CloudCredentialUsages field value
+// and a boolean to check if the value has been set.
+func (o *CloudChildCounts) GetCloudCredentialUsagesOk() (*int32, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.CloudCredentialUsages, true
+}
+
+// SetCloudCredentialUsages sets field value
+func (o *CloudChildCounts) SetCloudCredentialUsages(v int32) {
+	o.CloudCredentialUsages = v
+}
+
 func (o CloudChildCounts) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -80,6 +107,7 @@ func (o CloudChildCounts) MarshalJSON() ([]byte, error) {
 func (o CloudChildCounts) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["cloud_credentials"] = o.CloudCredentials
+	toSerialize["cloud_credential_usages"] = o.CloudCredentialUsages
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -94,6 +122,7 @@ func (o *CloudChildCounts) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"cloud_credentials",
+		"cloud_credential_usages",
 	}
 
 	allProperties := make(map[string]interface{})
@@ -124,6 +153,7 @@ func (o *CloudChildCounts) UnmarshalJSON(data []byte) (err error) {
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "cloud_credentials")
+		delete(additionalProperties, "cloud_credential_usages")
 		o.AdditionalProperties = additionalProperties
 	}
 

@@ -8585,11 +8585,12 @@ paths:
                 type: https://plexsphere.com/errors/cloud-not-empty
                 title: Cloud Not Empty
                 status: 409
-                detail: "Cloud still owns: cloud_credentials=2"
+                detail: "Cloud still owns: cloud_credentials=2 cloud_credential_usages=1"
                 instance: /v1/clouds/0190a8b8-a0c0-7a0a-8a0a-a0a0a0a0a0c1
                 code: cloud_not_empty
                 cloud_child_counts:
                   cloud_credentials: 2
+                  cloud_credential_usages: 1
               schema:
                 $ref: "#/components/schemas/Problem"
           description: |
@@ -9101,6 +9102,282 @@ paths:
       summary: Revoke a Cloud Credential.
       tags:
       - cloud
+  /v1/cloud-credentials/{id}/clouds:
+    get:
+      description: |
+        Returns a cloud_id-ordered page of the Clouds the Cloud
+        Credential identified by `{id}` serves — its home Cloud plus
+        every additional usage Cloud attached over the association API.
+        The handler resolves the credential's home Cloud, runs an
+        `observe` ReBAC check on it BEFORE the persistence read, then
+        pages the usage join.
+
+        The pagination cursor is HMAC-signed and bound to the
+        per-(caller, pepper) pseudonym, so a cursor minted by one
+        principal cannot be replayed by another — the cross-caller
+        replay surfaces as `403 cursor_binding_mismatch`. A tampered
+        envelope or unknown version byte stays on `400 invalid_cursor`.
+      operationId: ListCloudCredentialClouds
+      parameters:
+      - $ref: "#/components/parameters/CloudCredentialID"
+      - description: |
+          Opaque continuation token returned by a previous call's
+          `next_cursor`. The encoding is HMAC-signed by the server
+          so a tampered cursor surfaces as `400`.
+        explode: true
+        in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: |
+          Maximum number of items to return in a single page. The
+          handler clamps the value to [1, 200] before forwarding it
+          to the read service.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          default: 50
+          maximum: 200
+          minimum: 1
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                items:
+                - cloud_id: 0190a8b8-a0c0-7a0a-8a0a-a0a0a0a0a0c1
+                - cloud_id: 0190a8b8-a0c0-7a0a-8a0a-a0a0a0a0a0c2
+                next_cursor: null
+              schema:
+                $ref: "#/components/schemas/CloudCredentialCloudList"
+          description: Page of Clouds the credential serves.
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Invalid query parameters — typically a tampered or
+            malformed cursor, an out-of-range `limit`, or a malformed
+            Cloud Credential id.
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Caller is not authenticated.
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/PermissionDenied"
+          description: |
+            Caller is not authorized to observe the credential's home
+            Cloud (body is a `PermissionDenied` problem) OR the
+            pagination cursor was minted by a different caller and the
+            per-(caller, pepper) HMAC binding rejected the replay (body
+            is a `Problem` with `code = cursor_binding_mismatch`).
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Cloud Credential not found. Body is a `Problem` with
+            `code: cloud_credential_not_found`.
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Internal server error.
+      summary: List the Clouds a Cloud Credential serves.
+      tags:
+      - cloud
+    post:
+      description: |
+        Adds a usage edge so the Cloud Credential identified by `{id}`
+        additionally serves the Cloud named in the body. The handler
+        runs a `manage` ReBAC check on the credential's home Cloud
+        BEFORE decoding the body, then — once the body names the target
+        usage Cloud — a second `manage` check on that target Cloud, and
+        only then delegates to the Cloud Credentials Custodian which
+        records the usage edge. The caller must administer both Clouds:
+        the home Cloud whose credential is mutated and the target Cloud
+        that will start serving it.
+
+        Attach is idempotent: re-attaching an already-attached Cloud
+        returns `201` without creating a second edge. A revoked
+        credential cannot pick up further usage Clouds and is refused
+        with `409 cloud_credential_revoked`; a body `cloud_id` that
+        names no existing Cloud is refused with `404 cloud_not_found`.
+      operationId: AttachCloudCredentialCloud
+      parameters:
+      - $ref: "#/components/parameters/CloudCredentialID"
+      requestBody:
+        content:
+          application/json:
+            example:
+              cloud_id: 0190a8b8-a0c0-7a0a-8a0a-a0a0a0a0a0c2
+            schema:
+              $ref: "#/components/schemas/CloudCredentialAttachRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudUsageRef"
+          description: |
+            Usage Cloud attached (or already attached — the call is
+            idempotent).
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Malformed id or body. Body is a `Problem` with `code` ∈
+            { `invalid_cloud_credential_id`, `invalid_body`,
+            `invalid_cloud_id` }.
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Caller is not authenticated.
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/PermissionDenied"
+          description: |
+            Caller is not authorized to manage the credential's home
+            Cloud or the target usage Cloud. Body is a `PermissionDenied`
+            problem.
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Cloud Credential not found (`code:
+            cloud_credential_not_found`) or the body `cloud_id` names no
+            existing Cloud (`code: cloud_not_found`).
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            The Cloud Credential is revoked and cannot pick up further
+            usage Clouds. Body is a `Problem` with
+            `code: cloud_credential_revoked`.
+        "413":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Request body exceeded the 8 KiB Cloud Credentials ceiling.
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Internal server error.
+      summary: Attach a usage Cloud to a Cloud Credential.
+      tags:
+      - cloud
+  /v1/cloud-credentials/{id}/clouds/{cloudId}:
+    delete:
+      description: |
+        Removes the usage edge that binds the Cloud Credential
+        identified by `{id}` to the usage Cloud `{cloudId}`. The handler
+        authorises the detach against a `manage` ReBAC check on EITHER
+        the credential's home Cloud OR the target usage Cloud — so the
+        target Cloud's owner can remove an edge attached to their Cloud —
+        then delegates to the Cloud Credentials Custodian.
+
+        Detach is idempotent: detaching an absent edge returns `204`.
+        The credential's home Cloud anchors the KV-v2 path and can never
+        be detached — a detach targeting it is refused with
+        `409 cannot_detach_home_cloud`.
+      operationId: DetachCloudCredentialCloud
+      parameters:
+      - $ref: "#/components/parameters/CloudCredentialID"
+      - description: |
+          Identifier of the usage Cloud to detach (UUIDv7). Must be a
+          non-zero UUID — a malformed value is rejected with
+          `400 invalid_cloud_id`.
+        explode: false
+        in: path
+        name: cloudId
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "204":
+          description: |
+            Usage Cloud detached (or already absent — the call is
+            idempotent). No body.
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Malformed id. Body is a `Problem` with `code` ∈
+            { `invalid_cloud_credential_id`, `invalid_cloud_id` }.
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Caller is not authenticated.
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/PermissionDenied"
+          description: |
+            Caller is not authorized to manage either the credential's
+            home Cloud or the target usage Cloud. Body is a
+            `PermissionDenied` problem.
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Cloud Credential not found. Body is a `Problem` with
+            `code: cloud_credential_not_found`.
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            The addressed Cloud is the credential's home Cloud, which is
+            undetachable. Body is a `Problem` with
+            `code: cannot_detach_home_cloud`.
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Internal server error.
+      summary: Detach a usage Cloud from a Cloud Credential.
+      tags:
+      - cloud
   /v1/projects/{id}/credential-assignments:
     get:
       description: |
@@ -9202,12 +9479,15 @@ paths:
       - cloud
     post:
       description: |
-        Opens a Credential Assignment request that binds the Cloud
-        Credential named in the body to the Project identified by
-        `{id}`. The handler runs a `manage` ReBAC check on the parent
-        Project BEFORE the persistence write, then delegates to the
-        Credential Assignment application service which records the
-        request in the `requested` state and appends a
+        Opens a Credential Assignment request that binds a Cloud
+        Credential to the Project identified by `{id}`. The body names
+        the credential either directly (`cloud_credential_id`) or
+        indirectly by Cloud (`cloud_id`), in which case the system
+        auto-selects the most recently issued eligible credential
+        serving that Cloud. The handler runs a `deploy` ReBAC check on
+        the parent Project BEFORE the persistence write, then delegates
+        to the Credential Assignment application service which records
+        the request in the `requested` state and appends a
         `CredentialAssignmentRequested` outbox event in a single
         transaction.
 
@@ -9218,6 +9498,12 @@ paths:
         live is rejected with `409 duplicate_live_assignment`. A Cloud
         Credential that is not in an assignable lifecycle state is
         rejected with `422 credential_not_assignable`.
+
+        For the `cloud_id` form: the Cloud must be usable in the Project
+        (an approved Cloud Assignment) — otherwise
+        `422 cloud_not_usable_in_project` — and at least one eligible
+        credential must serve the Cloud — otherwise
+        `422 no_eligible_credential_for_cloud`.
       operationId: RequestCredentialAssignment
       parameters:
       - $ref: "#/components/parameters/ProjectID"
@@ -9256,7 +9542,10 @@ paths:
           description: |
             Malformed id or body. Body is a `Problem` with `code` ∈
             { `invalid_project_id`, `invalid_body`,
-            `invalid_cloud_credential_id` }.
+            `invalid_cloud_credential_id`, `invalid_cloud_id`,
+            `ambiguous_credential_target` }. `ambiguous_credential_target`
+            is returned when both `cloud_credential_id` and `cloud_id`
+            are supplied; `invalid_body` when neither is.
         "401":
           content:
             application/problem+json:
@@ -9269,7 +9558,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/PermissionDenied"
           description: |
-            Caller is not authorized to manage the parent Project.
+            Caller is not authorized to deploy in the parent Project.
             Body is a `PermissionDenied` problem.
         "409":
           content:
@@ -9286,9 +9575,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
           description: |
-            The named Cloud Credential is not in an assignable
-            lifecycle state. Body is a `Problem` with
-            `code: credential_not_assignable`.
+            Semantic rejection. Body is a `Problem` with `code` ∈
+            { `credential_not_assignable`, `cloud_not_usable_in_project`,
+            `no_eligible_credential_for_cloud` }.
+            `credential_not_assignable` — the named Cloud Credential is
+            not in an assignable lifecycle state.
+            `cloud_not_usable_in_project` — the `cloud_id` form named a
+            Cloud with no approved assignment to the Project.
+            `no_eligible_credential_for_cloud` — the `cloud_id` form
+            named a usable Cloud that has no eligible credential.
         "500":
           content:
             application/problem+json:
@@ -9536,6 +9831,512 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Internal server error.
       summary: Revoke a Credential Assignment.
+      tags:
+      - cloud
+  /v1/projects/{id}/cloud-assignments:
+    get:
+      description: |
+        Returns a creation-ordered page of Cloud Assignment lifecycle
+        metadata for the Project identified by `{id}`. The handler runs
+        a top-level `read` ReBAC check on the parent Project BEFORE the
+        persistence read; every assignment in the page belongs to the
+        one path Project, so the project `read` check authorises the
+        whole page.
+
+        The pagination cursor is HMAC-signed and bound to the
+        per-(caller, pepper) pseudonym, so a cursor minted by one
+        principal cannot be replayed by another — the cross-caller
+        replay surfaces as `403 cursor_binding_mismatch`. A tampered
+        envelope or unknown version byte stays on `400 invalid_cursor`.
+      operationId: ListCloudAssignments
+      parameters:
+      - $ref: "#/components/parameters/ProjectID"
+      - description: |
+          Opaque continuation token returned by a previous call's
+          `next_cursor`. The encoding is HMAC-signed by the server
+          so a tampered cursor surfaces as `400`.
+        explode: true
+        in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: |
+          Maximum number of items to return in a single page. The
+          handler clamps the value to [1, 200] before forwarding it
+          to the application service.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          default: 50
+          maximum: 200
+          minimum: 1
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                items:
+                - id: 0190a8b8-a0c0-7a0a-8a0a-a0a0a0a0a0f1
+                  project_id: 0190a8b8-a0c0-7a0a-8a0a-a0a0a0a0a0c1
+                  cloud_id: 0190a8b8-a0c0-7a0a-8a0a-a0a0a0a0a0c2
+                  state: approved
+                  materialised: true
+                  created_at: 2026-05-02T10:00:00Z
+                  updated_at: 2026-05-02T11:00:00Z
+                next_cursor: null
+              schema:
+                $ref: "#/components/schemas/CloudAssignmentList"
+          description: Page of Cloud Assignments.
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Invalid query parameters — typically a tampered or
+            malformed cursor, an out-of-range `limit`, or a malformed
+            Project id.
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Caller is not authenticated.
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/PermissionDenied"
+          description: |
+            Caller is not authorized to read the parent Project (body is
+            a `PermissionDenied` problem) OR the pagination cursor was
+            minted by a different caller and the per-(caller, pepper)
+            HMAC binding rejected the replay (body is a `Problem` with
+            `code = cursor_binding_mismatch`).
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Internal server error.
+      summary: List the Cloud Assignments owned by a Project.
+      tags:
+      - cloud
+    post:
+      description: |
+        Opens a Cloud Assignment request that asks for the Cloud named
+        in the body to be made usable in the Project identified by
+        `{id}`. The handler runs a `deploy` ReBAC check on the parent
+        Project BEFORE the persistence write, then delegates to the
+        Cloud Assignment application service which records the request in
+        the `requested` state and appends a `CloudAssignmentRequested`
+        outbox event in a single transaction.
+
+        The request is not yet usable — the Cloud only becomes usable in
+        the Project once an operator approves it. A second open request
+        for the same (Project, Cloud) pair while an earlier one is still
+        live is rejected with `409 duplicate_live_cloud_assignment`.
+      operationId: RequestCloudAssignment
+      parameters:
+      - $ref: "#/components/parameters/ProjectID"
+      requestBody:
+        content:
+          application/json:
+            example:
+              cloud_id: 0190a8b8-a0c0-7a0a-8a0a-a0a0a0a0a0c1
+            schema:
+              $ref: "#/components/schemas/CloudAssignmentRequestBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudAssignmentResponse"
+          description: |
+            Cloud Assignment opened in the `requested` state. The
+            `Location` header carries the canonical URL of the new
+            assignment.
+          headers:
+            Location:
+              description: |
+                Canonical URL of the freshly opened Cloud Assignment —
+                `/v1/cloud-assignments/{id}`.
+              explode: false
+              schema:
+                type: string
+              style: simple
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Malformed id or body. Body is a `Problem` with `code` ∈
+            { `invalid_project_id`, `invalid_body`, `invalid_cloud_id` }.
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Caller is not authenticated.
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/PermissionDenied"
+          description: |
+            Caller is not authorized to deploy in the parent Project.
+            Body is a `PermissionDenied` problem.
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            A live Cloud Assignment already exists for the same
+            (Project, Cloud) pair. Body is a `Problem` with
+            `code: duplicate_live_cloud_assignment`.
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Internal server error.
+      summary: Request usage of a Cloud for a Project.
+      tags:
+      - cloud
+  /v1/clouds/{id}/cloud-assignments:
+    post:
+      description: |
+        Assigns the Cloud identified by `{id}` to the Project named in
+        the body as a single authoritative Platform Operator action. The
+        handler runs an `assign` ReBAC check on the Cloud BEFORE the
+        persistence write, then delegates to the Cloud Assignment
+        application service which creates the assignment already approved
+        AND materialised in one step — the Cloud is immediately usable in
+        the Project — and appends a `CloudAssignmentGranted` outbox event
+        in a single transaction.
+
+        The operator grant bypasses the second-party approval rule by
+        design: there is no separate requester to compare against. A
+        second live assignment for the same (Project, Cloud) pair is
+        rejected with `409 duplicate_live_cloud_assignment`.
+      operationId: GrantCloudAssignment
+      parameters:
+      - $ref: "#/components/parameters/CloudID"
+      requestBody:
+        content:
+          application/json:
+            example:
+              project_id: 0190a8b8-a0c0-7a0a-8a0a-a0a0a0a0a0c1
+            schema:
+              $ref: "#/components/schemas/CloudAssignmentGrantRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudAssignmentResponse"
+          description: |
+            Cloud Assignment granted, already approved and materialised.
+            The `Location` header carries the canonical URL of the new
+            assignment.
+          headers:
+            Location:
+              description: |
+                Canonical URL of the freshly granted Cloud Assignment —
+                `/v1/cloud-assignments/{id}`.
+              explode: false
+              schema:
+                type: string
+              style: simple
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Malformed id or body. Body is a `Problem` with `code` ∈
+            { `invalid_cloud_id`, `invalid_body`, `invalid_project_id` }.
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Caller is not authenticated.
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/PermissionDenied"
+          description: |
+            Caller is not authorized to assign the Cloud. Body is a
+            `PermissionDenied` problem.
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            A live Cloud Assignment already exists for the same
+            (Project, Cloud) pair. Body is a `Problem` with
+            `code: duplicate_live_cloud_assignment`.
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Internal server error.
+      summary: Grant a Cloud to a Project (operator push).
+      tags:
+      - cloud
+  /v1/cloud-assignments/{id}/approve:
+    post:
+      description: |
+        Approves the Cloud Assignment identified by `{id}`. The handler
+        reads the row to resolve the owning Cloud, runs the `assign`
+        ReBAC check on that Cloud, then delegates to the Cloud
+        Assignment application service which moves the assignment to the
+        `approved` state, materialises the `cloud#uses` binding so the
+        Cloud is usable in the Project, and appends a
+        `CloudAssignmentMaterialised` outbox event in a single
+        transaction.
+
+        Approval is only legal from the `requested` state — any other
+        source state returns `409 illegal_transition`. The caller may
+        not approve an assignment they themselves requested; that
+        self-approval is rejected with `403 self_approval_denied`.
+      operationId: ApproveCloudAssignment
+      parameters:
+      - $ref: "#/components/parameters/CloudAssignmentID"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudAssignmentResponse"
+          description: |
+            Cloud Assignment approved. Body is the metadata projection
+            with `state: approved` and `materialised: true`.
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Malformed id. Body is a `Problem` with
+            `code: invalid_cloud_assignment_id`.
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Caller is not authenticated.
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/PermissionDenied"
+          description: |
+            Caller is not authorized to assign the owning Cloud, or the
+            caller is the requester of this assignment and may not
+            approve their own request (body is a `Problem` with
+            `code: self_approval_denied`).
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Cloud Assignment not found. Body is a `Problem` with
+            `code: cloud_assignment_not_found`.
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            The assignment is not in a state from which approval is
+            legal. Body is a `Problem` with `code: illegal_transition`.
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Internal server error.
+      summary: Approve a Cloud Assignment request.
+      tags:
+      - cloud
+  /v1/cloud-assignments/{id}/reject:
+    post:
+      description: |
+        Rejects the Cloud Assignment identified by `{id}`. The handler
+        reads the row to resolve the owning Cloud, runs the `assign`
+        ReBAC check on that Cloud, then delegates to the Cloud
+        Assignment application service which moves the assignment to the
+        `rejected` state and appends a `CloudAssignmentRejected` outbox
+        event in a single transaction. The `reason` from the body is
+        recorded on the event as an operator-supplied audit string.
+
+        Rejection is only legal from the `requested` state — any other
+        source state returns `409 illegal_transition`.
+      operationId: RejectCloudAssignment
+      parameters:
+      - $ref: "#/components/parameters/CloudAssignmentID"
+      requestBody:
+        content:
+          application/json:
+            example:
+              reason: Cloud is being decommissioned this quarter
+            schema:
+              $ref: "#/components/schemas/CloudAssignmentDecisionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudAssignmentResponse"
+          description: |
+            Cloud Assignment rejected. Body is the metadata projection
+            with `state: rejected`.
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Malformed id or body. Body is a `Problem` with `code` ∈
+            { `invalid_cloud_assignment_id`, `invalid_body`,
+            `invalid_decision_reason` }.
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Caller is not authenticated.
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/PermissionDenied"
+          description: |
+            Caller is not authorized to assign the owning Cloud.
+            Body is a `PermissionDenied` problem.
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Cloud Assignment not found. Body is a `Problem` with
+            `code: cloud_assignment_not_found`.
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            The assignment is not in a state from which rejection is
+            legal. Body is a `Problem` with `code: illegal_transition`.
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Internal server error.
+      summary: Reject a Cloud Assignment request.
+      tags:
+      - cloud
+  /v1/cloud-assignments/{id}/revoke:
+    post:
+      description: |
+        Revokes the Cloud Assignment identified by `{id}`. The handler
+        reads the row to resolve the owning Cloud, runs the `assign`
+        ReBAC check on that Cloud, then delegates to the Cloud
+        Assignment application service which moves the assignment to the
+        `revoked` state, narrow-deletes the `cloud#uses` binding so the
+        Cloud is no longer usable in the Project, and appends a
+        `CloudAssignmentRevoked` outbox event in a single transaction.
+        The `reason` from the body is recorded on the event as an
+        operator-supplied audit string.
+
+        Revocation is only legal from the `approved` state — any other
+        source state returns `409 illegal_transition`.
+      operationId: RevokeCloudAssignment
+      parameters:
+      - $ref: "#/components/parameters/CloudAssignmentID"
+      requestBody:
+        content:
+          application/json:
+            example:
+              reason: Project no longer authorised for this Cloud
+            schema:
+              $ref: "#/components/schemas/CloudAssignmentDecisionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudAssignmentResponse"
+          description: |
+            Cloud Assignment revoked. Body is the metadata projection
+            with `state: revoked`.
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Malformed id or body. Body is a `Problem` with `code` ∈
+            { `invalid_cloud_assignment_id`, `invalid_body`,
+            `invalid_decision_reason` }.
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Caller is not authenticated.
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/PermissionDenied"
+          description: |
+            Caller is not authorized to assign the owning Cloud.
+            Body is a `PermissionDenied` problem.
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Cloud Assignment not found. Body is a `Problem` with
+            `code: cloud_assignment_not_found`.
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            The assignment is not in a state from which revocation is
+            legal. Body is a `Problem` with `code: illegal_transition`.
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Internal server error.
+      summary: Revoke a Cloud Assignment.
       tags:
       - cloud
   /v1/approvals:
@@ -12635,6 +13436,129 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Internal server error.
       summary: Fetch a single Domain principal by identifier.
+      tags:
+      - tenancy
+  /v1/domains/{id}/service-identities:
+    post:
+      description: |
+        Provisions a new machine principal — an identity of kind
+        `service-identity` — on the addressed Domain. The handler runs the
+        `manage` ReBAC check on `domain:<id>` BEFORE the persistence write,
+        so an unauthorised caller never produces a
+        `ServiceIdentityProvisioned` outbox row. On success the service
+        identity and its registration event are written in one transaction;
+        the authz projection turns that event into the
+        `serviceaccount:<id>#parent@domain:<id>` ReBAC edge that makes the
+        new row visible on `GET /v1/domains/{id}/identities`.
+
+        Human users are NOT created through this endpoint — they arrive by
+        accepting an Invitation (`POST /v1/domains/{id}/invitations`). This
+        collection provisions service identities only.
+
+        The `201` body is the same `IdentitySummary` projection the listing
+        surface returns, with `kind: service-identity` and the per-Domain
+        `external_subject_pseudonym` populated, so the client renders the
+        new row without a follow-up read. The plaintext `subject` is never
+        echoed back.
+      operationId: CreateServiceIdentity
+      parameters:
+      - $ref: "#/components/parameters/DomainID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceIdentityCreateRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              example:
+                id: 0190a8b8-a0c0-7a0a-8a0a-a0a0a0a0a0c2
+                kind: service-identity
+                domain_id: 0190a8b8-a0c0-7a0a-8a0a-a0a0a0a0a0a1
+                display_name: CI deploy bot
+                external_subject_pseudonym: 9f2c7c0d2a3a4b8d1e6c8a7f5b3d2e1c0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d
+                last_sign_in_at: null
+                created_at: 2026-05-01T10:00:00Z
+              schema:
+                $ref: "#/components/schemas/IdentitySummary"
+          description: The service identity was created.
+          headers:
+            Location:
+              description: |
+                Path of the created service identity on the per-principal
+                listing surface
+                (`/v1/domains/{id}/identities/{principalId}`).
+              explode: false
+              schema:
+                type: string
+              style: simple
+        "400":
+          content:
+            application/problem+json:
+              example:
+                type: https://plexsphere.com/errors/invalid-service-identity
+                title: Invalid Service Identity
+                status: 400
+                detail: "federation_kind must be one of {oidc_cc, spiffe_svid, api_token}"
+                instance: /v1/domains/0190a8b8-a0c0-7a0a-8a0a-a0a0a0a0a0a1/service-identities
+                code: invalid_service_identity
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            Invalid request body — a missing or whitespace-only
+            `display_name`, `subject`, or `audience`, or a
+            `federation_kind` outside the closed set
+            {oidc_cc, spiffe_svid, api_token}
+            (`code: invalid_service_identity`).
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Caller is not authenticated.
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/PermissionDenied"
+          description: |
+            Caller lacks the `manage` ReBAC relation on the addressed
+            Domain (body is a `PermissionDenied` problem).
+        "409":
+          content:
+            application/problem+json:
+              example:
+                type: https://plexsphere.com/errors/service-identity-already-exists
+                title: Service Identity Already Exists
+                status: 409
+                detail: a service identity with this subject already exists in the
+                  Domain
+                instance: /v1/domains/0190a8b8-a0c0-7a0a-8a0a-a0a0a0a0a0a1/service-identities
+                code: service_identity_already_exists
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            A service identity with the same `subject` already exists in
+            this Domain (`code: service_identity_already_exists`). The
+            (Domain, subject) pair is unique.
+        "413":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Request body exceeded the size cap.
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: |
+            The authorization backend was unreachable, so the `manage`
+            gate could not be evaluated. The condition is transient;
+            retry with backoff.
+      summary: Create a service identity on a Domain.
       tags:
       - tenancy
   /v1/domains/{id}/invitations:
@@ -20019,6 +20943,21 @@ components:
         format: uuid
         type: string
       style: simple
+    CloudAssignmentID:
+      description: |
+        Cloud Assignment identifier (UUIDv7). Bound on
+        `/v1/cloud-assignments/{id}/approve`,
+        `/v1/cloud-assignments/{id}/reject`, and
+        `/v1/cloud-assignments/{id}/revoke` for the Cloud Assignment
+        decision surface.
+      explode: false
+      in: path
+      name: id
+      required: true
+      schema:
+        format: uuid
+        type: string
+      style: simple
     IntegrityViolationID:
       description: |
         Integrity-violation identifier (UUIDv7). Bound on
@@ -20513,7 +21452,17 @@ components:
               * `invalid_payload` — 400, `IssueCloudCredential` body `payload` decoded to zero bytes.
               * `invalid_revoke_reason` — 400, `RevokeCloudCredential` body `reason` was empty or whitespace-only.
               * `cloud_credential_not_found` — 404, the addressed Cloud Credential does not exist.
+              * `cloud_credential_revoked` — 409, `AttachCloudCredentialCloud` targeted a revoked credential, which cannot pick up further usage Clouds.
+              * `cannot_detach_home_cloud` — 409, `DetachCloudCredentialCloud` targeted the credential's home Cloud, which anchors the KV-v2 path and is undetachable.
               * `cloud_credentials_not_provisioned` — 501, the composition root has not wired the Cloud Credentials issue + read + revoke dependency bundle yet.
+
+            The Cloud Credential ↔ Cloud association surface
+            (`/v1/cloud-credentials/{id}/clouds[/{cloudId}]`) REUSES the
+            shared `invalid_cloud_credential_id`, `cloud_credential_not_found`,
+            `invalid_cloud_id`, `cloud_not_found`, `invalid_body`,
+            `invalid_limit`, `invalid_cursor`, `cursor_binding_mismatch`,
+            and `cloud_credentials_not_provisioned` codes with the same
+            semantics they carry above.
 
             The Cloud Credentials surface REUSES the shared
             `invalid_limit`, `invalid_cursor`, `cursor_binding_mismatch`,
@@ -20547,20 +21496,40 @@ components:
 
               * `invalid_credential_assignment_id` — 400, path `{id}` on `/v1/credential-assignments/{id}/...` was not a non-zero UUID.
               * `invalid_cloud_credential_id` — 400, `RequestCredentialAssignment` body `cloud_credential_id` was not a non-zero UUID. Reuses the same code string the Cloud Credentials path id carries.
+              * `ambiguous_credential_target` — 400, `RequestCredentialAssignment` body supplied BOTH `cloud_credential_id` and `cloud_id`; exactly one is required.
               * `invalid_decision_reason` — 400, `RejectCredentialAssignment` or `RevokeCredentialAssignment` body `reason` was empty or whitespace-only.
               * `credential_assignment_not_found` — 404, the addressed Credential Assignment does not exist.
               * `duplicate_live_assignment` — 409, a live Credential Assignment already exists for the same (Project, Cloud Credential) pair.
               * `credential_not_assignable` — 422, the named Cloud Credential is not in an assignable lifecycle state.
+              * `cloud_not_usable_in_project` — 422, the `cloud_id` form named a Cloud with no approved assignment to the Project.
+              * `no_eligible_credential_for_cloud` — 422, the `cloud_id` form named a usable Cloud that has no active, not-revoked, not-expired credential.
               * `illegal_transition` — 409, the requested lifecycle transition is not legal from the assignment's current state.
               * `self_approval_denied` — 403, the caller may not approve a Credential Assignment they themselves requested.
               * `credential_assignments_not_provisioned` — 501, the composition root has not wired the Credential Assignment dependency bundle yet.
 
             The Credential Assignment surface REUSES the shared
-            `invalid_project_id`, `invalid_limit`, `invalid_cursor`,
-            `cursor_binding_mismatch`, `invalid_body`,
+            `invalid_project_id`, `invalid_cloud_id`, `invalid_limit`,
+            `invalid_cursor`, `cursor_binding_mismatch`, `invalid_body`,
             `request_body_too_large`, `unauthenticated`, and `internal`
             codes with the same semantics they carry on the Cloud
             Inventory surface above.
+
+            The Cloud Assignment request + grant + decision surface adds
+            the closed taxonomy below. Each code maps to exactly one
+            repo / service sentinel and one HTTP status:
+
+              * `invalid_cloud_assignment_id` — 400, path `{id}` on `/v1/cloud-assignments/{id}/...` was not a non-zero UUID.
+              * `cloud_assignment_not_found` — 404, the addressed Cloud Assignment does not exist.
+              * `duplicate_live_cloud_assignment` — 409, a live Cloud Assignment already exists for the same (Project, Cloud) pair.
+              * `cloud_assignments_not_provisioned` — 501, the composition root has not wired the Cloud Assignment dependency bundle yet.
+
+            The Cloud Assignment surface REUSES the shared
+            `invalid_project_id`, `invalid_cloud_id`,
+            `invalid_decision_reason`, `illegal_transition`,
+            `self_approval_denied`, `invalid_limit`, `invalid_cursor`,
+            `cursor_binding_mismatch`, `invalid_body`,
+            `request_body_too_large`, `unauthenticated`, and `internal`
+            codes with the same semantics they carry above.
 
             The Approval Workflow dual-control surface adds the closed
             taxonomy below. Each code maps to exactly one repo / service
@@ -25829,13 +26798,25 @@ components:
         Per-aggregate count of children still attached to a Cloud at
         the moment a `DeleteCloud` call ran. Returned in the Problem
         detail of a `409 cloud_not_empty` response so the operator
-        knows how many credentials are still attached.
+        knows what is still attached and what to detach before retrying.
       properties:
         cloud_credentials:
-          description: Number of `CloudCredential` rows still attached.
+          description: |
+            Number of `CloudCredential` rows whose home Cloud is this
+            Cloud (the `cloud_credential.cloud_id` anchor).
+          minimum: 0
+          type: integer
+        cloud_credential_usages:
+          description: |
+            Number of usage edges that attach a `CloudCredential` homed
+            on another Cloud to this Cloud. A delete blocked solely by
+            usage edges reports `cloud_credentials: 0` here, so a machine
+            consumer keys on this field to know it must detach usage
+            edges rather than home credentials.
           minimum: 0
           type: integer
       required:
+      - cloud_credential_usages
       - cloud_credentials
     CloudCredentialStatus:
       description: |
@@ -25995,6 +26976,64 @@ components:
           type: string
       required:
       - reason
+    CloudUsageRef:
+      description: |
+        Reference to a single Cloud a Cloud Credential serves. Returned
+        as the item shape of `CloudCredentialCloudList` and as the body
+        of a successful `AttachCloudCredentialCloud` call.
+      example:
+        cloud_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        cloud_id:
+          description: Identifier of a Cloud the credential serves.
+          format: uuid
+          type: string
+      required:
+      - cloud_id
+    CloudCredentialCloudList:
+      description: |
+        Page of the Clouds a Cloud Credential serves, returned by
+        `GET /v1/cloud-credentials/{id}/clouds`. The window is the
+        credential's home Cloud plus every attached usage Cloud, ordered
+        by `cloud_id`.
+      example:
+        next_cursor: next_cursor
+        items:
+        - cloud_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        - cloud_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        items:
+          description: Clouds the credential serves in the current page.
+          items:
+            $ref: "#/components/schemas/CloudUsageRef"
+          type: array
+        next_cursor:
+          description: |
+            Continuation token for the next page. `null` or omitted
+            when the iteration has reached end-of-stream. The encoding
+            is HMAC-signed by the server so a tampered cursor surfaces
+            as `400` on the next call.
+          type: string
+          nullable: true
+      required:
+      - items
+    CloudCredentialAttachRequest:
+      additionalProperties: false
+      description: |
+        Body for `POST /v1/cloud-credentials/{id}/clouds`. Names the
+        usage Cloud to attach so the credential additionally serves it.
+      example:
+        cloud_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        cloud_id:
+          description: |
+            Identifier of the usage Cloud to attach. Must be a non-zero
+            UUID — a malformed value is rejected with
+            `400 invalid_cloud_id`.
+          format: uuid
+          type: string
+      required:
+      - cloud_id
     CloudCredentialIssueRequest:
       additionalProperties: false
       description: |
@@ -27261,19 +28300,39 @@ components:
       additionalProperties: false
       description: |
         Body for `POST /v1/projects/{id}/credential-assignments`. Names
-        the Cloud Credential to bind to the Project.
+        the Cloud Credential to bind to the Project — either directly by
+        `cloud_credential_id`, or indirectly by `cloud_id`, in which case
+        the system auto-selects the most recently issued eligible
+        credential serving that Cloud.
+
+        Exactly one of `cloud_credential_id` or `cloud_id` MUST be
+        supplied. Supplying both is rejected with
+        `400 ambiguous_credential_target`; supplying neither is rejected
+        with `400 invalid_body`. The `cloud_id` form additionally
+        requires the Cloud to be usable in the Project (an approved Cloud
+        Assignment) — otherwise `422 cloud_not_usable_in_project` — and
+        requires at least one eligible credential serving the Cloud —
+        otherwise `422 no_eligible_credential_for_cloud`.
       example:
         cloud_credential_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        cloud_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
       properties:
         cloud_credential_id:
           description: |
-            Identifier of the Cloud Credential to bind. Must be a
-            non-zero UUID — a malformed value is rejected with
-            `400 invalid_cloud_credential_id`.
+            Identifier of the Cloud Credential to bind directly. Must be
+            a non-zero UUID — a malformed value is rejected with
+            `400 invalid_cloud_credential_id`. Mutually exclusive with
+            `cloud_id`.
           format: uuid
           type: string
-      required:
-      - cloud_credential_id
+        cloud_id:
+          description: |
+            Identifier of the Cloud whose newest eligible credential the
+            system auto-selects and binds. Must be a non-zero UUID — a
+            malformed value is rejected with `400 invalid_cloud_id`.
+            Mutually exclusive with `cloud_credential_id`.
+          format: uuid
+          type: string
     CredentialAssignmentDecisionRequest:
       additionalProperties: false
       description: |
@@ -27281,6 +28340,176 @@ components:
         `POST /v1/credential-assignments/{id}/revoke`. The `reason` is
         recorded on the lifecycle outbox event so the decision carries
         an approver- or operator-supplied audit string.
+      example:
+        reason: reason
+      properties:
+        reason:
+          description: |
+            Decision rationale. Non-empty — whitespace-only is
+            rejected with `400 invalid_decision_reason`.
+          maxLength: 1024
+          minLength: 1
+          type: string
+      required:
+      - reason
+    CloudAssignmentState:
+      description: |
+        Lifecycle state of a Cloud Assignment, one of `requested`,
+        `approved`, `rejected`, or `revoked`. `requested` is the opening
+        state of a project-initiated request; `approved` materialises the
+        `cloud#uses` binding so the Cloud is usable in the Project;
+        `rejected` closes an unapproved request; `revoked` tears down a
+        previously approved binding. An operator grant creates the
+        assignment directly in the `approved` state. The state is a
+        stored column advanced only by the application service's
+        transition rules.
+      type: string
+    CloudAssignmentResponse:
+      description: |
+        Metadata projection of a Cloud Assignment. The shape is shared
+        by `RequestCloudAssignment`, `ListCloudAssignments`,
+        `GrantCloudAssignment`, `ApproveCloudAssignment`,
+        `RejectCloudAssignment`, and `RevokeCloudAssignment` so clients
+        only need one binding.
+      example:
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        project_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        created_at: 2000-01-23T04:56:07.000+00:00
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        cloud_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        state: state
+        materialised: true
+      properties:
+        id:
+          description: Cloud Assignment identifier (UUIDv7).
+          format: uuid
+          type: string
+        project_id:
+          description: |
+            Identifier of the consuming Project the Cloud is assigned to.
+          format: uuid
+          type: string
+        cloud_id:
+          description: |
+            Identifier of the Cloud being made usable in the Project —
+            the residency pivot the operator ReBAC gate authorises
+            against.
+          format: uuid
+          type: string
+        state:
+          description: |
+            Lifecycle state of a Cloud Assignment, one of `requested`,
+            `approved`, `rejected`, or `revoked`. `requested` is the opening
+            state of a project-initiated request; `approved` materialises the
+            `cloud#uses` binding so the Cloud is usable in the Project;
+            `rejected` closes an unapproved request; `revoked` tears down a
+            previously approved binding. An operator grant creates the
+            assignment directly in the `approved` state. The state is a
+            stored column advanced only by the application service's
+            transition rules.
+          type: string
+        materialised:
+          description: |
+            Whether the assignment's `cloud#uses` binding is currently
+            live. `true` only while the assignment is in the `approved`
+            state; `false` for `requested`, `rejected`, and `revoked`.
+          type: boolean
+        created_at:
+          description: Aggregate creation timestamp (UTC).
+          format: date-time
+          type: string
+        updated_at:
+          description: |
+            Last-modified timestamp (UTC). Bumped by every lifecycle
+            transition — approve, reject, revoke.
+          format: date-time
+          type: string
+      required:
+      - cloud_id
+      - created_at
+      - id
+      - materialised
+      - project_id
+      - state
+      - updated_at
+    CloudAssignmentList:
+      description: |
+        Page of Cloud Assignments returned by
+        `GET /v1/projects/{id}/cloud-assignments`. The window is
+        computed by the persistence layer in creation order; every row
+        belongs to the one path Project.
+      example:
+        next_cursor: next_cursor
+        items:
+        - updated_at: 2000-01-23T04:56:07.000+00:00
+          project_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          cloud_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          state: state
+          materialised: true
+        - updated_at: 2000-01-23T04:56:07.000+00:00
+          project_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          cloud_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          state: state
+          materialised: true
+      properties:
+        items:
+          description: Cloud Assignments in the current page.
+          items:
+            $ref: "#/components/schemas/CloudAssignmentResponse"
+          type: array
+        next_cursor:
+          description: |
+            Continuation token for the next page. `null` or omitted
+            when the iteration has reached end-of-stream. The encoding
+            is HMAC-signed by the server so a tampered cursor surfaces
+            as `400` on the next call.
+          type: string
+          nullable: true
+      required:
+      - items
+    CloudAssignmentRequestBody:
+      additionalProperties: false
+      description: |
+        Body for `POST /v1/projects/{id}/cloud-assignments`. Names the
+        Cloud the Project requests usage of.
+      example:
+        cloud_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        cloud_id:
+          description: |
+            Identifier of the Cloud to request. Must be a non-zero UUID
+            — a malformed value is rejected with `400 invalid_cloud_id`.
+          format: uuid
+          type: string
+      required:
+      - cloud_id
+    CloudAssignmentGrantRequest:
+      additionalProperties: false
+      description: |
+        Body for `POST /v1/clouds/{id}/cloud-assignments`. Names the
+        Project the operator grants the Cloud to.
+      example:
+        project_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        project_id:
+          description: |
+            Identifier of the Project to grant. Must be a non-zero UUID
+            — a malformed value is rejected with `400 invalid_project_id`.
+          format: uuid
+          type: string
+      required:
+      - project_id
+    CloudAssignmentDecisionRequest:
+      additionalProperties: false
+      description: |
+        Body for `POST /v1/cloud-assignments/{id}/reject` and
+        `POST /v1/cloud-assignments/{id}/revoke`. The `reason` is
+        recorded on the lifecycle outbox event so the decision carries
+        an operator-supplied audit string.
       example:
         reason: reason
       properties:
@@ -29218,6 +30447,62 @@ components:
           nullable: true
       required:
       - items
+    ServiceFederationKind:
+      description: |
+        Credential shape a service identity authenticates with. `oidc_cc`
+        is an OIDC client-credentials access token from the Domain's
+        IdPBinding; `spiffe_svid` is a JWT-SVID from a SPIFFE workload API;
+        `api_token` is a plexsphere-issued bearer bound to the identity.
+        The pin is enforced at sign-in: a credential of a different kind is
+        rejected without inspecting its payload. The three values mirror the
+        plexsphere.service_identities.federation_kind CHECK constraint.
+      enum:
+      - oidc_cc
+      - spiffe_svid
+      - api_token
+      type: string
+    ServiceIdentityCreateRequest:
+      description: |
+        Body for `POST /v1/domains/{id}/service-identities`. Provisions a
+        service identity (a machine principal) on the addressed Domain.
+        Every field is validated at the aggregate boundary; an empty or
+        whitespace-only string is rejected with
+        `400 invalid_service_identity`.
+      example:
+        federation_kind: oidc_cc
+        audience: audience
+        subject: subject
+        display_name: display_name
+      properties:
+        display_name:
+          description: |
+            Operator-facing label for the service identity (for example
+            `CI deploy bot`). Trimmed; must be non-empty.
+          maxLength: 256
+          minLength: 1
+          type: string
+        subject:
+          description: |
+            Upstream workload subject the presented credential must carry —
+            the OIDC `sub` claim or the SPIFFE ID, depending on
+            `federation_kind`. Unique per Domain: a second identity reusing
+            the same subject is rejected with `409`.
+          maxLength: 2048
+          minLength: 1
+          type: string
+        audience:
+          description: |
+            Expected audience claim for the presented credential.
+          maxLength: 256
+          minLength: 1
+          type: string
+        federation_kind:
+          $ref: "#/components/schemas/ServiceFederationKind"
+      required:
+      - audience
+      - display_name
+      - federation_kind
+      - subject
     InvitationStatus:
       description: |
         Closed-set lifecycle status of an Invitation. `pending` is the

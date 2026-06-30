@@ -11,29 +11,26 @@ API version: v1
 package plexsphere
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
 )
 
 // checks if the CredentialAssignmentRequest type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &CredentialAssignmentRequest{}
 
-// CredentialAssignmentRequest Body for `POST /v1/projects/{id}/credential-assignments`. Names the Cloud Credential to bind to the Project.
+// CredentialAssignmentRequest Body for `POST /v1/projects/{id}/credential-assignments`. Names the Cloud Credential to bind to the Project — either directly by `cloud_credential_id`, or indirectly by `cloud_id`, in which case the system auto-selects the most recently issued eligible credential serving that Cloud.  Exactly one of `cloud_credential_id` or `cloud_id` MUST be supplied. Supplying both is rejected with `400 ambiguous_credential_target`; supplying neither is rejected with `400 invalid_body`. The `cloud_id` form additionally requires the Cloud to be usable in the Project (an approved Cloud Assignment) — otherwise `422 cloud_not_usable_in_project` — and requires at least one eligible credential serving the Cloud — otherwise `422 no_eligible_credential_for_cloud`.
 type CredentialAssignmentRequest struct {
-	// Identifier of the Cloud Credential to bind. Must be a non-zero UUID — a malformed value is rejected with `400 invalid_cloud_credential_id`.
-	CloudCredentialId string `json:"cloud_credential_id"`
+	// Identifier of the Cloud Credential to bind directly. Must be a non-zero UUID — a malformed value is rejected with `400 invalid_cloud_credential_id`. Mutually exclusive with `cloud_id`.
+	CloudCredentialId *string `json:"cloud_credential_id,omitempty"`
+	// Identifier of the Cloud whose newest eligible credential the system auto-selects and binds. Must be a non-zero UUID — a malformed value is rejected with `400 invalid_cloud_id`. Mutually exclusive with `cloud_credential_id`.
+	CloudId *string `json:"cloud_id,omitempty"`
 }
-
-type _CredentialAssignmentRequest CredentialAssignmentRequest
 
 // NewCredentialAssignmentRequest instantiates a new CredentialAssignmentRequest object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewCredentialAssignmentRequest(cloudCredentialId string) *CredentialAssignmentRequest {
+func NewCredentialAssignmentRequest() *CredentialAssignmentRequest {
 	this := CredentialAssignmentRequest{}
-	this.CloudCredentialId = cloudCredentialId
 	return &this
 }
 
@@ -45,28 +42,68 @@ func NewCredentialAssignmentRequestWithDefaults() *CredentialAssignmentRequest {
 	return &this
 }
 
-// GetCloudCredentialId returns the CloudCredentialId field value
+// GetCloudCredentialId returns the CloudCredentialId field value if set, zero value otherwise.
 func (o *CredentialAssignmentRequest) GetCloudCredentialId() string {
-	if o == nil {
+	if o == nil || IsNil(o.CloudCredentialId) {
 		var ret string
 		return ret
 	}
-
-	return o.CloudCredentialId
+	return *o.CloudCredentialId
 }
 
-// GetCloudCredentialIdOk returns a tuple with the CloudCredentialId field value
+// GetCloudCredentialIdOk returns a tuple with the CloudCredentialId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
 func (o *CredentialAssignmentRequest) GetCloudCredentialIdOk() (*string, bool) {
-	if o == nil {
+	if o == nil || IsNil(o.CloudCredentialId) {
 		return nil, false
 	}
-	return &o.CloudCredentialId, true
+	return o.CloudCredentialId, true
 }
 
-// SetCloudCredentialId sets field value
+// HasCloudCredentialId returns a boolean if a field has been set.
+func (o *CredentialAssignmentRequest) HasCloudCredentialId() bool {
+	if o != nil && !IsNil(o.CloudCredentialId) {
+		return true
+	}
+
+	return false
+}
+
+// SetCloudCredentialId gets a reference to the given string and assigns it to the CloudCredentialId field.
 func (o *CredentialAssignmentRequest) SetCloudCredentialId(v string) {
-	o.CloudCredentialId = v
+	o.CloudCredentialId = &v
+}
+
+// GetCloudId returns the CloudId field value if set, zero value otherwise.
+func (o *CredentialAssignmentRequest) GetCloudId() string {
+	if o == nil || IsNil(o.CloudId) {
+		var ret string
+		return ret
+	}
+	return *o.CloudId
+}
+
+// GetCloudIdOk returns a tuple with the CloudId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CredentialAssignmentRequest) GetCloudIdOk() (*string, bool) {
+	if o == nil || IsNil(o.CloudId) {
+		return nil, false
+	}
+	return o.CloudId, true
+}
+
+// HasCloudId returns a boolean if a field has been set.
+func (o *CredentialAssignmentRequest) HasCloudId() bool {
+	if o != nil && !IsNil(o.CloudId) {
+		return true
+	}
+
+	return false
+}
+
+// SetCloudId gets a reference to the given string and assigns it to the CloudId field.
+func (o *CredentialAssignmentRequest) SetCloudId(v string) {
+	o.CloudId = &v
 }
 
 func (o CredentialAssignmentRequest) MarshalJSON() ([]byte, error) {
@@ -79,45 +116,13 @@ func (o CredentialAssignmentRequest) MarshalJSON() ([]byte, error) {
 
 func (o CredentialAssignmentRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	toSerialize["cloud_credential_id"] = o.CloudCredentialId
+	if !IsNil(o.CloudCredentialId) {
+		toSerialize["cloud_credential_id"] = o.CloudCredentialId
+	}
+	if !IsNil(o.CloudId) {
+		toSerialize["cloud_id"] = o.CloudId
+	}
 	return toSerialize, nil
-}
-
-func (o *CredentialAssignmentRequest) UnmarshalJSON(data []byte) (err error) {
-	// This validates that all required properties are included in the JSON object
-	// by unmarshalling the object into a generic map with string keys and checking
-	// that every required field exists as a key in the generic map.
-	requiredProperties := []string{
-		"cloud_credential_id",
-	}
-
-	allProperties := make(map[string]interface{})
-
-	err = json.Unmarshal(data, &allProperties)
-
-	if err != nil {
-		return err
-	}
-
-	for _, requiredProperty := range requiredProperties {
-		if _, exists := allProperties[requiredProperty]; !exists {
-			return fmt.Errorf("no value given for required property %v", requiredProperty)
-		}
-	}
-
-	varCredentialAssignmentRequest := _CredentialAssignmentRequest{}
-
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varCredentialAssignmentRequest)
-
-	if err != nil {
-		return err
-	}
-
-	*o = CredentialAssignmentRequest(varCredentialAssignmentRequest)
-
-	return err
 }
 
 type NullableCredentialAssignmentRequest struct {
