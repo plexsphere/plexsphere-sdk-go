@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -25,10 +25,10 @@ type AuditAPI interface {
 	/*
 		EraseIdentityFromAudit Erase an identity's PII mapping from the per-Domain audit log.
 
-		Right-to-erasure entry point. Drops the `audit_subject_pii` row for the per-Domain pseudonym derived from `identity_id`, then appends an `audit.erase-identity` self-audit entry to the same chain so the erasure event is itself auditable . The hash chain remains verifiable: rows reference the pseudonym, and the pseudonym is preserved — only the plaintext mapping is removed.  The endpoint is IDEMPOTENT on `subject_pseudonym`. A second call after a successful erasure is a no-op on the `audit_subject_pii` table (the row is already gone) and may emit a second self-audit entry; callers MAY safely retry after a partial network failure. The 202 status reflects the idempotent contract: a successful erasure has been recorded, even if the underlying PII row was already absent.
+		Right-to-erasure entry point. Drops the `audit_subject_pii` row for the per-Domain pseudonym derived from `identity_id`, then appends an `audit.erase-identity` self-audit entry to the same chain so the erasure event is itself auditable. The hash chain remains verifiable: rows reference the pseudonym, and the pseudonym is preserved — only the plaintext mapping is removed.  The endpoint is IDEMPOTENT on `subject_pseudonym`. A second call after a successful erasure is a no-op on the `audit_subject_pii` table (the row is already gone) and may emit a second self-audit entry; callers MAY safely retry after a partial network failure. The 200 status reflects the synchronous contract: the erasure has been recorded before the response is written, even if the underlying PII row was already absent.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@param domainId Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain; rows with platform residency live on the separate chain served under `/v1/platform/audit`.
 		@return ApiEraseIdentityFromAuditRequest
 	*/
 	EraseIdentityFromAudit(ctx context.Context, domainId string) ApiEraseIdentityFromAuditRequest
@@ -40,7 +40,7 @@ type AuditAPI interface {
 	/*
 		EraseIdentityFromPlatformAudit Erase an identity's PII mapping from the platform audit log.
 
-		Right-to-erasure entry point. Drops the `audit_subject_pii` row for the platform-residency pseudonym derived from `identity_id`, then appends an `audit.erase-identity` self-audit entry to the platform-residency chain so the erasure event is itself auditable. The hash chain remains verifiable: rows reference the pseudonym, and the pseudonym is preserved — only the plaintext mapping is removed.  The endpoint is IDEMPOTENT on `subject_pseudonym`. A second call after a successful erasure is a no-op on the `audit_subject_pii` table (the row is already gone) and may emit a second self-audit entry; callers MAY safely retry after a partial network failure. The 202 status reflects the idempotent contract: a successful erasure has been recorded, even if the underlying PII row was already absent.
+		Right-to-erasure entry point. Drops the `audit_subject_pii` row for the platform-residency pseudonym derived from `identity_id`, then appends an `audit.erase-identity` self-audit entry to the platform-residency chain so the erasure event is itself auditable. The hash chain remains verifiable: rows reference the pseudonym, and the pseudonym is preserved — only the plaintext mapping is removed.  The endpoint is IDEMPOTENT on `subject_pseudonym`. A second call after a successful erasure is a no-op on the `audit_subject_pii` table (the row is already gone) and may emit a second self-audit entry; callers MAY safely retry after a partial network failure. The 200 status reflects the synchronous contract: the erasure has been recorded before the response is written, even if the underlying PII row was already absent.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiEraseIdentityFromPlatformAuditRequest
@@ -54,10 +54,10 @@ type AuditAPI interface {
 	/*
 		GetAuditEntry Read a single audit entry with its hash-chain proof.
 
-		Returns the audit entry at `seq` on the addressed Domain's chain, together with the forensic proof needed to recompute and verify the entry's hash off-line. The proof carries `prev_hash`, `entry_hash`, and the canonical bytes the chain hashed — `sha256(prev_hash || sha256(canonical_bytes))` is the computed `entry_hash`, and comparing it against the stored value pins divergence at the offending row.  Cross-Domain reads are not allowed: a `seq` that exists on a DIFFERENT Domain's chain surfaces as 404 with the same shape as a truly-unknown `seq` so the endpoint cannot be used as a cross-Domain enumeration oracle. The 404-after-403 ordering matches the ListAuditEntries gate.  UNAUTHORISED READS COLLAPSE ONTO 404. Unlike ListAuditEntries and VerifyAuditChain, this surface deliberately maps a missing `auditor` relation to 404 (not 403) so the response is byte-indistinguishable from \"row does not exist on this Domain\". The seq id is per-Domain monotonic from 1 — a 403 would otherwise leak chain length and let an attacker probe for the existence of arbitrary rows across Domains. The same probe-oracle defence applies on cross-tenant reads .
+		Returns the audit entry at `seq` on the addressed Domain's chain, together with the forensic proof needed to recompute and verify the entry's hash off-line. The proof carries `prev_hash`, `entry_hash`, and the canonical bytes the chain hashed — `sha256(prev_hash || sha256(canonical_bytes))` is the computed `entry_hash`, and comparing it against the stored value pins divergence at the offending row.  Cross-Domain reads are not allowed: a `seq` that exists on a DIFFERENT Domain's chain surfaces as 404 with the same shape as a truly-unknown `seq` so the endpoint cannot be used as a cross-Domain enumeration oracle.  UNAUTHORISED READS COLLAPSE ONTO 404. Unlike ListAuditEntries and VerifyAuditChain, this surface deliberately maps a missing `auditor` relation to 404 (not 403) so the response is byte-indistinguishable from \"row does not exist on this Domain\". The seq id is per-Domain monotonic from 1 — a 403 would otherwise leak chain length and let an attacker probe for the existence of arbitrary rows across Domains. The same probe-oracle defence applies on cross-tenant reads.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@param domainId Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain; rows with platform residency live on the separate chain served under `/v1/platform/audit`.
 		@param seq Per-Domain monotonic sequence number assigned at append time. Sequences start at 1 (the genesis row) and never reset.
 		@return ApiGetAuditEntryRequest
 	*/
@@ -85,10 +85,10 @@ type AuditAPI interface {
 	/*
 		ListAuditEntries List entries on the per-Domain audit chain.
 
-		Returns a cursor-paginated page of audit chain rows for the addressed Domain. Every read is gated by the `auditor` ReBAC relation on the addressed Domain; unauthenticated callers receive 401, authenticated callers without the relation receive 403, and an unknown Domain id surfaces as 404 only after the authorisation gate has passed so the endpoint cannot be used as a Domain-id oracle.  Pagination is opaque-cursor based: the `next_cursor` returned in the response body is the value to pass back as `cursor` on the next call. Cursors are HMAC-signed and bound to the addressed Domain — replaying a cursor minted for a different Domain surfaces as a 400 with `code: cursor_invalid`. When the page is shorter than the requested `limit` the response omits `next_cursor` so callers stop on a single condition.  Filter semantics: every filter is optional and is AND-composed in the persistence layer. `subject` is the per-Domain pseudonym hex (the chain-input form, never plaintext — plaintext lives in `audit_subject_pii` and is purged on right-to-erasure). `from`/`to` bracket the `occurred_at` server-side timestamp. `correlation_id` matches the inbound request correlation id propagated from the transport layer.
+		Returns a cursor-paginated page of audit chain rows for the addressed Domain. Every read is gated by the `auditor` ReBAC relation on the addressed Domain; unauthenticated callers receive 401, authenticated callers without the relation receive 403, and an unknown Domain id surfaces as 404 only after the authorisation gate has passed so the endpoint cannot be used as a Domain-id oracle.  Pagination is opaque-cursor based: the `next_cursor` returned in the response body is the value to pass back as `cursor` on the next call. Cursors are HMAC-signed and bound to the addressed Domain — replaying a cursor minted for a different Domain surfaces as a 400 with `code: invalid_cursor`. When the page is shorter than the requested `limit` the response omits `next_cursor` so callers stop on a single condition.  Filter semantics: every filter is optional and is AND-composed in the persistence layer. `subject` is the per-Domain pseudonym hex (the chain-input form, never plaintext — plaintext lives in `audit_subject_pii` and is purged on right-to-erasure). `from`/`to` bracket the `occurred_at` server-side timestamp. `correlation_id` matches the inbound request correlation id propagated from the transport layer.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@param domainId Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain; rows with platform residency live on the separate chain served under `/v1/platform/audit`.
 		@return ApiListAuditEntriesRequest
 	*/
 	ListAuditEntries(ctx context.Context, domainId string) ApiListAuditEntriesRequest
@@ -100,7 +100,7 @@ type AuditAPI interface {
 	/*
 		ListPlatformAuditEntries List entries on the platform-residency audit chain.
 
-		Returns a cursor-paginated page of audit chain rows for the single platform-residency chain — the chain that carries privileged actions owned by no Domain (Cloud lifecycle, platform-scope Label definitions, the Invitation ExpirePending sweep). Every read is gated by the `auditor` ReBAC relation on the fixed platform object; unauthenticated callers receive 401 and authenticated callers without the relation receive 403.  Pagination is opaque-cursor based: the `next_cursor` returned in the response body is the value to pass back as `cursor` on the next call. Cursors are HMAC-signed and bound to the platform-residency chain — replaying a cursor minted against a different chain surfaces as a 400 with `code: cursor_invalid`. When the page is shorter than the requested `limit` the response omits `next_cursor` so callers stop on a single condition.  Filter semantics: every filter is optional and is AND-composed in the persistence layer. `subject` is the platform-residency pseudonym hex (the chain-input form, never plaintext — plaintext lives in `audit_subject_pii` and is purged on right-to-erasure). `from`/`to` bracket the `occurred_at` server-side timestamp. `correlation_id` matches the inbound request correlation id propagated from the transport layer.
+		Returns a cursor-paginated page of audit chain rows for the single platform-residency chain — the chain that carries privileged actions owned by no Domain (Cloud lifecycle, platform-scope Label definitions, the Invitation ExpirePending sweep). Every read is gated by the `auditor` ReBAC relation on the fixed platform object; unauthenticated callers receive 401 and authenticated callers without the relation receive 403.  Pagination is opaque-cursor based: the `next_cursor` returned in the response body is the value to pass back as `cursor` on the next call. Cursors are HMAC-signed and bound to the platform-residency chain — replaying a cursor minted against a different chain surfaces as a 400 with `code: invalid_cursor`. When the page is shorter than the requested `limit` the response omits `next_cursor` so callers stop on a single condition.  Filter semantics: every filter is optional and is AND-composed in the persistence layer. `subject` is the platform-residency pseudonym hex (the chain-input form, never plaintext — plaintext lives in `audit_subject_pii` and is purged on right-to-erasure). `from`/`to` bracket the `occurred_at` server-side timestamp. `correlation_id` matches the inbound request correlation id propagated from the transport layer.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiListPlatformAuditEntriesRequest
@@ -117,7 +117,7 @@ type AuditAPI interface {
 		Recomputes `sha256(prev_hash || sha256(canonical_bytes))` for every row in the requested segment and reports the first divergence, if any. Omit both `from_seq` and `to_seq` to verify the full chain anchored at the genesis row (`seq=1`, `prev_hash` = 32 zero bytes); supply one or both to verify a bounded segment without paging the entire chain into memory.  DIVERGENCE IS NOT AN ERROR. A tampered chain surfaces as `200 { ok: false, divergent_seq, expected_hash, observed_hash }` — the handler MUST NEVER return a 5xx for tampering. The 5xx channel is reserved for infrastructure faults (database unreachable, decode error on a malformed row); divergence is a finding the handler hands the operator alongside `200`. This distinction matters because divergence triggers an incident playbook while a 5xx triggers an oncall page.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@param domainId Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain; rows with platform residency live on the separate chain served under `/v1/platform/audit`.
 		@return ApiVerifyAuditChainRequest
 	*/
 	VerifyAuditChain(ctx context.Context, domainId string) ApiVerifyAuditChainRequest
@@ -163,10 +163,10 @@ func (r ApiEraseIdentityFromAuditRequest) Execute() (*AuditEraseIdentityResponse
 /*
 EraseIdentityFromAudit Erase an identity's PII mapping from the per-Domain audit log.
 
-Right-to-erasure entry point. Drops the `audit_subject_pii` row for the per-Domain pseudonym derived from `identity_id`, then appends an `audit.erase-identity` self-audit entry to the same chain so the erasure event is itself auditable . The hash chain remains verifiable: rows reference the pseudonym, and the pseudonym is preserved — only the plaintext mapping is removed.  The endpoint is IDEMPOTENT on `subject_pseudonym`. A second call after a successful erasure is a no-op on the `audit_subject_pii` table (the row is already gone) and may emit a second self-audit entry; callers MAY safely retry after a partial network failure. The 202 status reflects the idempotent contract: a successful erasure has been recorded, even if the underlying PII row was already absent.
+Right-to-erasure entry point. Drops the `audit_subject_pii` row for the per-Domain pseudonym derived from `identity_id`, then appends an `audit.erase-identity` self-audit entry to the same chain so the erasure event is itself auditable. The hash chain remains verifiable: rows reference the pseudonym, and the pseudonym is preserved — only the plaintext mapping is removed.  The endpoint is IDEMPOTENT on `subject_pseudonym`. A second call after a successful erasure is a no-op on the `audit_subject_pii` table (the row is already gone) and may emit a second self-audit entry; callers MAY safely retry after a partial network failure. The 200 status reflects the synchronous contract: the erasure has been recorded before the response is written, even if the underlying PII row was already absent.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@param domainId Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain; rows with platform residency live on the separate chain served under `/v1/platform/audit`.
 	@return ApiEraseIdentityFromAuditRequest
 */
 func (a *AuditAPIService) EraseIdentityFromAudit(ctx context.Context, domainId string) ApiEraseIdentityFromAuditRequest {
@@ -193,8 +193,8 @@ func (a *AuditAPIService) EraseIdentityFromAuditExecute(r ApiEraseIdentityFromAu
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/audit/erase-identity"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/audit/erase-identity"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -342,7 +342,7 @@ func (r ApiEraseIdentityFromPlatformAuditRequest) Execute() (*AuditEraseIdentity
 /*
 EraseIdentityFromPlatformAudit Erase an identity's PII mapping from the platform audit log.
 
-Right-to-erasure entry point. Drops the `audit_subject_pii` row for the platform-residency pseudonym derived from `identity_id`, then appends an `audit.erase-identity` self-audit entry to the platform-residency chain so the erasure event is itself auditable. The hash chain remains verifiable: rows reference the pseudonym, and the pseudonym is preserved — only the plaintext mapping is removed.  The endpoint is IDEMPOTENT on `subject_pseudonym`. A second call after a successful erasure is a no-op on the `audit_subject_pii` table (the row is already gone) and may emit a second self-audit entry; callers MAY safely retry after a partial network failure. The 202 status reflects the idempotent contract: a successful erasure has been recorded, even if the underlying PII row was already absent.
+Right-to-erasure entry point. Drops the `audit_subject_pii` row for the platform-residency pseudonym derived from `identity_id`, then appends an `audit.erase-identity` self-audit entry to the platform-residency chain so the erasure event is itself auditable. The hash chain remains verifiable: rows reference the pseudonym, and the pseudonym is preserved — only the plaintext mapping is removed.  The endpoint is IDEMPOTENT on `subject_pseudonym`. A second call after a successful erasure is a no-op on the `audit_subject_pii` table (the row is already gone) and may emit a second self-audit entry; callers MAY safely retry after a partial network failure. The 200 status reflects the synchronous contract: the erasure has been recorded before the response is written, even if the underlying PII row was already absent.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiEraseIdentityFromPlatformAuditRequest
@@ -503,10 +503,10 @@ func (r ApiGetAuditEntryRequest) Execute() (*AuditEntryProof, *http.Response, er
 /*
 GetAuditEntry Read a single audit entry with its hash-chain proof.
 
-Returns the audit entry at `seq` on the addressed Domain's chain, together with the forensic proof needed to recompute and verify the entry's hash off-line. The proof carries `prev_hash`, `entry_hash`, and the canonical bytes the chain hashed — `sha256(prev_hash || sha256(canonical_bytes))` is the computed `entry_hash`, and comparing it against the stored value pins divergence at the offending row.  Cross-Domain reads are not allowed: a `seq` that exists on a DIFFERENT Domain's chain surfaces as 404 with the same shape as a truly-unknown `seq` so the endpoint cannot be used as a cross-Domain enumeration oracle. The 404-after-403 ordering matches the ListAuditEntries gate.  UNAUTHORISED READS COLLAPSE ONTO 404. Unlike ListAuditEntries and VerifyAuditChain, this surface deliberately maps a missing `auditor` relation to 404 (not 403) so the response is byte-indistinguishable from \"row does not exist on this Domain\". The seq id is per-Domain monotonic from 1 — a 403 would otherwise leak chain length and let an attacker probe for the existence of arbitrary rows across Domains. The same probe-oracle defence applies on cross-tenant reads .
+Returns the audit entry at `seq` on the addressed Domain's chain, together with the forensic proof needed to recompute and verify the entry's hash off-line. The proof carries `prev_hash`, `entry_hash`, and the canonical bytes the chain hashed — `sha256(prev_hash || sha256(canonical_bytes))` is the computed `entry_hash`, and comparing it against the stored value pins divergence at the offending row.  Cross-Domain reads are not allowed: a `seq` that exists on a DIFFERENT Domain's chain surfaces as 404 with the same shape as a truly-unknown `seq` so the endpoint cannot be used as a cross-Domain enumeration oracle.  UNAUTHORISED READS COLLAPSE ONTO 404. Unlike ListAuditEntries and VerifyAuditChain, this surface deliberately maps a missing `auditor` relation to 404 (not 403) so the response is byte-indistinguishable from \"row does not exist on this Domain\". The seq id is per-Domain monotonic from 1 — a 403 would otherwise leak chain length and let an attacker probe for the existence of arbitrary rows across Domains. The same probe-oracle defence applies on cross-tenant reads.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@param domainId Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain; rows with platform residency live on the separate chain served under `/v1/platform/audit`.
 	@param seq Per-Domain monotonic sequence number assigned at append time. Sequences start at 1 (the genesis row) and never reset.
 	@return ApiGetAuditEntryRequest
 */
@@ -535,8 +535,8 @@ func (a *AuditAPIService) GetAuditEntryExecute(r ApiGetAuditEntryRequest) (*Audi
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/audit/entries/{seq}"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/audit/entries/{seq}"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"seq"+"}", url.PathEscape(parameterValueToString(r.seq, "seq")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -831,19 +831,19 @@ type ApiListAuditEntriesRequest struct {
 	correlationId *string
 }
 
-// Opaque pagination cursor — value of &#x60;next_cursor&#x60; from the previous page, or unset to start at the head of the chain .
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
 func (r ApiListAuditEntriesRequest) Cursor(cursor string) ApiListAuditEntriesRequest {
 	r.cursor = &cursor
 	return r
 }
 
-// Maximum number of entries to return on this page. Clamped server-side at 200 to protect the read replica from a single auditor issuing an unbounded LIMIT.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListAuditEntriesRequest) Limit(limit int32) ApiListAuditEntriesRequest {
 	r.limit = &limit
 	return r
 }
 
-// Filter by subject pseudonym (64 lowercase hex characters). The query service never accepts plaintext subject ids; pseudonymisation is the caller&#39;s responsibility and happens at the sink boundary.
+// Filter by subject pseudonym (64 lowercase hex characters). The query service never accepts plaintext subject ids; rows are pseudonymised at the sink boundary, so callers filter by the pseudonym as returned on previously read entries.
 func (r ApiListAuditEntriesRequest) Subject(subject string) ApiListAuditEntriesRequest {
 	r.subject = &subject
 	return r
@@ -898,10 +898,10 @@ func (r ApiListAuditEntriesRequest) Execute() (*AuditEntryList, *http.Response, 
 /*
 ListAuditEntries List entries on the per-Domain audit chain.
 
-Returns a cursor-paginated page of audit chain rows for the addressed Domain. Every read is gated by the `auditor` ReBAC relation on the addressed Domain; unauthenticated callers receive 401, authenticated callers without the relation receive 403, and an unknown Domain id surfaces as 404 only after the authorisation gate has passed so the endpoint cannot be used as a Domain-id oracle.  Pagination is opaque-cursor based: the `next_cursor` returned in the response body is the value to pass back as `cursor` on the next call. Cursors are HMAC-signed and bound to the addressed Domain — replaying a cursor minted for a different Domain surfaces as a 400 with `code: cursor_invalid`. When the page is shorter than the requested `limit` the response omits `next_cursor` so callers stop on a single condition.  Filter semantics: every filter is optional and is AND-composed in the persistence layer. `subject` is the per-Domain pseudonym hex (the chain-input form, never plaintext — plaintext lives in `audit_subject_pii` and is purged on right-to-erasure). `from`/`to` bracket the `occurred_at` server-side timestamp. `correlation_id` matches the inbound request correlation id propagated from the transport layer.
+Returns a cursor-paginated page of audit chain rows for the addressed Domain. Every read is gated by the `auditor` ReBAC relation on the addressed Domain; unauthenticated callers receive 401, authenticated callers without the relation receive 403, and an unknown Domain id surfaces as 404 only after the authorisation gate has passed so the endpoint cannot be used as a Domain-id oracle.  Pagination is opaque-cursor based: the `next_cursor` returned in the response body is the value to pass back as `cursor` on the next call. Cursors are HMAC-signed and bound to the addressed Domain — replaying a cursor minted for a different Domain surfaces as a 400 with `code: invalid_cursor`. When the page is shorter than the requested `limit` the response omits `next_cursor` so callers stop on a single condition.  Filter semantics: every filter is optional and is AND-composed in the persistence layer. `subject` is the per-Domain pseudonym hex (the chain-input form, never plaintext — plaintext lives in `audit_subject_pii` and is purged on right-to-erasure). `from`/`to` bracket the `occurred_at` server-side timestamp. `correlation_id` matches the inbound request correlation id propagated from the transport layer.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@param domainId Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain; rows with platform residency live on the separate chain served under `/v1/platform/audit`.
 	@return ApiListAuditEntriesRequest
 */
 func (a *AuditAPIService) ListAuditEntries(ctx context.Context, domainId string) ApiListAuditEntriesRequest {
@@ -928,8 +928,8 @@ func (a *AuditAPIService) ListAuditEntriesExecute(r ApiListAuditEntriesRequest) 
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/audit/entries"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/audit/entries"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -1103,19 +1103,19 @@ type ApiListPlatformAuditEntriesRequest struct {
 	correlationId *string
 }
 
-// Opaque pagination cursor — value of &#x60;next_cursor&#x60; from the previous page, or unset to start at the head of the chain .
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
 func (r ApiListPlatformAuditEntriesRequest) Cursor(cursor string) ApiListPlatformAuditEntriesRequest {
 	r.cursor = &cursor
 	return r
 }
 
-// Maximum number of entries to return on this page. Clamped server-side at 200 to protect the read replica from a single auditor issuing an unbounded LIMIT.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListPlatformAuditEntriesRequest) Limit(limit int32) ApiListPlatformAuditEntriesRequest {
 	r.limit = &limit
 	return r
 }
 
-// Filter by subject pseudonym (64 lowercase hex characters). The query service never accepts plaintext subject ids; pseudonymisation is the caller&#39;s responsibility and happens at the sink boundary.
+// Filter by subject pseudonym (64 lowercase hex characters). The query service never accepts plaintext subject ids; rows are pseudonymised at the sink boundary, so callers filter by the pseudonym as returned on previously read entries.
 func (r ApiListPlatformAuditEntriesRequest) Subject(subject string) ApiListPlatformAuditEntriesRequest {
 	r.subject = &subject
 	return r
@@ -1170,7 +1170,7 @@ func (r ApiListPlatformAuditEntriesRequest) Execute() (*AuditEntryList, *http.Re
 /*
 ListPlatformAuditEntries List entries on the platform-residency audit chain.
 
-Returns a cursor-paginated page of audit chain rows for the single platform-residency chain — the chain that carries privileged actions owned by no Domain (Cloud lifecycle, platform-scope Label definitions, the Invitation ExpirePending sweep). Every read is gated by the `auditor` ReBAC relation on the fixed platform object; unauthenticated callers receive 401 and authenticated callers without the relation receive 403.  Pagination is opaque-cursor based: the `next_cursor` returned in the response body is the value to pass back as `cursor` on the next call. Cursors are HMAC-signed and bound to the platform-residency chain — replaying a cursor minted against a different chain surfaces as a 400 with `code: cursor_invalid`. When the page is shorter than the requested `limit` the response omits `next_cursor` so callers stop on a single condition.  Filter semantics: every filter is optional and is AND-composed in the persistence layer. `subject` is the platform-residency pseudonym hex (the chain-input form, never plaintext — plaintext lives in `audit_subject_pii` and is purged on right-to-erasure). `from`/`to` bracket the `occurred_at` server-side timestamp. `correlation_id` matches the inbound request correlation id propagated from the transport layer.
+Returns a cursor-paginated page of audit chain rows for the single platform-residency chain — the chain that carries privileged actions owned by no Domain (Cloud lifecycle, platform-scope Label definitions, the Invitation ExpirePending sweep). Every read is gated by the `auditor` ReBAC relation on the fixed platform object; unauthenticated callers receive 401 and authenticated callers without the relation receive 403.  Pagination is opaque-cursor based: the `next_cursor` returned in the response body is the value to pass back as `cursor` on the next call. Cursors are HMAC-signed and bound to the platform-residency chain — replaying a cursor minted against a different chain surfaces as a 400 with `code: invalid_cursor`. When the page is shorter than the requested `limit` the response omits `next_cursor` so callers stop on a single condition.  Filter semantics: every filter is optional and is AND-composed in the persistence layer. `subject` is the platform-residency pseudonym hex (the chain-input form, never plaintext — plaintext lives in `audit_subject_pii` and is purged on right-to-erasure). `from`/`to` bracket the `occurred_at` server-side timestamp. `correlation_id` matches the inbound request correlation id propagated from the transport layer.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiListPlatformAuditEntriesRequest
@@ -1368,7 +1368,7 @@ VerifyAuditChain Verify the per-Domain hash chain or a segment of it.
 Recomputes `sha256(prev_hash || sha256(canonical_bytes))` for every row in the requested segment and reports the first divergence, if any. Omit both `from_seq` and `to_seq` to verify the full chain anchored at the genesis row (`seq=1`, `prev_hash` = 32 zero bytes); supply one or both to verify a bounded segment without paging the entire chain into memory.  DIVERGENCE IS NOT AN ERROR. A tampered chain surfaces as `200 { ok: false, divergent_seq, expected_hash, observed_hash }` — the handler MUST NEVER return a 5xx for tampering. The 5xx channel is reserved for infrastructure faults (database unreachable, decode error on a malformed row); divergence is a finding the handler hands the operator alongside `200`. This distinction matters because divergence triggers an incident playbook while a 5xx triggers an oncall page.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@param domainId Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain; rows with platform residency live on the separate chain served under `/v1/platform/audit`.
 	@return ApiVerifyAuditChainRequest
 */
 func (a *AuditAPIService) VerifyAuditChain(ctx context.Context, domainId string) ApiVerifyAuditChainRequest {
@@ -1395,8 +1395,8 @@ func (a *AuditAPIService) VerifyAuditChainExecute(r ApiVerifyAuditChainRequest) 
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/audit/verify"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/audit/verify"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

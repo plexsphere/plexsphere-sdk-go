@@ -4,7 +4,7 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**DefinitionId** | **string** | Parent Label Definition identifier (UUIDv7). | 
+**DefinitionId** | Pointer to **string** | Parent Label Definition identifier (UUIDv7). Absent for an orphaned Assignment whose parent Definition was deleted under the &#x60;on_delete&#x3D;orphan&#x60; policy — the denormalised &#x60;qualified_key&#x60; still records what the label is.  | [optional] 
 **QualifiedKey** | **string** | Fully-qualified Label key (denormalised). | 
 **ObjectKind** | **string** | Lowercase object-kind discriminator. | 
 **ObjectId** | **string** | Object identifier (UUIDv7). | 
@@ -16,7 +16,7 @@ Name | Type | Description | Notes
 
 ### NewLabelAssignment
 
-`func NewLabelAssignment(definitionId string, qualifiedKey string, objectKind string, objectId string, value interface{}, assignedBy string, assignedAt time.Time, ) *LabelAssignment`
+`func NewLabelAssignment(qualifiedKey string, objectKind string, objectId string, value interface{}, assignedBy string, assignedAt time.Time, ) *LabelAssignment`
 
 NewLabelAssignment instantiates a new LabelAssignment object
 This constructor will assign default values to properties that have it defined,
@@ -50,6 +50,11 @@ and a boolean to check if the value has been set.
 
 SetDefinitionId sets DefinitionId field to given value.
 
+### HasDefinitionId
+
+`func (o *LabelAssignment) HasDefinitionId() bool`
+
+HasDefinitionId returns a boolean if a field has been set.
 
 ### GetQualifiedKey
 

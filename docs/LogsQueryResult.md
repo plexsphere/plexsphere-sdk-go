@@ -4,7 +4,7 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**StatusCode** | **int32** | HTTP status the logs backend returned. | 
+**StatusCode** | **int32** | The backend&#39;s 2xx HTTP status (a non-2xx backend response is mapped to a platform 4xx/5xx and never reaches this body).  | 
 **Body** | **string** | The logs backend&#39;s verbatim response body, carried as an opaque JSON string so the platform does not re-shape the backend&#39;s stream envelope.  | 
 
 ## Methods

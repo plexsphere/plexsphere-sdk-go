@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -79,7 +79,7 @@ type AdminAPI interface {
 	/*
 		GetAdminGroupByID Fetch a Group by identifier.
 
-		Returns the Group aggregate identified by `{id}` .
+		Returns the Group aggregate identified by `{id}`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Group identifier (UUIDv7).
@@ -102,8 +102,8 @@ type AdminAPI interface {
 	GetAdminGroupList(ctx context.Context) ApiGetAdminGroupListRequest
 
 	// GetAdminGroupListExecute executes the request
-	//  @return GroupListResponse
-	GetAdminGroupListExecute(r ApiGetAdminGroupListRequest) (*GroupListResponse, *http.Response, error)
+	//  @return GroupList
+	GetAdminGroupListExecute(r ApiGetAdminGroupListRequest) (*GroupList, *http.Response, error)
 
 	/*
 		GetAdminGroupMembers List members of a Group.
@@ -117,13 +117,13 @@ type AdminAPI interface {
 	GetAdminGroupMembers(ctx context.Context, id string) ApiGetAdminGroupMembersRequest
 
 	// GetAdminGroupMembersExecute executes the request
-	//  @return GroupMembershipListResponse
-	GetAdminGroupMembersExecute(r ApiGetAdminGroupMembersRequest) (*GroupMembershipListResponse, *http.Response, error)
+	//  @return GroupMembershipList
+	GetAdminGroupMembersExecute(r ApiGetAdminGroupMembersRequest) (*GroupMembershipList, *http.Response, error)
 
 	/*
 		GetAdminIdPByID Read an IdP binding by identifier.
 
-		Returns the persisted IdP binding aggregate identified by `id` . A 404 is returned with `binding-not-found` semantics when no binding with the given identifier exists or the caller may not observe it.
+		Returns the persisted IdP binding aggregate identified by `id`. A 404 is returned with `binding_not_found` semantics when no binding with the given identifier exists or the caller may not observe it.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Binding identifier (UUIDv7).
@@ -193,7 +193,7 @@ type AdminAPI interface {
 	/*
 		PatchAdminIdP Partially update an IdP binding.
 
-		Applies a partial update to the IdP binding aggregate identified by `id`. Only the fields present in the request body are mutated; omitted fields are left unchanged. The `status` field is intentionally NOT mutable through this endpoint — use `PATCH /v1/admin/idp/{id}/status` instead. The `domain_id` and `issuer` columns are NOT exposed by `IdPBindingPatchRequest`, so this operation cannot collide with the partial unique index `idp_bindings_active_domain_issuer_uq`.  Concurrent PATCH callers are serialised via an optimistic- concurrency compare-and-swap on the binding's `version` column: each PATCH transaction reads the row under `SELECT... FOR UPDATE`, captures the version, and gates its UPDATE on `version = expected_version`. Two concurrent PATCHes therefore race deterministically — exactly ONE wins (response `200` with the new aggregate) and the loser receives a `409 binding-conflict` Problem so the client can refresh and retry against the post-winner state (,; review #1, comment 2).
+		Applies a partial update to the IdP binding aggregate identified by `id`. Only the fields present in the request body are mutated; omitted fields are left unchanged. The `status` field is intentionally NOT mutable through this endpoint — use `PATCH /v1/admin/idp/{id}/status` instead. The `domain_id` and `issuer` columns are NOT exposed by `IdPBindingPatchRequest`, so this operation cannot collide with the partial unique index `idp_bindings_active_domain_issuer_uq`.  Concurrent PATCH callers are serialised via an optimistic- concurrency compare-and-swap on the binding's `version` column: each PATCH transaction reads the row under `SELECT... FOR UPDATE`, captures the version, and gates its UPDATE on `version = expected_version`. Two concurrent PATCHes therefore race deterministically — exactly ONE wins (response `200` with the new aggregate) and the loser receives a `409 binding_conflict` Problem so the client can refresh and retry against the post-winner state.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Binding identifier (UUIDv7).
@@ -208,7 +208,7 @@ type AdminAPI interface {
 	/*
 		PatchAdminIdPStatus Activate or deactivate an IdP binding.
 
-		Toggles the `status` of the named binding between `active` and `deactivated`. The response echoes the full updated binding .
+		Toggles the `status` of the named binding between `active` and `deactivated`. The response echoes the full updated binding.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Binding identifier (UUIDv7).
@@ -223,7 +223,7 @@ type AdminAPI interface {
 	/*
 		PostAdminGroup Create a Group within a Domain.
 
-		Creates a Group aggregate scoped to the supplied Domain . The aggregate enforces the source-specific invariant: `source=idp` requires both `idp_binding_id` and `idp_claim_value`; `source=manual` forbids them. Violations surface as a 400 Problem from validation, not as a SQL CHECK failure.
+		Creates a Group aggregate scoped to the supplied Domain. The aggregate enforces the source-specific invariant: `source=idp` requires both `idp_binding_id` and `idp_claim_value`; `source=manual` forbids them. Violations surface as a 400 Problem from validation, not as a SQL CHECK failure.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiPostAdminGroupRequest
@@ -887,7 +887,7 @@ func (r ApiGetAdminGroupByIDRequest) Execute() (*GroupResponse, *http.Response, 
 /*
 GetAdminGroupByID Fetch a Group by identifier.
 
-Returns the Group aggregate identified by `{id}` .
+Returns the Group aggregate identified by `{id}`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Group identifier (UUIDv7).
@@ -1035,19 +1035,19 @@ func (r ApiGetAdminGroupListRequest) DomainId(domainId string) ApiGetAdminGroupL
 	return r
 }
 
-// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;.
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
 func (r ApiGetAdminGroupListRequest) Cursor(cursor string) ApiGetAdminGroupListRequest {
 	r.cursor = &cursor
 	return r
 }
 
-// Maximum number of items to return in a single page .
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiGetAdminGroupListRequest) Limit(limit int32) ApiGetAdminGroupListRequest {
 	r.limit = &limit
 	return r
 }
 
-func (r ApiGetAdminGroupListRequest) Execute() (*GroupListResponse, *http.Response, error) {
+func (r ApiGetAdminGroupListRequest) Execute() (*GroupList, *http.Response, error) {
 	return r.ApiService.GetAdminGroupListExecute(r)
 }
 
@@ -1068,13 +1068,13 @@ func (a *AdminAPIService) GetAdminGroupList(ctx context.Context) ApiGetAdminGrou
 
 // Execute executes the request
 //
-//	@return GroupListResponse
-func (a *AdminAPIService) GetAdminGroupListExecute(r ApiGetAdminGroupListRequest) (*GroupListResponse, *http.Response, error) {
+//	@return GroupList
+func (a *AdminAPIService) GetAdminGroupListExecute(r ApiGetAdminGroupListRequest) (*GroupList, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodGet
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *GroupListResponse
+		localVarReturnValue *GroupList
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AdminAPIService.GetAdminGroupList")
@@ -1205,7 +1205,7 @@ type ApiGetAdminGroupMembersRequest struct {
 	id         string
 }
 
-func (r ApiGetAdminGroupMembersRequest) Execute() (*GroupMembershipListResponse, *http.Response, error) {
+func (r ApiGetAdminGroupMembersRequest) Execute() (*GroupMembershipList, *http.Response, error) {
 	return r.ApiService.GetAdminGroupMembersExecute(r)
 }
 
@@ -1228,13 +1228,13 @@ func (a *AdminAPIService) GetAdminGroupMembers(ctx context.Context, id string) A
 
 // Execute executes the request
 //
-//	@return GroupMembershipListResponse
-func (a *AdminAPIService) GetAdminGroupMembersExecute(r ApiGetAdminGroupMembersRequest) (*GroupMembershipListResponse, *http.Response, error) {
+//	@return GroupMembershipList
+func (a *AdminAPIService) GetAdminGroupMembersExecute(r ApiGetAdminGroupMembersRequest) (*GroupMembershipList, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodGet
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *GroupMembershipListResponse
+		localVarReturnValue *GroupMembershipList
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AdminAPIService.GetAdminGroupMembers")
@@ -1359,7 +1359,7 @@ func (r ApiGetAdminIdPByIDRequest) Execute() (*IdPBindingResponse, *http.Respons
 /*
 GetAdminIdPByID Read an IdP binding by identifier.
 
-Returns the persisted IdP binding aggregate identified by `id` . A 404 is returned with `binding-not-found` semantics when no binding with the given identifier exists or the caller may not observe it.
+Returns the persisted IdP binding aggregate identified by `id`. A 404 is returned with `binding_not_found` semantics when no binding with the given identifier exists or the caller may not observe it.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Binding identifier (UUIDv7).
@@ -2107,7 +2107,7 @@ func (r ApiPatchAdminIdPRequest) Execute() (*IdPBindingResponse, *http.Response,
 /*
 PatchAdminIdP Partially update an IdP binding.
 
-Applies a partial update to the IdP binding aggregate identified by `id`. Only the fields present in the request body are mutated; omitted fields are left unchanged. The `status` field is intentionally NOT mutable through this endpoint — use `PATCH /v1/admin/idp/{id}/status` instead. The `domain_id` and `issuer` columns are NOT exposed by `IdPBindingPatchRequest`, so this operation cannot collide with the partial unique index `idp_bindings_active_domain_issuer_uq`.  Concurrent PATCH callers are serialised via an optimistic- concurrency compare-and-swap on the binding's `version` column: each PATCH transaction reads the row under `SELECT... FOR UPDATE`, captures the version, and gates its UPDATE on `version = expected_version`. Two concurrent PATCHes therefore race deterministically — exactly ONE wins (response `200` with the new aggregate) and the loser receives a `409 binding-conflict` Problem so the client can refresh and retry against the post-winner state (,; review #1, comment 2).
+Applies a partial update to the IdP binding aggregate identified by `id`. Only the fields present in the request body are mutated; omitted fields are left unchanged. The `status` field is intentionally NOT mutable through this endpoint — use `PATCH /v1/admin/idp/{id}/status` instead. The `domain_id` and `issuer` columns are NOT exposed by `IdPBindingPatchRequest`, so this operation cannot collide with the partial unique index `idp_bindings_active_domain_issuer_uq`.  Concurrent PATCH callers are serialised via an optimistic- concurrency compare-and-swap on the binding's `version` column: each PATCH transaction reads the row under `SELECT... FOR UPDATE`, captures the version, and gates its UPDATE on `version = expected_version`. Two concurrent PATCHes therefore race deterministically — exactly ONE wins (response `200` with the new aggregate) and the loser receives a `409 binding_conflict` Problem so the client can refresh and retry against the post-winner state.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Binding identifier (UUIDv7).
@@ -2287,7 +2287,7 @@ func (r ApiPatchAdminIdPStatusRequest) Execute() (*IdPBindingResponse, *http.Res
 /*
 PatchAdminIdPStatus Activate or deactivate an IdP binding.
 
-Toggles the `status` of the named binding between `active` and `deactivated`. The response echoes the full updated binding .
+Toggles the `status` of the named binding between `active` and `deactivated`. The response echoes the full updated binding.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Binding identifier (UUIDv7).
@@ -2455,7 +2455,7 @@ func (r ApiPostAdminGroupRequest) Execute() (*GroupResponse, *http.Response, err
 /*
 PostAdminGroup Create a Group within a Domain.
 
-Creates a Group aggregate scoped to the supplied Domain . The aggregate enforces the source-specific invariant: `source=idp` requires both `idp_binding_id` and `idp_claim_value`; `source=manual` forbids them. Violations surface as a 400 Problem from validation, not as a SQL CHECK failure.
+Creates a Group aggregate scoped to the supplied Domain. The aggregate enforces the source-specific invariant: `source=idp` requires both `idp_binding_id` and `idp_claim_value`; `source=manual` forbids them. Violations surface as a 400 Problem from validation, not as a SQL CHECK failure.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiPostAdminGroupRequest

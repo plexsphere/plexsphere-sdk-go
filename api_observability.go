@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -25,11 +25,11 @@ type ObservabilityAPI interface {
 	/*
 		AppendIncidentEvent Append an event to an incident's timeline.
 
-		Appends one event to the append-only timeline of the incident addressed by `{incidentId}`. Events may only be appended while the incident is open; appending to a resolved incident is rejected with 409. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before the write, then persists the event and returns the appended timeline event.
+		Appends one event to the append-only timeline of the incident addressed by `{incident_id}`. Events may only be appended while the incident is open; appending to a resolved incident is rejected with 409. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before the write, then persists the event and returns the appended timeline event.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
-		@param incidentId Incident identifier (UUIDv7). Bound on `/v1/domains/{domainId}/incidents/{incidentId}`, its `/events` sub-resource, and its `:resolve` sub-resource.
+		@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
+		@param incidentId Incident identifier (UUIDv7). Bound on `/v1/domains/{domain_id}/incidents/{incident_id}`, its `/events` sub-resource, and its `:resolve` sub-resource.
 		@return ApiAppendIncidentEventRequest
 	*/
 	AppendIncidentEvent(ctx context.Context, domainId string, incidentId string) ApiAppendIncidentEventRequest
@@ -44,7 +44,7 @@ type ObservabilityAPI interface {
 		Stores a new alert rule for the addressed Domain. The rule is stored, managed configuration only: the platform records and serves it and does not evaluate it in this phase. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before any write, validates the body, then persists the rule. The rule name is unique within a Domain; a duplicate name is rejected with 409.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 		@return ApiCreateAlertRuleRequest
 	*/
 	CreateAlertRule(ctx context.Context, domainId string) ApiCreateAlertRuleRequest
@@ -56,11 +56,11 @@ type ObservabilityAPI interface {
 	/*
 		DeleteAlertRule Delete a stored alert rule.
 
-		Deletes the alert rule addressed by `{alertRuleId}` within the Domain. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before the delete. Deleting an absent rule returns 404.
+		Deletes the alert rule addressed by `{alert_rule_id}` within the Domain. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before the delete. Deleting an absent rule returns 404.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
-		@param alertRuleId Alert rule identifier (UUIDv7). Bound on `/v1/domains/{domainId}/alert-rules/{alertRuleId}` for the single-rule read, update, and delete.
+		@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
+		@param alertRuleId Alert rule identifier (UUIDv7). Bound on `/v1/domains/{domain_id}/alert-rules/{alert_rule_id}` for the single-rule read, update, and delete.
 		@return ApiDeleteAlertRuleRequest
 	*/
 	DeleteAlertRule(ctx context.Context, domainId string, alertRuleId string) ApiDeleteAlertRuleRequest
@@ -71,11 +71,11 @@ type ObservabilityAPI interface {
 	/*
 		GetAlertRule Read a single stored alert rule.
 
-		Returns the alert rule addressed by `{alertRuleId}` within the Domain. The read is gated by the `domain-view` ReBAC relation on the addressed Domain. Alert rules are stored, managed configuration only and are not evaluated in this phase.
+		Returns the alert rule addressed by `{alert_rule_id}` within the Domain. The read is gated by the `domain-view` ReBAC relation on the addressed Domain. Alert rules are stored, managed configuration only and are not evaluated in this phase.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
-		@param alertRuleId Alert rule identifier (UUIDv7). Bound on `/v1/domains/{domainId}/alert-rules/{alertRuleId}` for the single-rule read, update, and delete.
+		@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
+		@param alertRuleId Alert rule identifier (UUIDv7). Bound on `/v1/domains/{domain_id}/alert-rules/{alert_rule_id}` for the single-rule read, update, and delete.
 		@return ApiGetAlertRuleRequest
 	*/
 	GetAlertRule(ctx context.Context, domainId string, alertRuleId string) ApiGetAlertRuleRequest
@@ -87,11 +87,11 @@ type ObservabilityAPI interface {
 	/*
 		GetIncident Read a single incident with its ordered timeline.
 
-		Returns the incident addressed by `{incidentId}` within the Domain, together with its append-only timeline ordered by `occurred_at` ascending. The read is gated by the `domain-view` ReBAC relation on the addressed Domain.
+		Returns the incident addressed by `{incident_id}` within the Domain, together with its append-only timeline ordered by `occurred_at` ascending. The read is gated by the `domain-view` ReBAC relation on the addressed Domain.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
-		@param incidentId Incident identifier (UUIDv7). Bound on `/v1/domains/{domainId}/incidents/{incidentId}`, its `/events` sub-resource, and its `:resolve` sub-resource.
+		@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
+		@param incidentId Incident identifier (UUIDv7). Bound on `/v1/domains/{domain_id}/incidents/{incident_id}`, its `/events` sub-resource, and its `:resolve` sub-resource.
 		@return ApiGetIncidentRequest
 	*/
 	GetIncident(ctx context.Context, domainId string, incidentId string) ApiGetIncidentRequest
@@ -106,7 +106,7 @@ type ObservabilityAPI interface {
 		Returns a cursor-paginated page of the alert rules stored for the addressed Domain. Alert rules are stored, managed configuration: the platform records and serves them and does not evaluate them in this phase. The read is gated by the `domain-view` ReBAC relation on the addressed Domain, checked before the persistence read.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 		@return ApiListAlertRulesRequest
 	*/
 	ListAlertRules(ctx context.Context, domainId string) ApiListAlertRulesRequest
@@ -121,7 +121,7 @@ type ObservabilityAPI interface {
 		Returns a cursor-paginated page of incident headers for the addressed Domain. The list projection is header-only — it omits the per-incident timeline, which is returned by the single-incident read. The read is gated by the `domain-view` ReBAC relation on the addressed Domain.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 		@return ApiListIncidentsRequest
 	*/
 	ListIncidents(ctx context.Context, domainId string) ApiListIncidentsRequest
@@ -136,7 +136,7 @@ type ObservabilityAPI interface {
 		Opens a new incident for the addressed Domain in the `open` state with an empty timeline. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before the write, validates the body, then persists the incident header.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 		@return ApiOpenIncidentRequest
 	*/
 	OpenIncident(ctx context.Context, domainId string) ApiOpenIncidentRequest
@@ -148,10 +148,10 @@ type ObservabilityAPI interface {
 	/*
 		QueryDomainLogs Run a read-only LogQL logs query for a Domain.
 
-		Runs a single read-only LogQL range query against the bundled logs backend for the addressed Domain and returns the backend's verbatim result. The query is always a range query bounded by `start` and `end`; `limit` caps the number of returned lines and `direction` chooses the scan order.  The handler authenticates the caller (401 when no Principal resolves), checks the `domain-view` ReBAC relation on the addressed Domain BEFORE touching the backend so the endpoint cannot be used as a Domain-id oracle (403 on denial), validates the query bounds, then forwards to the logs backend.  Query bounds are enforced at this boundary so one oversized query cannot overwhelm the shared logs store: the expression is capped at 4096 characters, the window may span at most 31 days, and the line result is capped server-side. A query that violates a bound is rejected with 400 before any backend call.  # DECISION: 502 covers an unreachable / failing Loki upstream and 504 # covers an upstream that did not answer in time, mirroring the metrics # query surface. 501 matches the capacity surface's deferred-wiring # posture so log scrapers can alert until the logs backend is wired.
+		Runs a single read-only LogQL range query against the bundled logs backend for the addressed Domain and returns the backend's verbatim result. The query is always a range query bounded by `start` and `end`; `limit` caps the number of returned lines and `direction` chooses the scan order.  The handler authenticates the caller (401 when no Principal resolves), checks the `domain-view` ReBAC relation on the addressed Domain BEFORE touching the backend so the endpoint cannot be used as a Domain-id oracle (403 on denial), validates the query bounds, then forwards to the logs backend.  TENANCY: the caller's LogQL expression is NEVER trusted to scope itself. The server derives the upstream tenant from the addressed Domain and stamps it as the backend `X-Scope-OrgID` header server-side (never from a client header), so `domain-view` on Domain A can only ever read Domain A's streams even if the expression names another Domain's labels.  Query bounds are enforced at this boundary so one oversized query cannot overwhelm the shared logs store: the expression is capped at 4096 characters, the window may span at most 31 days, and the line result is capped server-side. A query that violates a bound is rejected with 400 before any backend call.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 		@return ApiQueryDomainLogsRequest
 	*/
 	QueryDomainLogs(ctx context.Context, domainId string) ApiQueryDomainLogsRequest
@@ -163,10 +163,10 @@ type ObservabilityAPI interface {
 	/*
 		QueryDomainMetrics Run a read-only PromQL metrics query for a Domain.
 
-		Runs a single read-only PromQL query against the bundled metrics backend for the addressed Domain and returns the backend's verbatim result. Either an instant query (supply `time`) or a range query (supply `start`, `end`, and `step`) is run; when `time` is absent the handler runs a range query and requires the range bounds.  The handler authenticates the caller (401 when no Principal resolves), checks the `domain-view` ReBAC relation on the addressed Domain BEFORE touching the backend so the endpoint cannot be used as a Domain-id oracle (403 on denial), validates the query bounds, then forwards to the metrics backend.  Query bounds are enforced at this boundary so one oversized query cannot overwhelm the shared metrics store: the expression is capped at 4096 characters, a range window may span at most 31 days, and the series result is capped server-side. A query that violates a bound is rejected with 400 before any backend call.  # DECISION: 502 covers an unreachable / failing Mimir upstream and 504 # covers an upstream that did not answer in time, so the operator can # tell an unavailable backend apart from a slow one. 501 matches the # capacity surface's deferred-wiring posture: until the production # composition root supplies the query backends, every request returns # 501 so log scrapers can alert on the deferred-wiring state.
+		Runs a single read-only PromQL query against the bundled metrics backend for the addressed Domain and returns the backend's verbatim result. Either an instant query (supply `time`) or a range query (supply `start`, `end`, and `step`) is run; when `time` is absent the handler runs a range query and requires the range bounds. `time` takes precedence: if it is present the range triple is ignored rather than rejected, so a caller must send EITHER `time` OR the range triple, never both.  The handler authenticates the caller (401 when no Principal resolves), checks the `domain-view` ReBAC relation on the addressed Domain BEFORE touching the backend so the endpoint cannot be used as a Domain-id oracle (403 on denial), validates the query bounds, then forwards to the metrics backend.  TENANCY: the caller's PromQL expression is NEVER trusted to scope itself. The server derives the upstream tenant from the addressed Domain and stamps it as the backend `X-Scope-OrgID` header server-side (never from a client header), so `domain-view` on Domain A can only ever read Domain A's series even if the expression names another Domain's labels.  Query bounds are enforced at this boundary so one oversized query cannot overwhelm the shared metrics store: the expression is capped at 4096 characters, a range window may span at most 31 days, and the series result is capped server-side. A query that violates a bound is rejected with 400 before any backend call.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 		@return ApiQueryDomainMetricsRequest
 	*/
 	QueryDomainMetrics(ctx context.Context, domainId string) ApiQueryDomainMetricsRequest
@@ -178,11 +178,11 @@ type ObservabilityAPI interface {
 	/*
 		ResolveIncident Resolve an open incident.
 
-		Resolves the open incident addressed by `{incidentId}`, transitioning it to the `resolved` state and stamping its resolved-at timestamp. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before the write. Resolving an incident that is already resolved is rejected with 409 — the lifecycle permits a single resolve.
+		Resolves the open incident addressed by `{incident_id}`, transitioning it to the `resolved` state and stamping its resolved-at timestamp. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before the write. Resolving an incident that is already resolved is rejected with 409 — the lifecycle permits a single resolve.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
-		@param incidentId Incident identifier (UUIDv7). Bound on `/v1/domains/{domainId}/incidents/{incidentId}`, its `/events` sub-resource, and its `:resolve` sub-resource.
+		@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
+		@param incidentId Incident identifier (UUIDv7). Bound on `/v1/domains/{domain_id}/incidents/{incident_id}`, its `/events` sub-resource, and its `:resolve` sub-resource.
 		@return ApiResolveIncidentRequest
 	*/
 	ResolveIncident(ctx context.Context, domainId string, incidentId string) ApiResolveIncidentRequest
@@ -194,11 +194,11 @@ type ObservabilityAPI interface {
 	/*
 		UpdateAlertRule Update mutable fields on a stored alert rule.
 
-		Applies a partial update to the alert rule addressed by `{alertRuleId}`. Every body field is optional: an absent field leaves the stored value untouched. The rule remains stored, managed configuration only and is not evaluated in this phase. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before any write, applies the patch, and persists the result. A rename onto an existing name in the Domain is rejected with 409.
+		Applies a partial update to the alert rule addressed by `{alert_rule_id}`. Every body field is optional: an absent field leaves the stored value untouched. The rule remains stored, managed configuration only and is not evaluated in this phase. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before any write, applies the patch, and persists the result. A rename onto an existing name in the Domain is rejected with 409.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
-		@param alertRuleId Alert rule identifier (UUIDv7). Bound on `/v1/domains/{domainId}/alert-rules/{alertRuleId}` for the single-rule read, update, and delete.
+		@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
+		@param alertRuleId Alert rule identifier (UUIDv7). Bound on `/v1/domains/{domain_id}/alert-rules/{alert_rule_id}` for the single-rule read, update, and delete.
 		@return ApiUpdateAlertRuleRequest
 	*/
 	UpdateAlertRule(ctx context.Context, domainId string, alertRuleId string) ApiUpdateAlertRuleRequest
@@ -231,11 +231,11 @@ func (r ApiAppendIncidentEventRequest) Execute() (*TimelineEvent, *http.Response
 /*
 AppendIncidentEvent Append an event to an incident's timeline.
 
-Appends one event to the append-only timeline of the incident addressed by `{incidentId}`. Events may only be appended while the incident is open; appending to a resolved incident is rejected with 409. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before the write, then persists the event and returns the appended timeline event.
+Appends one event to the append-only timeline of the incident addressed by `{incident_id}`. Events may only be appended while the incident is open; appending to a resolved incident is rejected with 409. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before the write, then persists the event and returns the appended timeline event.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
-	@param incidentId Incident identifier (UUIDv7). Bound on `/v1/domains/{domainId}/incidents/{incidentId}`, its `/events` sub-resource, and its `:resolve` sub-resource.
+	@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
+	@param incidentId Incident identifier (UUIDv7). Bound on `/v1/domains/{domain_id}/incidents/{incident_id}`, its `/events` sub-resource, and its `:resolve` sub-resource.
 	@return ApiAppendIncidentEventRequest
 */
 func (a *ObservabilityAPIService) AppendIncidentEvent(ctx context.Context, domainId string, incidentId string) ApiAppendIncidentEventRequest {
@@ -263,9 +263,9 @@ func (a *ObservabilityAPIService) AppendIncidentEventExecute(r ApiAppendIncident
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/incidents/{incidentId}/events"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"incidentId"+"}", url.PathEscape(parameterValueToString(r.incidentId, "incidentId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/incidents/{incident_id}/events"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"incident_id"+"}", url.PathEscape(parameterValueToString(r.incidentId, "incidentId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -428,7 +428,7 @@ CreateAlertRule Store a new alert rule for a Domain.
 Stores a new alert rule for the addressed Domain. The rule is stored, managed configuration only: the platform records and serves it and does not evaluate it in this phase. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before any write, validates the body, then persists the rule. The rule name is unique within a Domain; a duplicate name is rejected with 409.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 	@return ApiCreateAlertRuleRequest
 */
 func (a *ObservabilityAPIService) CreateAlertRule(ctx context.Context, domainId string) ApiCreateAlertRuleRequest {
@@ -455,8 +455,8 @@ func (a *ObservabilityAPIService) CreateAlertRuleExecute(r ApiCreateAlertRuleReq
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/alert-rules"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/alert-rules"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -611,11 +611,11 @@ func (r ApiDeleteAlertRuleRequest) Execute() (*http.Response, error) {
 /*
 DeleteAlertRule Delete a stored alert rule.
 
-Deletes the alert rule addressed by `{alertRuleId}` within the Domain. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before the delete. Deleting an absent rule returns 404.
+Deletes the alert rule addressed by `{alert_rule_id}` within the Domain. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before the delete. Deleting an absent rule returns 404.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
-	@param alertRuleId Alert rule identifier (UUIDv7). Bound on `/v1/domains/{domainId}/alert-rules/{alertRuleId}` for the single-rule read, update, and delete.
+	@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
+	@param alertRuleId Alert rule identifier (UUIDv7). Bound on `/v1/domains/{domain_id}/alert-rules/{alert_rule_id}` for the single-rule read, update, and delete.
 	@return ApiDeleteAlertRuleRequest
 */
 func (a *ObservabilityAPIService) DeleteAlertRule(ctx context.Context, domainId string, alertRuleId string) ApiDeleteAlertRuleRequest {
@@ -640,9 +640,9 @@ func (a *ObservabilityAPIService) DeleteAlertRuleExecute(r ApiDeleteAlertRuleReq
 		return nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/alert-rules/{alertRuleId}"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"alertRuleId"+"}", url.PathEscape(parameterValueToString(r.alertRuleId, "alertRuleId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/alert-rules/{alert_rule_id}"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"alert_rule_id"+"}", url.PathEscape(parameterValueToString(r.alertRuleId, "alertRuleId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -772,11 +772,11 @@ func (r ApiGetAlertRuleRequest) Execute() (*AlertRule, *http.Response, error) {
 /*
 GetAlertRule Read a single stored alert rule.
 
-Returns the alert rule addressed by `{alertRuleId}` within the Domain. The read is gated by the `domain-view` ReBAC relation on the addressed Domain. Alert rules are stored, managed configuration only and are not evaluated in this phase.
+Returns the alert rule addressed by `{alert_rule_id}` within the Domain. The read is gated by the `domain-view` ReBAC relation on the addressed Domain. Alert rules are stored, managed configuration only and are not evaluated in this phase.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
-	@param alertRuleId Alert rule identifier (UUIDv7). Bound on `/v1/domains/{domainId}/alert-rules/{alertRuleId}` for the single-rule read, update, and delete.
+	@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
+	@param alertRuleId Alert rule identifier (UUIDv7). Bound on `/v1/domains/{domain_id}/alert-rules/{alert_rule_id}` for the single-rule read, update, and delete.
 	@return ApiGetAlertRuleRequest
 */
 func (a *ObservabilityAPIService) GetAlertRule(ctx context.Context, domainId string, alertRuleId string) ApiGetAlertRuleRequest {
@@ -804,9 +804,9 @@ func (a *ObservabilityAPIService) GetAlertRuleExecute(r ApiGetAlertRuleRequest) 
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/alert-rules/{alertRuleId}"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"alertRuleId"+"}", url.PathEscape(parameterValueToString(r.alertRuleId, "alertRuleId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/alert-rules/{alert_rule_id}"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"alert_rule_id"+"}", url.PathEscape(parameterValueToString(r.alertRuleId, "alertRuleId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -945,11 +945,11 @@ func (r ApiGetIncidentRequest) Execute() (*Incident, *http.Response, error) {
 /*
 GetIncident Read a single incident with its ordered timeline.
 
-Returns the incident addressed by `{incidentId}` within the Domain, together with its append-only timeline ordered by `occurred_at` ascending. The read is gated by the `domain-view` ReBAC relation on the addressed Domain.
+Returns the incident addressed by `{incident_id}` within the Domain, together with its append-only timeline ordered by `occurred_at` ascending. The read is gated by the `domain-view` ReBAC relation on the addressed Domain.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
-	@param incidentId Incident identifier (UUIDv7). Bound on `/v1/domains/{domainId}/incidents/{incidentId}`, its `/events` sub-resource, and its `:resolve` sub-resource.
+	@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
+	@param incidentId Incident identifier (UUIDv7). Bound on `/v1/domains/{domain_id}/incidents/{incident_id}`, its `/events` sub-resource, and its `:resolve` sub-resource.
 	@return ApiGetIncidentRequest
 */
 func (a *ObservabilityAPIService) GetIncident(ctx context.Context, domainId string, incidentId string) ApiGetIncidentRequest {
@@ -977,9 +977,9 @@ func (a *ObservabilityAPIService) GetIncidentExecute(r ApiGetIncidentRequest) (*
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/incidents/{incidentId}"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"incidentId"+"}", url.PathEscape(parameterValueToString(r.incidentId, "incidentId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/incidents/{incident_id}"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"incident_id"+"}", url.PathEscape(parameterValueToString(r.incidentId, "incidentId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -1112,13 +1112,13 @@ type ApiListAlertRulesRequest struct {
 	limit      *int32
 }
 
-// Opaque pagination cursor — value of &#x60;next_cursor&#x60; from the previous page, or unset to start at the head of the list.
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
 func (r ApiListAlertRulesRequest) Cursor(cursor string) ApiListAlertRulesRequest {
 	r.cursor = &cursor
 	return r
 }
 
-// Maximum number of alert rules to return on this page. Clamped server-side at 200.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListAlertRulesRequest) Limit(limit int32) ApiListAlertRulesRequest {
 	r.limit = &limit
 	return r
@@ -1134,7 +1134,7 @@ ListAlertRules List the stored alert rules for a Domain.
 Returns a cursor-paginated page of the alert rules stored for the addressed Domain. Alert rules are stored, managed configuration: the platform records and serves them and does not evaluate them in this phase. The read is gated by the `domain-view` ReBAC relation on the addressed Domain, checked before the persistence read.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 	@return ApiListAlertRulesRequest
 */
 func (a *ObservabilityAPIService) ListAlertRules(ctx context.Context, domainId string) ApiListAlertRulesRequest {
@@ -1161,8 +1161,8 @@ func (a *ObservabilityAPIService) ListAlertRulesExecute(r ApiListAlertRulesReque
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/alert-rules"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/alert-rules"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -1306,13 +1306,13 @@ type ApiListIncidentsRequest struct {
 	status     *IncidentStatus
 }
 
-// Opaque pagination cursor — value of &#x60;next_cursor&#x60; from the previous page, or unset to start at the head of the list.
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
 func (r ApiListIncidentsRequest) Cursor(cursor string) ApiListIncidentsRequest {
 	r.cursor = &cursor
 	return r
 }
 
-// Maximum number of incidents to return on this page. Clamped server-side at 200.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListIncidentsRequest) Limit(limit int32) ApiListIncidentsRequest {
 	r.limit = &limit
 	return r
@@ -1334,7 +1334,7 @@ ListIncidents List the incidents for a Domain.
 Returns a cursor-paginated page of incident headers for the addressed Domain. The list projection is header-only — it omits the per-incident timeline, which is returned by the single-incident read. The read is gated by the `domain-view` ReBAC relation on the addressed Domain.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 	@return ApiListIncidentsRequest
 */
 func (a *ObservabilityAPIService) ListIncidents(ctx context.Context, domainId string) ApiListIncidentsRequest {
@@ -1361,8 +1361,8 @@ func (a *ObservabilityAPIService) ListIncidentsExecute(r ApiListIncidentsRequest
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/incidents"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/incidents"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -1522,7 +1522,7 @@ OpenIncident Open a new incident for a Domain.
 Opens a new incident for the addressed Domain in the `open` state with an empty timeline. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before the write, validates the body, then persists the incident header.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 	@return ApiOpenIncidentRequest
 */
 func (a *ObservabilityAPIService) OpenIncident(ctx context.Context, domainId string) ApiOpenIncidentRequest {
@@ -1549,8 +1549,8 @@ func (a *ObservabilityAPIService) OpenIncidentExecute(r ApiOpenIncidentRequest) 
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/incidents"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/incidents"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -1722,7 +1722,7 @@ func (r ApiQueryDomainLogsRequest) Direction(direction QueryDomainLogsDirectionP
 	return r
 }
 
-// Optional Node filter. When present the query is scoped to the named Node so the Dashboard can drill into a single Node&#39;s logs.
+// Optional Node hint for a single-Node drill-down. NOTE: this filter is accepted but NOT yet applied — splicing a per-Node label selector into an arbitrary caller-supplied LogQL expression safely requires parsing the query AST, which is a deferred enhancement. The Domain tenant boundary IS enforced regardless; until Node scoping lands, a present &#x60;nodeId&#x60; does not narrow the result to that Node.
 func (r ApiQueryDomainLogsRequest) NodeId(nodeId string) ApiQueryDomainLogsRequest {
 	r.nodeId = &nodeId
 	return r
@@ -1735,10 +1735,10 @@ func (r ApiQueryDomainLogsRequest) Execute() (*LogsQueryResult, *http.Response, 
 /*
 QueryDomainLogs Run a read-only LogQL logs query for a Domain.
 
-Runs a single read-only LogQL range query against the bundled logs backend for the addressed Domain and returns the backend's verbatim result. The query is always a range query bounded by `start` and `end`; `limit` caps the number of returned lines and `direction` chooses the scan order.  The handler authenticates the caller (401 when no Principal resolves), checks the `domain-view` ReBAC relation on the addressed Domain BEFORE touching the backend so the endpoint cannot be used as a Domain-id oracle (403 on denial), validates the query bounds, then forwards to the logs backend.  Query bounds are enforced at this boundary so one oversized query cannot overwhelm the shared logs store: the expression is capped at 4096 characters, the window may span at most 31 days, and the line result is capped server-side. A query that violates a bound is rejected with 400 before any backend call.  # DECISION: 502 covers an unreachable / failing Loki upstream and 504 # covers an upstream that did not answer in time, mirroring the metrics # query surface. 501 matches the capacity surface's deferred-wiring # posture so log scrapers can alert until the logs backend is wired.
+Runs a single read-only LogQL range query against the bundled logs backend for the addressed Domain and returns the backend's verbatim result. The query is always a range query bounded by `start` and `end`; `limit` caps the number of returned lines and `direction` chooses the scan order.  The handler authenticates the caller (401 when no Principal resolves), checks the `domain-view` ReBAC relation on the addressed Domain BEFORE touching the backend so the endpoint cannot be used as a Domain-id oracle (403 on denial), validates the query bounds, then forwards to the logs backend.  TENANCY: the caller's LogQL expression is NEVER trusted to scope itself. The server derives the upstream tenant from the addressed Domain and stamps it as the backend `X-Scope-OrgID` header server-side (never from a client header), so `domain-view` on Domain A can only ever read Domain A's streams even if the expression names another Domain's labels.  Query bounds are enforced at this boundary so one oversized query cannot overwhelm the shared logs store: the expression is capped at 4096 characters, the window may span at most 31 days, and the line result is capped server-side. A query that violates a bound is rejected with 400 before any backend call.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 	@return ApiQueryDomainLogsRequest
 */
 func (a *ObservabilityAPIService) QueryDomainLogs(ctx context.Context, domainId string) ApiQueryDomainLogsRequest {
@@ -1765,8 +1765,8 @@ func (a *ObservabilityAPIService) QueryDomainLogsExecute(r ApiQueryDomainLogsReq
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/logs/query"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/logs/query"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -1805,7 +1805,7 @@ func (a *ObservabilityAPIService) QueryDomainLogsExecute(r ApiQueryDomainLogsReq
 		r.direction = &defaultValue
 	}
 	if r.nodeId != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "nodeId", r.nodeId, "form", "")
+		parameterAddToHeaderOrQuery(localVarQueryParams, "node_id", r.nodeId, "form", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
@@ -1990,7 +1990,7 @@ func (r ApiQueryDomainMetricsRequest) Step(step string) ApiQueryDomainMetricsReq
 	return r
 }
 
-// Optional Node filter. When present the query is scoped to the named Node so the Dashboard can drill into a single Node&#39;s metrics.
+// Optional Node hint for a single-Node drill-down. NOTE: this filter is accepted but NOT yet applied — splicing a per-Node label selector into an arbitrary caller-supplied PromQL expression safely requires parsing the query AST, which is a deferred enhancement. The Domain tenant boundary IS enforced regardless (see the operation description); until Node scoping lands, a present &#x60;nodeId&#x60; does not narrow the result to that Node.
 func (r ApiQueryDomainMetricsRequest) NodeId(nodeId string) ApiQueryDomainMetricsRequest {
 	r.nodeId = &nodeId
 	return r
@@ -2003,10 +2003,10 @@ func (r ApiQueryDomainMetricsRequest) Execute() (*MetricsQueryResult, *http.Resp
 /*
 QueryDomainMetrics Run a read-only PromQL metrics query for a Domain.
 
-Runs a single read-only PromQL query against the bundled metrics backend for the addressed Domain and returns the backend's verbatim result. Either an instant query (supply `time`) or a range query (supply `start`, `end`, and `step`) is run; when `time` is absent the handler runs a range query and requires the range bounds.  The handler authenticates the caller (401 when no Principal resolves), checks the `domain-view` ReBAC relation on the addressed Domain BEFORE touching the backend so the endpoint cannot be used as a Domain-id oracle (403 on denial), validates the query bounds, then forwards to the metrics backend.  Query bounds are enforced at this boundary so one oversized query cannot overwhelm the shared metrics store: the expression is capped at 4096 characters, a range window may span at most 31 days, and the series result is capped server-side. A query that violates a bound is rejected with 400 before any backend call.  # DECISION: 502 covers an unreachable / failing Mimir upstream and 504 # covers an upstream that did not answer in time, so the operator can # tell an unavailable backend apart from a slow one. 501 matches the # capacity surface's deferred-wiring posture: until the production # composition root supplies the query backends, every request returns # 501 so log scrapers can alert on the deferred-wiring state.
+Runs a single read-only PromQL query against the bundled metrics backend for the addressed Domain and returns the backend's verbatim result. Either an instant query (supply `time`) or a range query (supply `start`, `end`, and `step`) is run; when `time` is absent the handler runs a range query and requires the range bounds. `time` takes precedence: if it is present the range triple is ignored rather than rejected, so a caller must send EITHER `time` OR the range triple, never both.  The handler authenticates the caller (401 when no Principal resolves), checks the `domain-view` ReBAC relation on the addressed Domain BEFORE touching the backend so the endpoint cannot be used as a Domain-id oracle (403 on denial), validates the query bounds, then forwards to the metrics backend.  TENANCY: the caller's PromQL expression is NEVER trusted to scope itself. The server derives the upstream tenant from the addressed Domain and stamps it as the backend `X-Scope-OrgID` header server-side (never from a client header), so `domain-view` on Domain A can only ever read Domain A's series even if the expression names another Domain's labels.  Query bounds are enforced at this boundary so one oversized query cannot overwhelm the shared metrics store: the expression is capped at 4096 characters, a range window may span at most 31 days, and the series result is capped server-side. A query that violates a bound is rejected with 400 before any backend call.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 	@return ApiQueryDomainMetricsRequest
 */
 func (a *ObservabilityAPIService) QueryDomainMetrics(ctx context.Context, domainId string) ApiQueryDomainMetricsRequest {
@@ -2033,8 +2033,8 @@ func (a *ObservabilityAPIService) QueryDomainMetricsExecute(r ApiQueryDomainMetr
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/metrics/query"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/metrics/query"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -2063,7 +2063,7 @@ func (a *ObservabilityAPIService) QueryDomainMetricsExecute(r ApiQueryDomainMetr
 		parameterAddToHeaderOrQuery(localVarQueryParams, "step", r.step, "form", "")
 	}
 	if r.nodeId != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "nodeId", r.nodeId, "form", "")
+		parameterAddToHeaderOrQuery(localVarQueryParams, "node_id", r.nodeId, "form", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
@@ -2220,11 +2220,11 @@ func (r ApiResolveIncidentRequest) Execute() (*Incident, *http.Response, error) 
 /*
 ResolveIncident Resolve an open incident.
 
-Resolves the open incident addressed by `{incidentId}`, transitioning it to the `resolved` state and stamping its resolved-at timestamp. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before the write. Resolving an incident that is already resolved is rejected with 409 — the lifecycle permits a single resolve.
+Resolves the open incident addressed by `{incident_id}`, transitioning it to the `resolved` state and stamping its resolved-at timestamp. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before the write. Resolving an incident that is already resolved is rejected with 409 — the lifecycle permits a single resolve.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
-	@param incidentId Incident identifier (UUIDv7). Bound on `/v1/domains/{domainId}/incidents/{incidentId}`, its `/events` sub-resource, and its `:resolve` sub-resource.
+	@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
+	@param incidentId Incident identifier (UUIDv7). Bound on `/v1/domains/{domain_id}/incidents/{incident_id}`, its `/events` sub-resource, and its `:resolve` sub-resource.
 	@return ApiResolveIncidentRequest
 */
 func (a *ObservabilityAPIService) ResolveIncident(ctx context.Context, domainId string, incidentId string) ApiResolveIncidentRequest {
@@ -2252,9 +2252,9 @@ func (a *ObservabilityAPIService) ResolveIncidentExecute(r ApiResolveIncidentReq
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/incidents/{incidentId}:resolve"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"incidentId"+"}", url.PathEscape(parameterValueToString(r.incidentId, "incidentId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/incidents/{incident_id}/resolve"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"incident_id"+"}", url.PathEscape(parameterValueToString(r.incidentId, "incidentId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -2410,11 +2410,11 @@ func (r ApiUpdateAlertRuleRequest) Execute() (*AlertRule, *http.Response, error)
 /*
 UpdateAlertRule Update mutable fields on a stored alert rule.
 
-Applies a partial update to the alert rule addressed by `{alertRuleId}`. Every body field is optional: an absent field leaves the stored value untouched. The rule remains stored, managed configuration only and is not evaluated in this phase. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before any write, applies the patch, and persists the result. A rename onto an existing name in the Domain is rejected with 409.
+Applies a partial update to the alert rule addressed by `{alert_rule_id}`. Every body field is optional: an absent field leaves the stored value untouched. The rule remains stored, managed configuration only and is not evaluated in this phase. The handler checks the `domain-edit` ReBAC relation on the addressed Domain before any write, applies the patch, and persists the result. A rename onto an existing name in the Domain is rejected with 409.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
-	@param alertRuleId Alert rule identifier (UUIDv7). Bound on `/v1/domains/{domainId}/alert-rules/{alertRuleId}` for the single-rule read, update, and delete.
+	@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
+	@param alertRuleId Alert rule identifier (UUIDv7). Bound on `/v1/domains/{domain_id}/alert-rules/{alert_rule_id}` for the single-rule read, update, and delete.
 	@return ApiUpdateAlertRuleRequest
 */
 func (a *ObservabilityAPIService) UpdateAlertRule(ctx context.Context, domainId string, alertRuleId string) ApiUpdateAlertRuleRequest {
@@ -2442,9 +2442,9 @@ func (a *ObservabilityAPIService) UpdateAlertRuleExecute(r ApiUpdateAlertRuleReq
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/alert-rules/{alertRuleId}"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"alertRuleId"+"}", url.PathEscape(parameterValueToString(r.alertRuleId, "alertRuleId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/alert-rules/{alert_rule_id}"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"alert_rule_id"+"}", url.PathEscape(parameterValueToString(r.alertRuleId, "alertRuleId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

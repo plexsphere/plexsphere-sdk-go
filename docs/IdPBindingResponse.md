@@ -5,7 +5,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Id** | **string** | Binding identifier (UUIDv7). | 
-**DomainId** | Pointer to **string** | Owning Domain, or null for a platform-scoped (shared) binding usable by any Domain.  | [optional] 
+**DomainId** | Pointer to **string** | Owning Domain; absent for a platform-scoped (shared) binding usable by any Domain.  | [optional] 
 **Issuer** | **string** | OIDC issuer URL. | 
 **ClientId** | **string** | OIDC client identifier. | 
 **ClientSecretRef** | **string** | Opaque reference to the client secret. | 

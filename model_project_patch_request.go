@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -17,14 +17,14 @@ import (
 // checks if the ProjectPatchRequest type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &ProjectPatchRequest{}
 
-// ProjectPatchRequest Body for `PATCH /v1/projects/{id}`. All properties are optional — but the body MUST set at least one of `name`, `description`, `sub_range_cidr`, or `release_sub_range`. An empty body is rejected at the handler with `400 empty_patch`.  x-project-slug-immutable: The `slug` is intentionally absent from this schema. The handler rejects any request body that carries a `slug` key (even with the same value) at decode time with `400 slug_immutable`. See the `tenancy` tag description for the rationale.
+// ProjectPatchRequest Body for `PATCH /v1/projects/{id}`. All properties are optional — but the body MUST set at least one of `name`, `description`, `sub_range_cidr`, or `release_sub_range`. An empty body is rejected at the handler with `400 empty_patch`.  The immutable `slug` is intentionally absent from this schema; the handler rejects any body carrying a `slug` key (even with the same value) at decode time with `400 slug_immutable`. See the `tenancy` tag description for the rationale.
 type ProjectPatchRequest struct {
 	// New human-readable Project name. The aggregate's `Rename` mutator validates the same constraints as `NewProject`.
 	Name *string `json:"name,omitempty"`
 	// New free-form description. The empty string clears the description; a whitespace-only string is rejected so an operator typo cannot silently wipe the field.
 	Description *string `json:"description,omitempty"`
 	// New canonical RFC 4632 sub-range reservation. Triggers the in-tx sibling-overlap guard inside the parent Domain (`409 sub_range_overlap` / `422 sub_range_invalidates_allocation`).
-	SubRangeCidr *string `json:"sub_range_cidr,omitempty"`
+	SubRangeCidr *string `json:"sub_range_cidr,omitempty" validate:"regexp=^([0-9]{1,3}\\\\.){3}[0-9]{1,3}\\/[0-9]{1,2}$|^[0-9a-fA-F:]+\\/[0-9]{1,3}$"`
 	// When `true`, clears the existing sub-range reservation. Mutually exclusive with `sub_range_cidr` — the service rejects bodies that carry both with `422 sub_range_invalidates_allocation`.
 	ReleaseSubRange *bool `json:"release_sub_range,omitempty"`
 }

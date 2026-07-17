@@ -4,13 +4,13 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**Tunnels** | [**[]BridgeSiteToSiteTunnelResponse**](BridgeSiteToSiteTunnelResponse.md) | Tunnels ordered by slug ascending. | 
+**Items** | [**[]BridgeSiteToSiteTunnelResponse**](BridgeSiteToSiteTunnelResponse.md) | Tunnels ordered by slug ascending. | 
 
 ## Methods
 
 ### NewBridgeSiteToSiteTunnelList
 
-`func NewBridgeSiteToSiteTunnelList(tunnels []BridgeSiteToSiteTunnelResponse, ) *BridgeSiteToSiteTunnelList`
+`func NewBridgeSiteToSiteTunnelList(items []BridgeSiteToSiteTunnelResponse, ) *BridgeSiteToSiteTunnelList`
 
 NewBridgeSiteToSiteTunnelList instantiates a new BridgeSiteToSiteTunnelList object
 This constructor will assign default values to properties that have it defined,
@@ -25,24 +25,24 @@ NewBridgeSiteToSiteTunnelListWithDefaults instantiates a new BridgeSiteToSiteTun
 This constructor will only assign default values to properties that have it defined,
 but it doesn't guarantee that properties required by API are set
 
-### GetTunnels
+### GetItems
 
-`func (o *BridgeSiteToSiteTunnelList) GetTunnels() []BridgeSiteToSiteTunnelResponse`
+`func (o *BridgeSiteToSiteTunnelList) GetItems() []BridgeSiteToSiteTunnelResponse`
 
-GetTunnels returns the Tunnels field if non-nil, zero value otherwise.
+GetItems returns the Items field if non-nil, zero value otherwise.
 
-### GetTunnelsOk
+### GetItemsOk
 
-`func (o *BridgeSiteToSiteTunnelList) GetTunnelsOk() (*[]BridgeSiteToSiteTunnelResponse, bool)`
+`func (o *BridgeSiteToSiteTunnelList) GetItemsOk() (*[]BridgeSiteToSiteTunnelResponse, bool)`
 
-GetTunnelsOk returns a tuple with the Tunnels field if it's non-nil, zero value otherwise
+GetItemsOk returns a tuple with the Items field if it's non-nil, zero value otherwise
 and a boolean to check if the value has been set.
 
-### SetTunnels
+### SetItems
 
-`func (o *BridgeSiteToSiteTunnelList) SetTunnels(v []BridgeSiteToSiteTunnelResponse)`
+`func (o *BridgeSiteToSiteTunnelList) SetItems(v []BridgeSiteToSiteTunnelResponse)`
 
-SetTunnels sets Tunnels field to given value.
+SetItems sets Items field to given value.
 
 
 

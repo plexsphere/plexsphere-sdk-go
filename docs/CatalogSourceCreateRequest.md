@@ -8,8 +8,8 @@ Name | Type | Description | Notes
 **OciReference** | [**OciReference**](OciReference.md) |  | 
 **Verification** | [**VerificationPolicy**](VerificationPolicy.md) |  | 
 **Tracking** | [**TrackingPolicy**](TrackingPolicy.md) |  | 
-**CredentialRef** | Pointer to **string** | Optional &#x60;namespace/name&#x60; reference to the Kubernetes Secret the registry authenticates with. Omit or &#x60;null&#x60; for a public registry. A malformed reference surfaces as &#x60;400 invalid_credential_ref&#x60;.  | [optional] 
-**DomainId** | Pointer to **string** | Owning Domain when the source is scoped to a single Domain. Omit or &#x60;null&#x60; for a catalog-global source. The scope drives the ReBAC gate: a Domain-scoped source gates on &#x60;domain#manage&#x60;, a catalog-global source on &#x60;platform#manage&#x60;.  | [optional] 
+**CredentialRef** | Pointer to **string** | Optional &#x60;namespace/name&#x60; reference to the Kubernetes Secret the registry authenticates with. Omit for a public registry. A malformed reference surfaces as &#x60;400 invalid_credential_ref&#x60;.  | [optional] 
+**DomainId** | Pointer to **string** | Owning Domain when the source is scoped to a single Domain. Omit for a catalog-global source. The scope drives the ReBAC gate: a Domain-scoped source gates on &#x60;domain#manage&#x60;, a catalog-global source on &#x60;platform#manage&#x60;.  | [optional] 
 **Status** | [**CatalogSourceCreateRequestStatus**](CatalogSourceCreateRequestStatus.md) |  | 
 
 ## Methods

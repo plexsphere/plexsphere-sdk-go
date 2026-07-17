@@ -6,7 +6,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Id** | **string** | Blueprint identifier (UUIDv7). | 
 **Slug** | **string** | Kebab-case URL handle, unique across the catalogue. | 
-**DomainId** | Pointer to **string** | Owning Domain when the Blueprint is scoped to a single Domain. &#x60;null&#x60; when the entry is catalogue-wide.  | [optional] 
+**DomainId** | Pointer to **string** | Owning Domain when the Blueprint is scoped to a single Domain. Absent when the entry is catalogue-wide.  | [optional] 
 **DisplayName** | **string** | Human-readable Blueprint name. | 
 **Description** | Pointer to **string** | Optional free-form Blueprint description. Empty when the catalogue entry declares none.  | [optional] 
 **Status** | [**BlueprintResponseStatus**](BlueprintResponseStatus.md) |  | 

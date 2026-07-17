@@ -7,7 +7,7 @@ Name | Type | Description | Notes
 **Subject** | **string** | Object reference of the subject whose reachable resources are enumerated (e.g. &#x60;user:0190a8b8-...&#x60;, &#x60;service-identity:...&#x60;).  | 
 **Relation** | **string** | Relation name to evaluate (e.g. &#x60;read&#x60;, &#x60;manage&#x60;). The accepted set is fixed by the schema in &#x60;schema/authz.zed&#x60;.  | 
 **ResourceType** | **string** | Object type whose instances are enumerated (e.g. &#x60;project&#x60;, &#x60;domain&#x60;). Returned &#x60;items&#x60; are &#x60;&lt;resource_type&gt;:&lt;id&gt;&#x60; object references.  | 
-**CaveatContext** | Pointer to **map[string]interface{}** | Optional set of caveat field NAMES the request makes available to the caveat program. Values are never carried across the contract boundary; the field type is &#x60;object&#x60; for forward-compatibility but the contract requires NAMES-only payloads.  | [optional] 
+**CaveatContext** | Pointer to **map[string]interface{}** | Optional CEL caveat evaluation context — a map from caveat field NAME to VALUE — forwarded verbatim to the authorizer so a caveated relation can be evaluated at check time. Values DO cross this boundary (they are the evaluation inputs); it is the AUDIT projection of this call that records field NAMES only, never the values.  | [optional] 
 
 ## Methods
 

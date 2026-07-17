@@ -4,13 +4,13 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**RevokeReason** | [**RevokeReason**](RevokeReason.md) | Reason for the revocation. Only the operator-driven values are accepted here — the sweeper reasons (&#x60;ttl_expired&#x60;, &#x60;idle_timeout&#x60;) are set internally, never by this call.  | 
+**RevokeReason** | [**OperatorRevokeReason**](OperatorRevokeReason.md) | Reason for the revocation. The schema is the operator-driven subset of &#x60;RevokeReason&#x60; — the sweeper reasons (&#x60;ttl_expired&#x60;, &#x60;idle_timeout&#x60;) are set internally, never by this call, so a request carrying one fails validation instead of reaching the handler.  | 
 
 ## Methods
 
 ### NewRevokeSessionRequest
 
-`func NewRevokeSessionRequest(revokeReason RevokeReason, ) *RevokeSessionRequest`
+`func NewRevokeSessionRequest(revokeReason OperatorRevokeReason, ) *RevokeSessionRequest`
 
 NewRevokeSessionRequest instantiates a new RevokeSessionRequest object
 This constructor will assign default values to properties that have it defined,
@@ -27,20 +27,20 @@ but it doesn't guarantee that properties required by API are set
 
 ### GetRevokeReason
 
-`func (o *RevokeSessionRequest) GetRevokeReason() RevokeReason`
+`func (o *RevokeSessionRequest) GetRevokeReason() OperatorRevokeReason`
 
 GetRevokeReason returns the RevokeReason field if non-nil, zero value otherwise.
 
 ### GetRevokeReasonOk
 
-`func (o *RevokeSessionRequest) GetRevokeReasonOk() (*RevokeReason, bool)`
+`func (o *RevokeSessionRequest) GetRevokeReasonOk() (*OperatorRevokeReason, bool)`
 
 GetRevokeReasonOk returns a tuple with the RevokeReason field if it's non-nil, zero value otherwise
 and a boolean to check if the value has been set.
 
 ### SetRevokeReason
 
-`func (o *RevokeSessionRequest) SetRevokeReason(v RevokeReason)`
+`func (o *RevokeSessionRequest) SetRevokeReason(v OperatorRevokeReason)`
 
 SetRevokeReason sets RevokeReason field to given value.
 

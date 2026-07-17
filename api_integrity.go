@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -39,7 +39,7 @@ type IntegrityAPI interface {
 	/*
 		ListIntegrityViolations List integrity violations across Domains.
 
-		Returns a cursor-paginated page of integrity-violation rows the agents reported, optionally narrowed by owning Domain, Project, Node, violation `kind`, or lifecycle `status`. The handler runs the platform read gate before the persistence read, then layers a per-row visibility filter on the owning Domain so `items` is the subset the caller is authorised to see.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym; a cross-caller replay surfaces as `403 cursor_binding_mismatch`, and a tampered or malformed cursor surfaces as `400 invalid_cursor`. `limit` is clamped to `[1, 200]` rather than rejected.
+		Returns a cursor-paginated page of integrity-violation rows the agents reported, optionally narrowed by owning Domain, Project, Node, violation `kind`, or lifecycle `status`. The handler runs the platform read gate before the persistence read, then layers a per-row visibility filter on the owning Domain so `items` is the subset the caller is authorised to see.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym; a cross-caller replay surfaces as `403 cursor_binding_mismatch`, and a tampered or malformed cursor surfaces as `400 invalid_cursor`. An out-of-range `limit` is rejected with `400`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiListIntegrityViolationsRequest
@@ -276,13 +276,13 @@ func (r ApiListIntegrityViolationsRequest) Status(status IntegrityViolationStatu
 	return r
 }
 
-// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed so a tampered cursor surfaces as &#x60;400&#x60;.
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
 func (r ApiListIntegrityViolationsRequest) Cursor(cursor string) ApiListIntegrityViolationsRequest {
 	r.cursor = &cursor
 	return r
 }
 
-// Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the read service.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListIntegrityViolationsRequest) Limit(limit int32) ApiListIntegrityViolationsRequest {
 	r.limit = &limit
 	return r
@@ -295,7 +295,7 @@ func (r ApiListIntegrityViolationsRequest) Execute() (*IntegrityViolationList, *
 /*
 ListIntegrityViolations List integrity violations across Domains.
 
-Returns a cursor-paginated page of integrity-violation rows the agents reported, optionally narrowed by owning Domain, Project, Node, violation `kind`, or lifecycle `status`. The handler runs the platform read gate before the persistence read, then layers a per-row visibility filter on the owning Domain so `items` is the subset the caller is authorised to see.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym; a cross-caller replay surfaces as `403 cursor_binding_mismatch`, and a tampered or malformed cursor surfaces as `400 invalid_cursor`. `limit` is clamped to `[1, 200]` rather than rejected.
+Returns a cursor-paginated page of integrity-violation rows the agents reported, optionally narrowed by owning Domain, Project, Node, violation `kind`, or lifecycle `status`. The handler runs the platform read gate before the persistence read, then layers a per-row visibility filter on the owning Domain so `items` is the subset the caller is authorised to see.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym; a cross-caller replay surfaces as `403 cursor_binding_mismatch`, and a tampered or malformed cursor surfaces as `400 invalid_cursor`. An out-of-range `limit` is rejected with `400`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiListIntegrityViolationsRequest
@@ -416,7 +416,7 @@ func (a *IntegrityAPIService) ListIntegrityViolationsExecute(r ApiListIntegrityV
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 403 {
-			var v PermissionDenied
+			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()

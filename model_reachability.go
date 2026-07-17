@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -19,10 +19,10 @@ import (
 // checks if the Reachability type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &Reachability{}
 
-// Reachability Per-Node reachability projection driven by the heartbeat handler. The state-machine transitions `healthy` → `stale` after 90 seconds without an accepted heartbeat and `stale` → `unreachable` after 300 seconds. `last_heartbeat_at` is `null` until the first heartbeat is accepted; `changed_at` is always present and tracks the most recent state transition.
+// Reachability Per-Node reachability projection driven by the heartbeat handler. The state-machine transitions `healthy` → `stale` after 90 seconds without an accepted heartbeat and `stale` → `unreachable` after 300 seconds. `last_heartbeat_at` is absent until the first heartbeat is accepted; `changed_at` is always present and tracks the most recent state transition.
 type Reachability struct {
 	State ReachabilityState `json:"state"`
-	// Server-side timestamp of the most recently accepted heartbeat, or `null` until the first heartbeat is accepted.
+	// Server-side timestamp of the most recently accepted heartbeat; absent until the first heartbeat is accepted.
 	LastHeartbeatAt *time.Time `json:"last_heartbeat_at,omitempty"`
 	// Server-side timestamp of the most recent transition into the current `state`. Always present — for a Node that has never sent a heartbeat this is the timestamp at which the reachability row was first materialised.
 	ChangedAt            time.Time `json:"changed_at"`

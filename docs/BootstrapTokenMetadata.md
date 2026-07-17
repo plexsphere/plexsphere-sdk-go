@@ -10,8 +10,8 @@ Name | Type | Description | Notes
 **EnvPrefix** | **string** | Environment segment encoded in the plaintext at issuance time.  | 
 **IssuedAt** | **time.Time** | Issuance timestamp (UTC). | 
 **ExpiresAt** | **time.Time** | Absolute expiry timestamp (UTC). | 
-**ConsumedAt** | Pointer to **time.Time** | Redemption timestamp, or null when the token has not yet been redeemed. A non-null value is terminal — a consumed token cannot be redeemed again.  | [optional] 
-**RevokedAt** | Pointer to **time.Time** | Revocation timestamp, or null when the token is still live. A non-null value is terminal — a revoked token rejects redemption regardless of expiry.  | [optional] 
+**ConsumedAt** | Pointer to **time.Time** | Redemption timestamp; absent when the token has not yet been redeemed. A non-null value is terminal — a consumed token cannot be redeemed again.  | [optional] 
+**RevokedAt** | Pointer to **time.Time** | Revocation timestamp; absent when the token is still live. A non-null value is terminal — a revoked token rejects redemption regardless of expiry.  | [optional] 
 **IssuedByUserId** | **string** | User who issued the token.  | 
 
 ## Methods

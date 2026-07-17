@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -32,7 +32,7 @@ type ProjectResponse struct {
 	// Optional free-form description. Empty string when the operator did not set one (the wire shape never carries `null` for this field).
 	Description *string `json:"description,omitempty"`
 	// Optional canonical RFC 4632 sub-range reservation inside the parent Domain's mesh_cidr. Cross-Project non-overlap within the parent Domain is enforced by the SQL GIST exclusion constraint on `plexsphere.project_mesh_ip_reservations`.
-	SubRangeCidr *string `json:"sub_range_cidr,omitempty"`
+	SubRangeCidr *string `json:"sub_range_cidr,omitempty" validate:"regexp=^([0-9]{1,3}\\\\.){3}[0-9]{1,3}\\/[0-9]{1,2}$|^[0-9a-fA-F:]+\\/[0-9]{1,3}$"`
 	// Aggregate creation timestamp (UTC).
 	CreatedAt time.Time `json:"created_at"`
 	// Last-modified timestamp (UTC). Bumped by every mutator — `Rename`, `ChangeDescription`, `ReserveSubRange`, `ResizeSubRange`, `ReleaseSubRange`.

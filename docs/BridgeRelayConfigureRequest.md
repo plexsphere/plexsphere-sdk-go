@@ -5,7 +5,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Enabled** | **bool** | Whether the relay is active. A disabled relay keeps its configuration but programs no listener on the Node.  | 
-**ListenPort** | **int32** | UDP port the relay listens on. Outside &#x60;1..65535&#x60; the write is rejected with &#x60;400 relay_port_out_of_range&#x60;.  | 
+**ListenPort** | **int32** | UDP port the relay listens on. Outside &#x60;1..65535&#x60; the write is rejected with &#x60;400 port_out_of_range&#x60;.  | 
 
 ## Methods
 

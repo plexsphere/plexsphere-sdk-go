@@ -7,7 +7,7 @@ Name | Type | Description | Notes
 **Slug** | **string** | Kebab-case URL handle, unique across the catalogue. The aggregate&#39;s &#x60;ParseSlug&#x60; enforces the same regex; surfacing the pattern here lets the generated client validate before the round-trip.  | 
 **DisplayName** | **string** | Human-readable Blueprint name. Whitespace-only is rejected. | 
 **Description** | Pointer to **string** | Optional free-form Blueprint description. | [optional] 
-**DomainId** | Pointer to **string** | Owning Domain when the Blueprint is scoped to a single Domain. Omit or &#x60;null&#x60; for a catalogue-wide entry.  | [optional] 
+**DomainId** | Pointer to **string** | Owning Domain when the Blueprint is scoped to a single Domain. Omit for a catalogue-wide entry.  | [optional] 
 
 ## Methods
 

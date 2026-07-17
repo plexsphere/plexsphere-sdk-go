@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -20,17 +20,17 @@ var _ MappedNullable = &RegisterRequest{}
 
 // RegisterRequest Body for POST /v1/register. Carries every field a freshly-installed plexd agent submits at registration time: the tenant scope (`project_id` + `resource_id`), the one-shot BootstrapToken plaintext, a replay-protection nonce, and the agent's WireGuard X25519 public key.  Field order in the wire shape mirrors the `internal/identity/nodes/registration.RegisterCommand` value-object the handler builds before invoking the application service. The handler validates `public_key` BEFORE attempting any BootstrapToken consumption so a malformed key cannot also waste a token.
 type RegisterRequest struct {
-	// Project the redeeming substrate is enrolling into. Must match the `project_id` segment of the plaintext `bootstrap_token`; a mismatch surfaces as 403 with `reason=project_mismatch`.
+	// Project the redeeming substrate is enrolling into. Must match the `project_id` segment of the plaintext `bootstrap_token`; a mismatch surfaces as 403 with `code=project_mismatch`.
 	ProjectId string `json:"project_id"`
 	// Human-readable Resource handle (e.g. `edge-router-01`) the registering Node binds to. The handler resolves this against the Resource aggregate; an unknown handle surfaces as 404 with `code=resource_not_found`.
-	ResourceId string `json:"resource_id"`
-	// Plaintext BootstrapToken in the documented `psb_<env>_<projectId>_<kind>_<random>` format (matches `^psb_[a-z]+_[a-z2-7]+_(node|bridge)_[a-z2-7]{20,}$`) . The Validator parses the prefix to discover the env + project-id + kind triple before running the candidate scan.
+	ResourceHandle string `json:"resource_handle"`
+	// Plaintext BootstrapToken in the documented `psb_<env>_<projectId>_<kind>_<random>` format (matches `^psb_[a-z]+_[a-z2-7]+_(node|bridge)_[a-z2-7]{20,}$`). The Validator parses the prefix to discover the env + project-id + kind triple before running the candidate scan.
 	BootstrapToken string `json:"bootstrap_token"`
-	// Request-side replay-protection nonce. The persistence layer holds a partial UNIQUE on (project_id, consumed_nonce); a duplicate surfaces as 403 with `reason=nonce_collision`.
+	// Request-side replay-protection nonce. The persistence layer holds a partial UNIQUE on (project_id, consumed_nonce); a duplicate surfaces as 403 with `code=nonce_collision`.
 	Nonce string `json:"nonce"`
 	// 32-byte X25519 (WireGuard) public key, base64-encoded with standard padding. RFC 7748 §5 fixes the curve to a 32-byte little-endian point encoding so any other byte length surfaces as 400 with `code=public_key_invalid`; the all-zero degenerate value (a known small-order point) is also rejected with the same code. The fixed length-44 base64 canonical form is the standard `RawStdEncoding`-with-padding result for a 32-byte payload.
 	PublicKey string `json:"public_key" validate:"regexp=^[A-Za-z0-9+\\/]{43}=$"`
-	// Optional override the operator can supply when the substrate's own naming differs from the platform handle (e.g. the Node identifies itself as `node-12` while the platform Resource is `edge-router-01`). Empty or omitted means \"no override; use `resource_id` verbatim\" .
+	// Optional override the operator can supply when the substrate's own naming differs from the platform handle (e.g. the Node identifies itself as `node-12` while the platform Resource is `edge-router-01`). Empty or omitted means \"no override; use `resource_handle` verbatim\".
 	RequestedResourceId  *string `json:"requested_resource_id,omitempty"`
 	AdditionalProperties map[string]interface{}
 }
@@ -41,10 +41,10 @@ type _RegisterRequest RegisterRequest
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewRegisterRequest(projectId string, resourceId string, bootstrapToken string, nonce string, publicKey string) *RegisterRequest {
+func NewRegisterRequest(projectId string, resourceHandle string, bootstrapToken string, nonce string, publicKey string) *RegisterRequest {
 	this := RegisterRequest{}
 	this.ProjectId = projectId
-	this.ResourceId = resourceId
+	this.ResourceHandle = resourceHandle
 	this.BootstrapToken = bootstrapToken
 	this.Nonce = nonce
 	this.PublicKey = publicKey
@@ -83,28 +83,28 @@ func (o *RegisterRequest) SetProjectId(v string) {
 	o.ProjectId = v
 }
 
-// GetResourceId returns the ResourceId field value
-func (o *RegisterRequest) GetResourceId() string {
+// GetResourceHandle returns the ResourceHandle field value
+func (o *RegisterRequest) GetResourceHandle() string {
 	if o == nil {
 		var ret string
 		return ret
 	}
 
-	return o.ResourceId
+	return o.ResourceHandle
 }
 
-// GetResourceIdOk returns a tuple with the ResourceId field value
+// GetResourceHandleOk returns a tuple with the ResourceHandle field value
 // and a boolean to check if the value has been set.
-func (o *RegisterRequest) GetResourceIdOk() (*string, bool) {
+func (o *RegisterRequest) GetResourceHandleOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
-	return &o.ResourceId, true
+	return &o.ResourceHandle, true
 }
 
-// SetResourceId sets field value
-func (o *RegisterRequest) SetResourceId(v string) {
-	o.ResourceId = v
+// SetResourceHandle sets field value
+func (o *RegisterRequest) SetResourceHandle(v string) {
+	o.ResourceHandle = v
 }
 
 // GetBootstrapToken returns the BootstrapToken field value
@@ -222,7 +222,7 @@ func (o RegisterRequest) MarshalJSON() ([]byte, error) {
 func (o RegisterRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["project_id"] = o.ProjectId
-	toSerialize["resource_id"] = o.ResourceId
+	toSerialize["resource_handle"] = o.ResourceHandle
 	toSerialize["bootstrap_token"] = o.BootstrapToken
 	toSerialize["nonce"] = o.Nonce
 	toSerialize["public_key"] = o.PublicKey
@@ -243,7 +243,7 @@ func (o *RegisterRequest) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"project_id",
-		"resource_id",
+		"resource_handle",
 		"bootstrap_token",
 		"nonce",
 		"public_key",
@@ -277,7 +277,7 @@ func (o *RegisterRequest) UnmarshalJSON(data []byte) (err error) {
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "project_id")
-		delete(additionalProperties, "resource_id")
+		delete(additionalProperties, "resource_handle")
 		delete(additionalProperties, "bootstrap_token")
 		delete(additionalProperties, "nonce")
 		delete(additionalProperties, "public_key")

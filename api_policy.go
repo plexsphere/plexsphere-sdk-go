@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -128,8 +128,8 @@ type PolicyAPI interface {
 	ListPolicies(ctx context.Context, projectId string) ApiListPoliciesRequest
 
 	// ListPoliciesExecute executes the request
-	//  @return PolicyListResponse
-	ListPoliciesExecute(r ApiListPoliciesRequest) (*PolicyListResponse, *http.Response, error)
+	//  @return PolicyList
+	ListPoliciesExecute(r ApiListPoliciesRequest) (*PolicyList, *http.Response, error)
 
 	/*
 		ListPolicyRevisions List a Policy's revision history.
@@ -144,8 +144,8 @@ type PolicyAPI interface {
 	ListPolicyRevisions(ctx context.Context, projectId string, policyId string) ApiListPolicyRevisionsRequest
 
 	// ListPolicyRevisionsExecute executes the request
-	//  @return PolicyRevisionListResponse
-	ListPolicyRevisionsExecute(r ApiListPolicyRevisionsRequest) (*PolicyRevisionListResponse, *http.Response, error)
+	//  @return PolicyRevisionList
+	ListPolicyRevisionsExecute(r ApiListPolicyRevisionsRequest) (*PolicyRevisionList, *http.Response, error)
 
 	/*
 		UpdatePolicy Update a Policy by landing a new revision.
@@ -1179,19 +1179,19 @@ type ApiListPoliciesRequest struct {
 	limit      *int32
 }
 
-// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;.
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
 func (r ApiListPoliciesRequest) Cursor(cursor string) ApiListPoliciesRequest {
 	r.cursor = &cursor
 	return r
 }
 
-// Maximum number of items to return in a single page. Clamped to 200 server-side.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListPoliciesRequest) Limit(limit int32) ApiListPoliciesRequest {
 	r.limit = &limit
 	return r
 }
 
-func (r ApiListPoliciesRequest) Execute() (*PolicyListResponse, *http.Response, error) {
+func (r ApiListPoliciesRequest) Execute() (*PolicyList, *http.Response, error) {
 	return r.ApiService.ListPoliciesExecute(r)
 }
 
@@ -1214,13 +1214,13 @@ func (a *PolicyAPIService) ListPolicies(ctx context.Context, projectId string) A
 
 // Execute executes the request
 //
-//	@return PolicyListResponse
-func (a *PolicyAPIService) ListPoliciesExecute(r ApiListPoliciesRequest) (*PolicyListResponse, *http.Response, error) {
+//	@return PolicyList
+func (a *PolicyAPIService) ListPoliciesExecute(r ApiListPoliciesRequest) (*PolicyList, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodGet
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *PolicyListResponse
+		localVarReturnValue *PolicyList
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "PolicyAPIService.ListPolicies")
@@ -1362,19 +1362,19 @@ type ApiListPolicyRevisionsRequest struct {
 	limit      *int32
 }
 
-// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;.
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
 func (r ApiListPolicyRevisionsRequest) Cursor(cursor string) ApiListPolicyRevisionsRequest {
 	r.cursor = &cursor
 	return r
 }
 
-// Maximum number of items to return in a single page. Clamped to 200 server-side.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListPolicyRevisionsRequest) Limit(limit int32) ApiListPolicyRevisionsRequest {
 	r.limit = &limit
 	return r
 }
 
-func (r ApiListPolicyRevisionsRequest) Execute() (*PolicyRevisionListResponse, *http.Response, error) {
+func (r ApiListPolicyRevisionsRequest) Execute() (*PolicyRevisionList, *http.Response, error) {
 	return r.ApiService.ListPolicyRevisionsExecute(r)
 }
 
@@ -1399,13 +1399,13 @@ func (a *PolicyAPIService) ListPolicyRevisions(ctx context.Context, projectId st
 
 // Execute executes the request
 //
-//	@return PolicyRevisionListResponse
-func (a *PolicyAPIService) ListPolicyRevisionsExecute(r ApiListPolicyRevisionsRequest) (*PolicyRevisionListResponse, *http.Response, error) {
+//	@return PolicyRevisionList
+func (a *PolicyAPIService) ListPolicyRevisionsExecute(r ApiListPolicyRevisionsRequest) (*PolicyRevisionList, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodGet
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *PolicyRevisionListResponse
+		localVarReturnValue *PolicyRevisionList
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "PolicyAPIService.ListPolicyRevisions")

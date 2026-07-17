@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -24,7 +24,7 @@ type AuthAPI interface {
 	/*
 		DeleteAuthSession Sign the current caller out.
 
-		Terminates the caller's authenticated session and clears the session cookie. The endpoint is idempotent and unauthenticated: callers without a session cookie, or with a stale or already-revoked one, still receive a 204 with the cookie cleared. No information about whether a session existed is disclosed in the response body. Because the handler treats every caller as a successful 204 by design (the four behaviour scenarios are documented on `internal/transport/http/v1/auth/signout.go`), this operation advertises only the 204 response — no 401 or 500 path is reachable from the handler (-1 Q4).
+		Terminates the caller's authenticated session and clears the session cookie. The endpoint is idempotent and unauthenticated: callers without a session cookie, or with a stale or already-revoked one, still receive a 204 with the cookie cleared. No information about whether a session existed is disclosed in the response body. Because the handler treats every caller as a successful 204 by design (the four behaviour scenarios are documented on `internal/transport/http/v1/auth/signout.go`), this operation advertises only the 204 response — no 401 or 500 path is reachable from the handler.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiDeleteAuthSessionRequest
@@ -37,7 +37,7 @@ type AuthAPI interface {
 	/*
 		DeleteAuthTokenByID Immediately revoke an API token.
 
-		Revokes the token identified by `id` with no grace period . Subsequent authentications with the plaintext fail closed.
+		Revokes the token identified by `id` with no grace period. Subsequent authentications with the plaintext fail closed.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Token identifier (UUIDv7).
@@ -51,7 +51,7 @@ type AuthAPI interface {
 	/*
 		GetAuthCallback OIDC redirect callback — exchanges `code` for a session.
 
-		Receives the OIDC redirect after the end user completes sign-in at the IdP. Validates `state` and `nonce`, exchanges the authorization code for tokens, provisions/updates the user via the JIT policy, issues a plexsphere session cookie, and 303 See Other-redirects the browser to the application root (`/`). The endpoint is invoked exclusively via top-level browser navigation per RFC 6749 §4.1.2; clients that need a machine-readable session shape should call `GET /v1/auth/whoami` once the session cookie is set .  Failure responses are content-negotiated via the `Accept` request header:  - **Browser-leg failure** — when `Accept` is absent, `*_/_*`, or   includes `text/html`, the server responds with `303 See   Other` to `/?auth_error_kind=...&auth_error_status=...&auth_error_detail=...`   so the browser client can render the error inline next to the sign-in   form. No session cookie is issued. - **JSON-leg failure** — when `Accept` includes   `application/json` or `application/problem+json`, the server   returns the original status (`400`, `500`, or `502`) with an   `application/problem+json` body conforming to RFC 7807.
+		Receives the OIDC redirect after the end user completes sign-in at the IdP. Validates `state` and `nonce`, exchanges the authorization code for tokens, provisions/updates the user via the JIT policy, issues a plexsphere session cookie, and 303 See Other-redirects the browser to the application root (`/`). The endpoint is invoked exclusively via top-level browser navigation per RFC 6749 §4.1.2; clients that need a machine-readable session shape should call `GET /v1/auth/whoami` once the session cookie is set.  Failure responses are content-negotiated via the `Accept` request header:  - **Browser-leg failure** — when `Accept` is absent, `*_/_*`, or   includes `text/html`, the server responds with `303 See   Other` to `/?auth_error_kind=...&auth_error_status=...&auth_error_detail=...`   so the browser client can render the error inline next to the sign-in   form. No session cookie is issued. - **JSON-leg failure** — when `Accept` includes   `application/json` or `application/problem+json`, the server   returns the original status (`400`, `500`, or `502`) with an   `application/problem+json` body conforming to RFC 7807.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiGetAuthCallbackRequest
@@ -62,9 +62,9 @@ type AuthAPI interface {
 	GetAuthCallbackExecute(r ApiGetAuthCallbackRequest) (*http.Response, error)
 
 	/*
-		GetAuthIdPBindings List a Domain's effective IdP bindings for the sign-in chooser.
+		GetAuthIdPBindings List the IdP bindings available to the sign-in chooser.
 
-		Unauthenticated, display-safe discovery surface the dashboard sign-in page calls once a Domain id is known (typed or supplied via a deep link) so it can render a provider chooser. Returns only the active bindings the Domain can sign in with — its own active bindings, falling back to the platform-scoped shared bindings when the Domain owns none — projected to non-secret fields and ordered primary-first.  The endpoint is intentionally a pre-auth enumeration surface and does not behave as a Domain-existence oracle: a Domain that does not exist returns the same shape (the applicable platform bindings, or an empty list) as a Domain that exists but owns no bindings, so an unauthenticated caller cannot distinguish the two. Responses are marked `Cache-Control: no-store`.
+		Unauthenticated, display-safe discovery surface the dashboard sign-in page calls so it can render a provider chooser. Callers supply either `domain_id` OR `scope=platform`.  With `domain_id`, returns only the active bindings the Domain can sign in with — its own active bindings, falling back to the platform-scoped shared bindings when the Domain owns none — projected to non-secret fields and ordered primary-first.  With `scope=platform` (and no `domain_id`), returns the active platform-scoped shared bindings a Platform Operator can start a Domain-independent sign-in against. The platform set is the same shared fall-back set any `domain_id` request may already receive, so listing it discloses nothing new.  The endpoint is intentionally a pre-auth enumeration surface and does not behave as a Domain-existence oracle: a Domain that does not exist returns the same shape (the applicable platform bindings, or an empty list) as a Domain that exists but owns no bindings, so an unauthenticated caller cannot distinguish the two. Responses are marked `Cache-Control: no-store`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiGetAuthIdPBindingsRequest
@@ -78,7 +78,7 @@ type AuthAPI interface {
 	/*
 		GetAuthTokens List the caller's API tokens (no plaintext).
 
-		Returns the caller's API-token summaries. Plaintext is never included — it is only available at issuance time .
+		Returns the caller's API-token summaries. Plaintext is never included — it is only available at issuance time.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiGetAuthTokensRequest
@@ -106,7 +106,7 @@ type AuthAPI interface {
 	/*
 		PostAuthDeviceApprove Approve a pending RFC 8628 device-authorization session.
 
-		Flips a pending `DeviceSession` (looked up by the operator-typed `user_code`) to `status=approved` and pins the authenticated principal onto it so the next `POST /v1/auth/device-token` poll mints a token bound to that user.  Authentication: requires the `plexsphere_session` cookie minted by the OIDC callback. The CSRF middleware additionally requires the `X-Plexsphere-CSRF` header to echo the `plexsphere_csrf` cookie value (issue #181).  Errors use the RFC 8628-adjacent taxonomy in `Problem.code`: `device-code-not-found` (404 — unknown user_code), `device-code-expired` (409 — session past `expires_at`), `device-code-already-approved` (409 — already approved by an earlier request), `csrf-token-mismatch` / `csrf-origin-mismatch` (403 — see /v1/auth/sign-in for the taxonomy).
+		Flips a pending `DeviceSession` (looked up by the operator-typed `user_code`) to `status=approved` and pins the authenticated principal onto it so the next `POST /v1/auth/device-token` poll mints a token bound to that user.  Authentication: requires the `plexsphere_session` cookie minted by the OIDC callback. The CSRF middleware additionally requires the `X-Plexsphere-CSRF` header to echo the `plexsphere_csrf` cookie value.  Errors use the RFC 8628-adjacent taxonomy in `Problem.code`: `device_code_not_found` (404 — unknown user_code), `device_code_expired` (409 — session past `expires_at`), `device_code_already_approved` (409 — already approved by an earlier request), `csrf_token_mismatch` / `csrf_origin_mismatch` (403 — see the CSRF defence-in-depth note in the API description for the taxonomy).
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiPostAuthDeviceApproveRequest
@@ -120,7 +120,7 @@ type AuthAPI interface {
 	/*
 		PostAuthDeviceCode Initiate an RFC 8628 device-authorization flow.
 
-		Issues a `device_code` / `user_code` pair the CLI can present to the end user so they can authenticate in a browser on a second device (RFC 8628). The client then polls /v1/auth/device-token.
+		Issues a `device_code` / `user_code` pair the CLI can present to the end user so they can authenticate in a browser on a second device (RFC 8628). The client then polls /v1/auth/device-token.  A platform-shared binding named via `idp_binding_id` or `idp_binding_alias` with **no** `domain_id` starts a **platform-operator** device authorization: the approval mints a Domain-independent platform-scoped token, mirroring the browser sign-in contract. Because initiation is anonymous, the platform shapes require the explicit deployment opt-in `PLEXSPHERE_AUTH_PLATFORM_DEVICE_LOGIN=true`; without it this surface keeps the tenant-only contract and rejects them `400`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiPostAuthDeviceCodeRequest
@@ -189,7 +189,7 @@ type AuthAPI interface {
 	/*
 		PostAuthTokenRotate Rotate an API token; old plaintext is retired with Sunset.
 
-		Issues a replacement plaintext for the named token and marks the previous plaintext for retirement. A `Sunset` header names the RFC 8594 retirement deadline of the rotated-from token .
+		Issues a replacement plaintext for the named token and marks the previous plaintext for retirement. A `Sunset` header names the RFC 8594 retirement deadline of the rotated-from token.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Token identifier (UUIDv7).
@@ -231,7 +231,7 @@ func (r ApiDeleteAuthSessionRequest) Execute() (*http.Response, error) {
 /*
 DeleteAuthSession Sign the current caller out.
 
-Terminates the caller's authenticated session and clears the session cookie. The endpoint is idempotent and unauthenticated: callers without a session cookie, or with a stale or already-revoked one, still receive a 204 with the cookie cleared. No information about whether a session existed is disclosed in the response body. Because the handler treats every caller as a successful 204 by design (the four behaviour scenarios are documented on `internal/transport/http/v1/auth/signout.go`), this operation advertises only the 204 response — no 401 or 500 path is reachable from the handler (-1 Q4).
+Terminates the caller's authenticated session and clears the session cookie. The endpoint is idempotent and unauthenticated: callers without a session cookie, or with a stale or already-revoked one, still receive a 204 with the cookie cleared. No information about whether a session existed is disclosed in the response body. Because the handler treats every caller as a successful 204 by design (the four behaviour scenarios are documented on `internal/transport/http/v1/auth/signout.go`), this operation advertises only the 204 response — no 401 or 500 path is reachable from the handler.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiDeleteAuthSessionRequest
@@ -320,7 +320,7 @@ func (r ApiDeleteAuthTokenByIDRequest) Execute() (*http.Response, error) {
 /*
 DeleteAuthTokenByID Immediately revoke an API token.
 
-Revokes the token identified by `id` with no grace period . Subsequent authentications with the plaintext fail closed.
+Revokes the token identified by `id` with no grace period. Subsequent authentications with the plaintext fail closed.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Token identifier (UUIDv7).
@@ -457,7 +457,7 @@ func (r ApiGetAuthCallbackRequest) Execute() (*http.Response, error) {
 /*
 GetAuthCallback OIDC redirect callback — exchanges `code` for a session.
 
-Receives the OIDC redirect after the end user completes sign-in at the IdP. Validates `state` and `nonce`, exchanges the authorization code for tokens, provisions/updates the user via the JIT policy, issues a plexsphere session cookie, and 303 See Other-redirects the browser to the application root (`/`). The endpoint is invoked exclusively via top-level browser navigation per RFC 6749 §4.1.2; clients that need a machine-readable session shape should call `GET /v1/auth/whoami` once the session cookie is set .  Failure responses are content-negotiated via the `Accept` request header:  - **Browser-leg failure** — when `Accept` is absent, `*_/_*`, or   includes `text/html`, the server responds with `303 See   Other` to `/?auth_error_kind=...&auth_error_status=...&auth_error_detail=...`   so the browser client can render the error inline next to the sign-in   form. No session cookie is issued. - **JSON-leg failure** — when `Accept` includes   `application/json` or `application/problem+json`, the server   returns the original status (`400`, `500`, or `502`) with an   `application/problem+json` body conforming to RFC 7807.
+Receives the OIDC redirect after the end user completes sign-in at the IdP. Validates `state` and `nonce`, exchanges the authorization code for tokens, provisions/updates the user via the JIT policy, issues a plexsphere session cookie, and 303 See Other-redirects the browser to the application root (`/`). The endpoint is invoked exclusively via top-level browser navigation per RFC 6749 §4.1.2; clients that need a machine-readable session shape should call `GET /v1/auth/whoami` once the session cookie is set.  Failure responses are content-negotiated via the `Accept` request header:  - **Browser-leg failure** — when `Accept` is absent, `*_/_*`, or   includes `text/html`, the server responds with `303 See   Other` to `/?auth_error_kind=...&auth_error_status=...&auth_error_detail=...`   so the browser client can render the error inline next to the sign-in   form. No session cookie is issued. - **JSON-leg failure** — when `Accept` includes   `application/json` or `application/problem+json`, the server   returns the original status (`400`, `500`, or `502`) with an   `application/problem+json` body conforming to RFC 7807.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiGetAuthCallbackRequest
@@ -577,11 +577,18 @@ type ApiGetAuthIdPBindingsRequest struct {
 	ctx        context.Context
 	ApiService AuthAPI
 	domainId   *string
+	scope      *GetAuthIdPBindingsScopeParameter
 }
 
-// Domain whose effective IdP bindings to list.
+// Domain whose effective IdP bindings to list. Mutually exclusive with &#x60;scope&#x3D;platform&#x60;; when both are supplied the scope takes precedence. Omitting both yields an empty list.
 func (r ApiGetAuthIdPBindingsRequest) DomainId(domainId string) ApiGetAuthIdPBindingsRequest {
 	r.domainId = &domainId
+	return r
+}
+
+// Set to &#x60;platform&#x60; to list the platform-scoped shared bindings for a Domain-independent platform-operator sign-in instead of a Domain&#39;s effective set.
+func (r ApiGetAuthIdPBindingsRequest) Scope(scope GetAuthIdPBindingsScopeParameter) ApiGetAuthIdPBindingsRequest {
+	r.scope = &scope
 	return r
 }
 
@@ -590,9 +597,9 @@ func (r ApiGetAuthIdPBindingsRequest) Execute() ([]DomainIdPBinding, *http.Respo
 }
 
 /*
-GetAuthIdPBindings List a Domain's effective IdP bindings for the sign-in chooser.
+GetAuthIdPBindings List the IdP bindings available to the sign-in chooser.
 
-Unauthenticated, display-safe discovery surface the dashboard sign-in page calls once a Domain id is known (typed or supplied via a deep link) so it can render a provider chooser. Returns only the active bindings the Domain can sign in with — its own active bindings, falling back to the platform-scoped shared bindings when the Domain owns none — projected to non-secret fields and ordered primary-first.  The endpoint is intentionally a pre-auth enumeration surface and does not behave as a Domain-existence oracle: a Domain that does not exist returns the same shape (the applicable platform bindings, or an empty list) as a Domain that exists but owns no bindings, so an unauthenticated caller cannot distinguish the two. Responses are marked `Cache-Control: no-store`.
+Unauthenticated, display-safe discovery surface the dashboard sign-in page calls so it can render a provider chooser. Callers supply either `domain_id` OR `scope=platform`.  With `domain_id`, returns only the active bindings the Domain can sign in with — its own active bindings, falling back to the platform-scoped shared bindings when the Domain owns none — projected to non-secret fields and ordered primary-first.  With `scope=platform` (and no `domain_id`), returns the active platform-scoped shared bindings a Platform Operator can start a Domain-independent sign-in against. The platform set is the same shared fall-back set any `domain_id` request may already receive, so listing it discloses nothing new.  The endpoint is intentionally a pre-auth enumeration surface and does not behave as a Domain-existence oracle: a Domain that does not exist returns the same shape (the applicable platform bindings, or an empty list) as a Domain that exists but owns no bindings, so an unauthenticated caller cannot distinguish the two. Responses are marked `Cache-Control: no-store`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiGetAuthIdPBindingsRequest
@@ -625,11 +632,13 @@ func (a *AuthAPIService) GetAuthIdPBindingsExecute(r ApiGetAuthIdPBindingsReques
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-	if r.domainId == nil {
-		return localVarReturnValue, nil, reportError("domainId is required and must be specified")
-	}
 
-	parameterAddToHeaderOrQuery(localVarQueryParams, "domain_id", r.domainId, "form", "")
+	if r.domainId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domain_id", r.domainId, "form", "")
+	}
+	if r.scope != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "scope", r.scope, "form", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -717,7 +726,7 @@ func (r ApiGetAuthTokensRequest) Execute() ([]APITokenSummary, *http.Response, e
 /*
 GetAuthTokens List the caller's API tokens (no plaintext).
 
-Returns the caller's API-token summaries. Plaintext is never included — it is only available at issuance time .
+Returns the caller's API-token summaries. Plaintext is never included — it is only available at issuance time.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiGetAuthTokensRequest
@@ -965,7 +974,7 @@ func (r ApiPostAuthDeviceApproveRequest) Execute() (*DeviceApproveResponse, *htt
 /*
 PostAuthDeviceApprove Approve a pending RFC 8628 device-authorization session.
 
-Flips a pending `DeviceSession` (looked up by the operator-typed `user_code`) to `status=approved` and pins the authenticated principal onto it so the next `POST /v1/auth/device-token` poll mints a token bound to that user.  Authentication: requires the `plexsphere_session` cookie minted by the OIDC callback. The CSRF middleware additionally requires the `X-Plexsphere-CSRF` header to echo the `plexsphere_csrf` cookie value (issue #181).  Errors use the RFC 8628-adjacent taxonomy in `Problem.code`: `device-code-not-found` (404 — unknown user_code), `device-code-expired` (409 — session past `expires_at`), `device-code-already-approved` (409 — already approved by an earlier request), `csrf-token-mismatch` / `csrf-origin-mismatch` (403 — see /v1/auth/sign-in for the taxonomy).
+Flips a pending `DeviceSession` (looked up by the operator-typed `user_code`) to `status=approved` and pins the authenticated principal onto it so the next `POST /v1/auth/device-token` poll mints a token bound to that user.  Authentication: requires the `plexsphere_session` cookie minted by the OIDC callback. The CSRF middleware additionally requires the `X-Plexsphere-CSRF` header to echo the `plexsphere_csrf` cookie value.  Errors use the RFC 8628-adjacent taxonomy in `Problem.code`: `device_code_not_found` (404 — unknown user_code), `device_code_expired` (409 — session past `expires_at`), `device_code_already_approved` (409 — already approved by an earlier request), `csrf_token_mismatch` / `csrf_origin_mismatch` (403 — see the CSRF defence-in-depth note in the API description for the taxonomy).
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiPostAuthDeviceApproveRequest
@@ -1141,7 +1150,7 @@ func (r ApiPostAuthDeviceCodeRequest) Execute() (*DeviceCodeResponse, *http.Resp
 /*
 PostAuthDeviceCode Initiate an RFC 8628 device-authorization flow.
 
-Issues a `device_code` / `user_code` pair the CLI can present to the end user so they can authenticate in a browser on a second device (RFC 8628). The client then polls /v1/auth/device-token.
+Issues a `device_code` / `user_code` pair the CLI can present to the end user so they can authenticate in a browser on a second device (RFC 8628). The client then polls /v1/auth/device-token.  A platform-shared binding named via `idp_binding_id` or `idp_binding_alias` with **no** `domain_id` starts a **platform-operator** device authorization: the approval mints a Domain-independent platform-scoped token, mirroring the browser sign-in contract. Because initiation is anonymous, the platform shapes require the explicit deployment opt-in `PLEXSPHERE_AUTH_PLATFORM_DEVICE_LOGIN=true`; without it this surface keeps the tenant-only contract and rejects them `400`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiPostAuthDeviceCodeRequest
@@ -1850,7 +1859,7 @@ func (r ApiPostAuthTokenRotateRequest) Execute() (*APITokenRotateResponse, *http
 /*
 PostAuthTokenRotate Rotate an API token; old plaintext is retired with Sunset.
 
-Issues a replacement plaintext for the named token and marks the previous plaintext for retirement. A `Sunset` header names the RFC 8594 retirement deadline of the rotated-from token .
+Issues a replacement plaintext for the named token and marks the previous plaintext for retirement. A `Sunset` header names the RFC 8594 retirement deadline of the rotated-from token.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Token identifier (UUIDv7).

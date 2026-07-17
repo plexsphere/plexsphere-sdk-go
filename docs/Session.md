@@ -15,7 +15,7 @@ Name | Type | Description | Notes
 **ExpiresAt** | **time.Time** | Expiry timestamp (UTC) — issuance time plus the clamped TTL.  | 
 **LastActiveAt** | **time.Time** | Timestamp of the most recent recorded activity (UTC); drives the idle-timeout sweeper.  | 
 **IdleTimeoutSeconds** | Pointer to **int32** | Idle window in whole seconds — the Session is reclaimed when &#x60;last_active_at + idle_timeout&#x60; passes.  | [optional] 
-**RevokedAt** | Pointer to **time.Time** | Revocation timestamp (UTC); &#x60;null&#x60; while the Session is live.  | [optional] 
+**RevokedAt** | Pointer to **time.Time** | Revocation timestamp (UTC); absent while the Session is live.  | [optional] 
 **RevokeReason** | Pointer to [**RevokeReason**](RevokeReason.md) | Reason the Session was revoked. Omitted while the Session is live.  | [optional] 
 **Target** | [**SessionTarget**](SessionTarget.md) |  | 
 

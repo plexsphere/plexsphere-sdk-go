@@ -4,14 +4,14 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**Entries** | [**[]AuditEntry**](AuditEntry.md) | Audit rows in ascending &#x60;seq&#x60; order. | 
-**NextCursor** | Pointer to **string** | Opaque, HMAC-signed cursor scoped to the addressed Domain. Replaying a cursor minted for a different Domain surfaces as 400 with &#x60;code: cursor_invalid&#x60;.  | [optional] 
+**Items** | [**[]AuditEntry**](AuditEntry.md) | Audit rows in ascending &#x60;seq&#x60; order. | 
+**NextCursor** | Pointer to **string** | Opaque, HMAC-signed cursor scoped to the addressed chain. Replaying a cursor minted for a different chain surfaces as 400 with &#x60;code: invalid_cursor&#x60;.  | [optional] 
 
 ## Methods
 
 ### NewAuditEntryList
 
-`func NewAuditEntryList(entries []AuditEntry, ) *AuditEntryList`
+`func NewAuditEntryList(items []AuditEntry, ) *AuditEntryList`
 
 NewAuditEntryList instantiates a new AuditEntryList object
 This constructor will assign default values to properties that have it defined,
@@ -26,24 +26,24 @@ NewAuditEntryListWithDefaults instantiates a new AuditEntryList object
 This constructor will only assign default values to properties that have it defined,
 but it doesn't guarantee that properties required by API are set
 
-### GetEntries
+### GetItems
 
-`func (o *AuditEntryList) GetEntries() []AuditEntry`
+`func (o *AuditEntryList) GetItems() []AuditEntry`
 
-GetEntries returns the Entries field if non-nil, zero value otherwise.
+GetItems returns the Items field if non-nil, zero value otherwise.
 
-### GetEntriesOk
+### GetItemsOk
 
-`func (o *AuditEntryList) GetEntriesOk() (*[]AuditEntry, bool)`
+`func (o *AuditEntryList) GetItemsOk() (*[]AuditEntry, bool)`
 
-GetEntriesOk returns a tuple with the Entries field if it's non-nil, zero value otherwise
+GetItemsOk returns a tuple with the Items field if it's non-nil, zero value otherwise
 and a boolean to check if the value has been set.
 
-### SetEntries
+### SetItems
 
-`func (o *AuditEntryList) SetEntries(v []AuditEntry)`
+`func (o *AuditEntryList) SetItems(v []AuditEntry)`
 
-SetEntries sets Entries field to given value.
+SetItems sets Items field to given value.
 
 
 ### GetNextCursor

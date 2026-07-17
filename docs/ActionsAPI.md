@@ -4,10 +4,10 @@ All URIs are relative to *http://localhost*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**DispatchExecution**](ActionsAPI.md#DispatchExecution) | **Post** /v1/projects/{project_id}/executions:dispatch | Dispatch an action to a single Node or a label-selected cohort.
+[**DispatchExecution**](ActionsAPI.md#DispatchExecution) | **Post** /v1/projects/{project_id}/executions/dispatch | Dispatch an action to a single Node or a label-selected cohort.
 [**GetExecution**](ActionsAPI.md#GetExecution) | **Get** /v1/projects/{project_id}/executions/{execution_id} | Inspect a single action Execution.
 [**ListExecutions**](ActionsAPI.md#ListExecutions) | **Get** /v1/projects/{project_id}/executions | List action Executions for a Project.
-[**PostNodeExecutionCallback**](ActionsAPI.md#PostNodeExecutionCallback) | **Post** /v1/nodes/{id}/executions/{exec_id} | Report an action-execution status advance from a Node.
+[**PostNodeExecutionCallback**](ActionsAPI.md#PostNodeExecutionCallback) | **Post** /v1/nodes/{id}/executions/{execution_id} | Report an action-execution status advance from a Node.
 
 
 
@@ -71,7 +71,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -144,7 +144,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -181,7 +181,7 @@ func main() {
 	status := openapiclient.ExecutionStatus("pending") // ExecutionStatus | Optional aggregate-status filter. When present, only Executions whose aggregate status equals the named value are returned.  (optional)
 	actionName := "actionName_example" // string | Optional action-name filter. When present, only Executions for the named action are returned.  (optional)
 	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
-	limit := int32(56) // int32 | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the read service.  (optional) (default to 50)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -214,7 +214,7 @@ Name | Type | Description  | Notes
  **status** | [**ExecutionStatus**](ExecutionStatus.md) | Optional aggregate-status filter. When present, only Executions whose aggregate status equals the named value are returned.  | 
  **actionName** | **string** | Optional action-name filter. When present, only Executions for the named action are returned.  | 
  **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
- **limit** | **int32** | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the read service.  | [default to 50]
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
 
 ### Return type
 
@@ -222,7 +222,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -236,7 +236,7 @@ No authorization required
 
 ## PostNodeExecutionCallback
 
-> ExecutionCallbackResponse PostNodeExecutionCallback(ctx, id, execId).Authorization(authorization).ExecutionCallbackRequest(executionCallbackRequest).Execute()
+> ExecutionCallbackResponse PostNodeExecutionCallback(ctx, id, executionId).ExecutionCallbackRequest(executionCallbackRequest).Execute()
 
 Report an action-execution status advance from a Node.
 
@@ -256,13 +256,12 @@ import (
 
 func main() {
 	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Node identifier (UUIDv7) — the callback scope.
-	execId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Execution identifier (UUIDv7) the callback settles.
-	authorization := "authorization_example" // string | `Bearer <NSK plaintext>` — the per-Node Node Secret Key issued at registration time. The NSK is bound to the Node addressed by the path `id`; a credential belonging to a different Node surfaces as 403 `nsk_node_mismatch`. 
+	executionId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Execution identifier (UUIDv7) the callback settles.
 	executionCallbackRequest := *openapiclient.NewExecutionCallbackRequest(openapiclient.ExecutionStatus("pending")) // ExecutionCallbackRequest | 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.ActionsAPI.PostNodeExecutionCallback(context.Background(), id, execId).Authorization(authorization).ExecutionCallbackRequest(executionCallbackRequest).Execute()
+	resp, r, err := apiClient.ActionsAPI.PostNodeExecutionCallback(context.Background(), id, executionId).ExecutionCallbackRequest(executionCallbackRequest).Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error when calling `ActionsAPI.PostNodeExecutionCallback``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
@@ -279,7 +278,7 @@ Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
 **id** | **string** | Node identifier (UUIDv7) — the callback scope. | 
-**execId** | **string** | Execution identifier (UUIDv7) the callback settles. | 
+**executionId** | **string** | Execution identifier (UUIDv7) the callback settles. | 
 
 ### Other Parameters
 
@@ -290,7 +289,6 @@ Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 
 
- **authorization** | **string** | &#x60;Bearer &lt;NSK plaintext&gt;&#x60; — the per-Node Node Secret Key issued at registration time. The NSK is bound to the Node addressed by the path &#x60;id&#x60;; a credential belonging to a different Node surfaces as 403 &#x60;nsk_node_mismatch&#x60;.  | 
  **executionCallbackRequest** | [**ExecutionCallbackRequest**](ExecutionCallbackRequest.md) |  | 
 
 ### Return type
@@ -299,7 +297,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[nskBearer](../README.md#nskBearer)
 
 ### HTTP request headers
 

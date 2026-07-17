@@ -4,7 +4,7 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**IdentityId** | **string** | Identity whose &#x60;audit_subject_pii&#x60; mapping must be purged from the addressed Domain. The pseudonym is derived server-side from &#x60;(domain_id, identity_id)&#x60; and the per-Domain pepper; clients never compute it themselves .  | 
+**IdentityId** | **string** | Identity whose &#x60;audit_subject_pii&#x60; mapping must be purged from the addressed chain. The pseudonym is derived server-side from the chain&#39;s scope anchor, &#x60;identity_id&#x60;, and the per-chain pepper; clients never compute it themselves.  | 
 
 ## Methods
 

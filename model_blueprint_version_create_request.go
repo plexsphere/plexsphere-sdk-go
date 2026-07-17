@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -28,10 +28,9 @@ type BlueprintVersionCreateRequest struct {
 	Composition map[string]interface{} `json:"composition"`
 	// Typed parameter-schema document of the form `{\"parameters\":[{\"name\":…,\"type\":…,\"required\":…,\"default\"?:…}]}`. A structurally invalid document surfaces as `400 invalid_parameter_schema`.
 	ParameterSchema map[string]interface{} `json:"parameter_schema"`
-	// Closed-set infrastructure substrates this version can target, one or more of `aws`, `gcp`, `hetzner`, `openstack`. The server validates each value through the domain provider-kind parser; an out-of-set value is rejected with `400 invalid_provider_kind`. Non-empty.
-	ProviderKinds []string `json:"provider_kinds"`
-	// Discriminator naming how this version threads request parameters into the rendered Composite Resource, one of `cloud-init-user-data`, `helm-values`, `provider-secret`. The server validates the value; an out-of-set value is rejected with `400 invalid_injection_strategy`.
-	InjectionStrategy    string `json:"injection_strategy"`
+	// Closed-set infrastructure substrates this version can target. The server re-validates each value through the domain provider-kind parser; an out-of-set value is rejected with `400 invalid_provider_kind`. Non-empty. The enum mirrors `BlueprintVersionResponse.provider_kinds` so generated clients validate before the round-trip.
+	ProviderKinds        []BlueprintVersionCreateRequestProviderKindsInner `json:"provider_kinds"`
+	InjectionStrategy    BlueprintVersionCreateRequestInjectionStrategy    `json:"injection_strategy"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -41,7 +40,7 @@ type _BlueprintVersionCreateRequest BlueprintVersionCreateRequest
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewBlueprintVersionCreateRequest(version string, xrd map[string]interface{}, composition map[string]interface{}, parameterSchema map[string]interface{}, providerKinds []string, injectionStrategy string) *BlueprintVersionCreateRequest {
+func NewBlueprintVersionCreateRequest(version string, xrd map[string]interface{}, composition map[string]interface{}, parameterSchema map[string]interface{}, providerKinds []BlueprintVersionCreateRequestProviderKindsInner, injectionStrategy BlueprintVersionCreateRequestInjectionStrategy) *BlueprintVersionCreateRequest {
 	this := BlueprintVersionCreateRequest{}
 	this.Version = version
 	this.Xrd = xrd
@@ -157,9 +156,9 @@ func (o *BlueprintVersionCreateRequest) SetParameterSchema(v map[string]interfac
 }
 
 // GetProviderKinds returns the ProviderKinds field value
-func (o *BlueprintVersionCreateRequest) GetProviderKinds() []string {
+func (o *BlueprintVersionCreateRequest) GetProviderKinds() []BlueprintVersionCreateRequestProviderKindsInner {
 	if o == nil {
-		var ret []string
+		var ret []BlueprintVersionCreateRequestProviderKindsInner
 		return ret
 	}
 
@@ -168,7 +167,7 @@ func (o *BlueprintVersionCreateRequest) GetProviderKinds() []string {
 
 // GetProviderKindsOk returns a tuple with the ProviderKinds field value
 // and a boolean to check if the value has been set.
-func (o *BlueprintVersionCreateRequest) GetProviderKindsOk() ([]string, bool) {
+func (o *BlueprintVersionCreateRequest) GetProviderKindsOk() ([]BlueprintVersionCreateRequestProviderKindsInner, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -176,14 +175,14 @@ func (o *BlueprintVersionCreateRequest) GetProviderKindsOk() ([]string, bool) {
 }
 
 // SetProviderKinds sets field value
-func (o *BlueprintVersionCreateRequest) SetProviderKinds(v []string) {
+func (o *BlueprintVersionCreateRequest) SetProviderKinds(v []BlueprintVersionCreateRequestProviderKindsInner) {
 	o.ProviderKinds = v
 }
 
 // GetInjectionStrategy returns the InjectionStrategy field value
-func (o *BlueprintVersionCreateRequest) GetInjectionStrategy() string {
+func (o *BlueprintVersionCreateRequest) GetInjectionStrategy() BlueprintVersionCreateRequestInjectionStrategy {
 	if o == nil {
-		var ret string
+		var ret BlueprintVersionCreateRequestInjectionStrategy
 		return ret
 	}
 
@@ -192,7 +191,7 @@ func (o *BlueprintVersionCreateRequest) GetInjectionStrategy() string {
 
 // GetInjectionStrategyOk returns a tuple with the InjectionStrategy field value
 // and a boolean to check if the value has been set.
-func (o *BlueprintVersionCreateRequest) GetInjectionStrategyOk() (*string, bool) {
+func (o *BlueprintVersionCreateRequest) GetInjectionStrategyOk() (*BlueprintVersionCreateRequestInjectionStrategy, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -200,7 +199,7 @@ func (o *BlueprintVersionCreateRequest) GetInjectionStrategyOk() (*string, bool)
 }
 
 // SetInjectionStrategy sets field value
-func (o *BlueprintVersionCreateRequest) SetInjectionStrategy(v string) {
+func (o *BlueprintVersionCreateRequest) SetInjectionStrategy(v BlueprintVersionCreateRequestInjectionStrategy) {
 	o.InjectionStrategy = v
 }
 

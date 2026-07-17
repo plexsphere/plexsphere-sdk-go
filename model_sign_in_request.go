@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -17,7 +17,7 @@ import (
 // checks if the SignInRequest type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &SignInRequest{}
 
-// SignInRequest Body for POST /v1/auth/sign-in. At least one of `domain_id` or `idp_binding_id` must be supplied; the router uses them to resolve the IdP binding against which to begin the flow .
+// SignInRequest Body for POST /v1/auth/sign-in. At least one of `domain_id` or `idp_binding_id` must be supplied; the router uses them to resolve the IdP binding against which to begin the flow. An `idp_binding_id` naming a platform-scoped (shared) binding with NO `domain_id` starts a Domain-independent platform-operator sign-in that yields a platform-scoped session; a per-Domain binding still requires its Domain.
 type SignInRequest struct {
 	// Domain the user is signing into.
 	DomainId *string `json:"domain_id,omitempty"`

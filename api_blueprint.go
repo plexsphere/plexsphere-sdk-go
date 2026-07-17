@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -27,7 +27,7 @@ type BlueprintAPI interface {
 		Returns the Blueprint identified by `{id}` together with its ordered `versions` array. Each version carries a typed `parameter_schema` — the closed-set parameter declarations an operator fills in when provisioning a Resource from the version.  The handler runs the `blueprint#user` ReBAC check BEFORE the persistence read; an unauthorised caller therefore receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing Blueprint surfaces as `404 blueprint_not_found`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Blueprint identifier (UUIDv7). Bound on `/v1/blueprints/{id}` for the read-only Blueprint Catalog surface.
+		@param id Blueprint identifier (UUIDv7). Bound on `/v1/blueprints/{id}` for the Blueprint Catalog read surface and on `/v1/blueprints/{id}/versions` for the version-publishing authorship surface.
 		@return ApiGetBlueprintRequest
 	*/
 	GetBlueprint(ctx context.Context, id string) ApiGetBlueprintRequest
@@ -56,7 +56,7 @@ type BlueprintAPI interface {
 		Publishes an immutable version under an existing Blueprint. The service validates the request BEFORE any persistence write: the `provider_kinds` enum members, the `injection_strategy` enum, the `parameter_schema` document, and the structural XRD/Composition manifest pair are each checked, so a malformed payload never appends a `BlueprintVersionPublished` outbox row.  The handler authorises the caller against the `publish` permission on the addressed Blueprint (`blueprint#publish`) BEFORE invoking the service. The registrar of a Blueprint holds `owner`, which grants `publish`; the grant is written asynchronously after registration, so a publish issued in the same instant as the register may be refused until the tuple propagates.  A missing parent Blueprint surfaces as `404 blueprint_not_found`; a re-published `(blueprint, version)` pair surfaces as `409 blueprint_version_exists`. On success the handler emits a `blueprint.publish` audit row and the service appends a `BlueprintVersionPublished` outbox event in the same transaction.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Blueprint identifier (UUIDv7). Bound on `/v1/blueprints/{id}` for the read-only Blueprint Catalog surface.
+		@param id Blueprint identifier (UUIDv7). Bound on `/v1/blueprints/{id}` for the Blueprint Catalog read surface and on `/v1/blueprints/{id}/versions` for the version-publishing authorship surface.
 		@return ApiPublishBlueprintVersionRequest
 	*/
 	PublishBlueprintVersion(ctx context.Context, id string) ApiPublishBlueprintVersionRequest
@@ -99,7 +99,7 @@ GetBlueprint Fetch a Blueprint by identifier.
 Returns the Blueprint identified by `{id}` together with its ordered `versions` array. Each version carries a typed `parameter_schema` — the closed-set parameter declarations an operator fills in when provisioning a Resource from the version.  The handler runs the `blueprint#user` ReBAC check BEFORE the persistence read; an unauthorised caller therefore receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing Blueprint surfaces as `404 blueprint_not_found`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Blueprint identifier (UUIDv7). Bound on `/v1/blueprints/{id}` for the read-only Blueprint Catalog surface.
+	@param id Blueprint identifier (UUIDv7). Bound on `/v1/blueprints/{id}` for the Blueprint Catalog read surface and on `/v1/blueprints/{id}/versions` for the version-publishing authorship surface.
 	@return ApiGetBlueprintRequest
 */
 func (a *BlueprintAPIService) GetBlueprint(ctx context.Context, id string) ApiGetBlueprintRequest {
@@ -243,7 +243,7 @@ func (r ApiListBlueprintsRequest) Cursor(cursor string) ApiListBlueprintsRequest
 	return r
 }
 
-// Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the read service.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListBlueprintsRequest) Limit(limit int32) ApiListBlueprintsRequest {
 	r.limit = &limit
 	return r
@@ -362,7 +362,7 @@ func (a *BlueprintAPIService) ListBlueprintsExecute(r ApiListBlueprintsRequest) 
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 403 {
-			var v PermissionDenied
+			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -419,7 +419,7 @@ PublishBlueprintVersion Publish a Blueprint version.
 Publishes an immutable version under an existing Blueprint. The service validates the request BEFORE any persistence write: the `provider_kinds` enum members, the `injection_strategy` enum, the `parameter_schema` document, and the structural XRD/Composition manifest pair are each checked, so a malformed payload never appends a `BlueprintVersionPublished` outbox row.  The handler authorises the caller against the `publish` permission on the addressed Blueprint (`blueprint#publish`) BEFORE invoking the service. The registrar of a Blueprint holds `owner`, which grants `publish`; the grant is written asynchronously after registration, so a publish issued in the same instant as the register may be refused until the tuple propagates.  A missing parent Blueprint surfaces as `404 blueprint_not_found`; a re-published `(blueprint, version)` pair surfaces as `409 blueprint_version_exists`. On success the handler emits a `blueprint.publish` audit row and the service appends a `BlueprintVersionPublished` outbox event in the same transaction.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Blueprint identifier (UUIDv7). Bound on `/v1/blueprints/{id}` for the read-only Blueprint Catalog surface.
+	@param id Blueprint identifier (UUIDv7). Bound on `/v1/blueprints/{id}` for the Blueprint Catalog read surface and on `/v1/blueprints/{id}/versions` for the version-publishing authorship surface.
 	@return ApiPublishBlueprintVersionRequest
 */
 func (a *BlueprintAPIService) PublishBlueprintVersion(ctx context.Context, id string) ApiPublishBlueprintVersionRequest {

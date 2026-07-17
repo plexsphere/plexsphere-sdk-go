@@ -4,13 +4,13 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**Rules** | [**[]BridgeIngressRuleResponse**](BridgeIngressRuleResponse.md) | Rules ordered by slug ascending. | 
+**Items** | [**[]BridgeIngressRuleResponse**](BridgeIngressRuleResponse.md) | Rules ordered by slug ascending. | 
 
 ## Methods
 
 ### NewBridgeIngressRuleList
 
-`func NewBridgeIngressRuleList(rules []BridgeIngressRuleResponse, ) *BridgeIngressRuleList`
+`func NewBridgeIngressRuleList(items []BridgeIngressRuleResponse, ) *BridgeIngressRuleList`
 
 NewBridgeIngressRuleList instantiates a new BridgeIngressRuleList object
 This constructor will assign default values to properties that have it defined,
@@ -25,24 +25,24 @@ NewBridgeIngressRuleListWithDefaults instantiates a new BridgeIngressRuleList ob
 This constructor will only assign default values to properties that have it defined,
 but it doesn't guarantee that properties required by API are set
 
-### GetRules
+### GetItems
 
-`func (o *BridgeIngressRuleList) GetRules() []BridgeIngressRuleResponse`
+`func (o *BridgeIngressRuleList) GetItems() []BridgeIngressRuleResponse`
 
-GetRules returns the Rules field if non-nil, zero value otherwise.
+GetItems returns the Items field if non-nil, zero value otherwise.
 
-### GetRulesOk
+### GetItemsOk
 
-`func (o *BridgeIngressRuleList) GetRulesOk() (*[]BridgeIngressRuleResponse, bool)`
+`func (o *BridgeIngressRuleList) GetItemsOk() (*[]BridgeIngressRuleResponse, bool)`
 
-GetRulesOk returns a tuple with the Rules field if it's non-nil, zero value otherwise
+GetItemsOk returns a tuple with the Items field if it's non-nil, zero value otherwise
 and a boolean to check if the value has been set.
 
-### SetRules
+### SetItems
 
-`func (o *BridgeIngressRuleList) SetRules(v []BridgeIngressRuleResponse)`
+`func (o *BridgeIngressRuleList) SetItems(v []BridgeIngressRuleResponse)`
 
-SetRules sets Rules field to given value.
+SetItems sets Items field to given value.
 
 
 

@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -32,7 +32,7 @@ type DomainResponse struct {
 	// The region the Domain is pinned to. Unlike `description`, this field is OMITTED from the wire entirely when the Domain is unpinned — it is never carried as an empty string, so an absent key means \"no region\".
 	Region *string `json:"region,omitempty" validate:"regexp=^[a-z0-9]+(-[a-z0-9]+)*$"`
 	// Canonical RFC 4632 mesh-IP pool the Domain owns. Cross- Domain non-overlap is enforced by the SQL GIST exclusion constraint.
-	MeshCidr     string                   `json:"mesh_cidr"`
+	MeshCidr     string                   `json:"mesh_cidr" validate:"regexp=^([0-9]{1,3}\\\\.){3}[0-9]{1,3}\\/[0-9]{1,2}$|^[0-9a-fA-F:]+\\/[0-9]{1,3}$"`
 	Reachability DomainReachabilityPolicy `json:"reachability"`
 	// Aggregate creation timestamp (UTC).
 	CreatedAt time.Time `json:"created_at"`

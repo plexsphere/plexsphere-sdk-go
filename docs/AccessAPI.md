@@ -9,7 +9,7 @@ Method | HTTP request | Description
 [**IssueSession**](AccessAPI.md#IssueSession) | **Post** /v1/projects/{project_id}/sessions | Issue a short-lived, session-scoped JWT for a mediated target.
 [**ListSessions**](AccessAPI.md#ListSessions) | **Get** /v1/projects/{project_id}/sessions | List mediated sessions for a Project.
 [**PostNodeSessionCallback**](AccessAPI.md#PostNodeSessionCallback) | **Post** /v1/nodes/{id}/sessions/{session_id} | Report per-kind session activity from a Node.
-[**RevokeSession**](AccessAPI.md#RevokeSession) | **Post** /v1/projects/{project_id}/sessions/{session_id}:revoke | Instantly revoke a live mediated session.
+[**RevokeSession**](AccessAPI.md#RevokeSession) | **Post** /v1/projects/{project_id}/sessions/{session_id}/revoke | Instantly revoke a live mediated session.
 
 
 
@@ -255,7 +255,7 @@ func main() {
 	kind := openapiclient.SessionKind("ssh") // SessionKind | Optional kind filter. When present, only Sessions of the named kind are returned.  (optional)
 	identityId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Optional identity filter. When present, only Sessions issued to the named Identity are returned.  (optional)
 	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
-	limit := int32(56) // int32 | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the read service.  (optional) (default to 50)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -289,7 +289,7 @@ Name | Type | Description  | Notes
  **kind** | [**SessionKind**](SessionKind.md) | Optional kind filter. When present, only Sessions of the named kind are returned.  | 
  **identityId** | **string** | Optional identity filter. When present, only Sessions issued to the named Identity are returned.  | 
  **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
- **limit** | **int32** | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the read service.  | [default to 50]
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
 
 ### Return type
 
@@ -311,7 +311,7 @@ Name | Type | Description  | Notes
 
 ## PostNodeSessionCallback
 
-> PostNodeSessionCallback(ctx, id, sessionId).Authorization(authorization).SessionActivityRequest(sessionActivityRequest).Execute()
+> PostNodeSessionCallback(ctx, id, sessionId).SessionActivityRequest(sessionActivityRequest).Execute()
 
 Report per-kind session activity from a Node.
 
@@ -332,12 +332,11 @@ import (
 func main() {
 	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Node identifier (UUIDv7) — the callback scope.
 	sessionId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Session identifier (UUIDv7) the activity belongs to.
-	authorization := "authorization_example" // string | `Bearer <NSK plaintext>` — the per-Node Node Secret Key issued at registration time. The NSK is bound to the Node addressed by the path `id`; a credential belonging to a different Node surfaces as 403 `nsk_node_mismatch`. 
 	sessionActivityRequest := *openapiclient.NewSessionActivityRequest() // SessionActivityRequest | 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
-	r, err := apiClient.AccessAPI.PostNodeSessionCallback(context.Background(), id, sessionId).Authorization(authorization).SessionActivityRequest(sessionActivityRequest).Execute()
+	r, err := apiClient.AccessAPI.PostNodeSessionCallback(context.Background(), id, sessionId).SessionActivityRequest(sessionActivityRequest).Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error when calling `AccessAPI.PostNodeSessionCallback``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
@@ -363,7 +362,6 @@ Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 
 
- **authorization** | **string** | &#x60;Bearer &lt;NSK plaintext&gt;&#x60; — the per-Node Node Secret Key issued at registration time. The NSK is bound to the Node addressed by the path &#x60;id&#x60;; a credential belonging to a different Node surfaces as 403 &#x60;nsk_node_mismatch&#x60;.  | 
  **sessionActivityRequest** | [**SessionActivityRequest**](SessionActivityRequest.md) |  | 
 
 ### Return type
@@ -372,7 +370,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[nskBearer](../README.md#nskBearer)
 
 ### HTTP request headers
 
@@ -407,7 +405,7 @@ import (
 func main() {
 	projectId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Owning Project. The Access Orchestrator issue, list, read, and revoke operations are scoped per Project, so every operator-facing endpoint requires the Project identifier in the path. 
 	sessionId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Session identifier (UUIDv7). Bound on `/v1/projects/{project_id}/sessions/{session_id}`, its `:revoke` sub-resource, and its `/attach` WebSocket gateway for the single-Session read, revoke, and attach. 
-	revokeSessionRequest := *openapiclient.NewRevokeSessionRequest(openapiclient.RevokeReason("operator_request")) // RevokeSessionRequest | 
+	revokeSessionRequest := *openapiclient.NewRevokeSessionRequest(openapiclient.OperatorRevokeReason("operator_request")) // RevokeSessionRequest | 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)

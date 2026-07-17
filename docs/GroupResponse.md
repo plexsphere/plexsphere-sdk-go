@@ -6,11 +6,11 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Id** | **string** | Group identifier (UUIDv7). | 
 **DomainId** | **string** | Owning Domain. | 
-**Slug** | **string** | URL-safe identifier unique within &#x60;domain_id&#x60; .  | 
+**Slug** | **string** | URL-safe identifier unique within &#x60;domain_id&#x60;.  | 
 **DisplayName** | **string** | Human-friendly Group name. | 
 **Source** | [**GroupResponseSource**](GroupResponseSource.md) |  | 
 **IdpBindingId** | Pointer to **string** | IdP binding the Group is reconciled from. Present only when &#x60;source&#x3D;idp&#x60;.  | [optional] 
-**IdpClaimValue** | Pointer to **string** | Verbatim IdP claim value. Present only when &#x60;source&#x3D;idp&#x60; .  | [optional] 
+**IdpClaimValue** | Pointer to **string** | Verbatim IdP claim value. Present only when &#x60;source&#x3D;idp&#x60;.  | [optional] 
 **CreatedAt** | **time.Time** |  | 
 **UpdatedAt** | **time.Time** |  | 
 

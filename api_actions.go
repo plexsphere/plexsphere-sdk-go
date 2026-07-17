@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -24,7 +24,7 @@ type ActionsAPI interface {
 	/*
 		DispatchExecution Dispatch an action to a single Node or a label-selected cohort.
 
-		Dispatches a named action — a built-in shipped with the Node agent or a user-declared hook — to a target set inside the owning Project. The handler runs the dispatch ReBAC check on the Project BEFORE any persistence write, resolves the target cohort (either a single `node_id` or the Nodes matching an opaque label `selector`), gates the dispatch on capability availability and hook integrity, then mints one Execution that fans out to one per-Node invocation. Each invocation carries a unique callback URL under `/v1/nodes/{id}/executions/{exec_id}` the Node reports progress back to.  The request body supplies the `action` name, the action `type` (`builtin` or `hook`), an opaque `parameters` JSON document, and an optional `timeout_seconds`. The target is EXACTLY ONE of a single `node_id` or an opaque label `selector` — supplying both, or neither, is rejected.
+		Dispatches a named action — a built-in shipped with the Node agent or a user-declared hook — to a target set inside the owning Project. The handler runs the dispatch ReBAC check on the Project BEFORE any persistence write, resolves the target cohort (either a single `node_id` or the Nodes matching an opaque label `selector`), gates the dispatch on capability availability and hook integrity, then mints one Execution that fans out to one per-Node invocation. Each invocation carries a unique callback URL under `/v1/nodes/{id}/executions/{execution_id}` the Node reports progress back to.  The request body supplies the `action` name, the action `type` (`builtin` or `hook`), an opaque `parameters` JSON document, and an optional `timeout_seconds`. The target is EXACTLY ONE of a single `node_id` or an opaque label `selector` — supplying both, or neither, is rejected.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param projectId Owning Project. The Action Orchestrator dispatch and read operations are scoped per Project, so every operator-facing endpoint requires the Project identifier in the path.
@@ -70,14 +70,14 @@ type ActionsAPI interface {
 	/*
 		PostNodeExecutionCallback Report an action-execution status advance from a Node.
 
-		Accepts a per-Node action-execution result callback from plexd and drives the addressed invocation through the closed status state machine. The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      rejecting revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `nsk_node_mismatch` so a leaked NSK cannot be replayed      against a sibling Node's invocation.   3. Drives the invocation addressed by `{exec_id}` to the      reported `status` through a server-side compare-and-set      against the closed state machine      (`ack → started → (succeeded | failed | cancelled |      timeout)`). An illegal advance returns 409      `invalid_state_transition`; a re-post onto an already-settled      invocation returns 409 `execution_already_terminal`.   4. Collects the reported output. A bounded inline `output`      (≤ 16 KiB) is stored in the control plane; an inline body      over the ceiling is refused with 413      `inline_output_too_large`. When the Node declares an      over-ceiling output, the FIRST callback's 200 response      carries an `output_upload_url` — a presigned object-store      PUT URL the Node uploads the full body to before sending the      terminal callback.  DEFERRED-WIRING POSTURE: until the production composition root supplies the callback service and its NSK validator, every request to this endpoint returns 501 with `code: execution_callback_not_provisioned` so log scrapers can alert on the deferred-wiring state.
+		Accepts a per-Node action-execution result callback from plexd and drives the addressed invocation through the closed status state machine. The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      rejecting revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `nsk_node_mismatch` so a leaked NSK cannot be replayed      against a sibling Node's invocation.   3. Drives the invocation addressed by `{execution_id}` to the      reported `status` through a server-side compare-and-set      against the closed state machine. A Node reports      `ack → started → (succeeded | failed | cancelled)` — the      `cancelled` terminal is a Node-side cancellation of its own      invocation (there is no operator cancel endpoint). `timeout`      is NOT reportable here: it is set server-side by the      background reconciler when a Node never reports a terminal      result. An illegal advance returns 409      `invalid_state_transition`; a re-post onto an already-settled      invocation returns 409 `execution_already_terminal`.   4. Collects the reported output. A bounded inline `output`      (≤ 16 KiB) is stored in the control plane; an inline body      over the ceiling is refused with 413      `inline_output_too_large`. When the Node declares an      over-ceiling output, the FIRST callback's 200 response      carries an `output_upload_url` — a presigned object-store      PUT URL the Node uploads the full body to before sending the      terminal callback.  DEFERRED-WIRING POSTURE: until the production composition root supplies the callback service and its NSK validator, every request to this endpoint returns 501 with `code: execution_callback_not_provisioned` so log scrapers can alert on the deferred-wiring state.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Node identifier (UUIDv7) — the callback scope.
-		@param execId Execution identifier (UUIDv7) the callback settles.
+		@param executionId Execution identifier (UUIDv7) the callback settles.
 		@return ApiPostNodeExecutionCallbackRequest
 	*/
-	PostNodeExecutionCallback(ctx context.Context, id string, execId string) ApiPostNodeExecutionCallbackRequest
+	PostNodeExecutionCallback(ctx context.Context, id string, executionId string) ApiPostNodeExecutionCallbackRequest
 
 	// PostNodeExecutionCallbackExecute executes the request
 	//  @return ExecutionCallbackResponse
@@ -106,7 +106,7 @@ func (r ApiDispatchExecutionRequest) Execute() (*Execution, *http.Response, erro
 /*
 DispatchExecution Dispatch an action to a single Node or a label-selected cohort.
 
-Dispatches a named action — a built-in shipped with the Node agent or a user-declared hook — to a target set inside the owning Project. The handler runs the dispatch ReBAC check on the Project BEFORE any persistence write, resolves the target cohort (either a single `node_id` or the Nodes matching an opaque label `selector`), gates the dispatch on capability availability and hook integrity, then mints one Execution that fans out to one per-Node invocation. Each invocation carries a unique callback URL under `/v1/nodes/{id}/executions/{exec_id}` the Node reports progress back to.  The request body supplies the `action` name, the action `type` (`builtin` or `hook`), an opaque `parameters` JSON document, and an optional `timeout_seconds`. The target is EXACTLY ONE of a single `node_id` or an opaque label `selector` — supplying both, or neither, is rejected.
+Dispatches a named action — a built-in shipped with the Node agent or a user-declared hook — to a target set inside the owning Project. The handler runs the dispatch ReBAC check on the Project BEFORE any persistence write, resolves the target cohort (either a single `node_id` or the Nodes matching an opaque label `selector`), gates the dispatch on capability availability and hook integrity, then mints one Execution that fans out to one per-Node invocation. Each invocation carries a unique callback URL under `/v1/nodes/{id}/executions/{execution_id}` the Node reports progress back to.  The request body supplies the `action` name, the action `type` (`builtin` or `hook`), an opaque `parameters` JSON document, and an optional `timeout_seconds`. The target is EXACTLY ONE of a single `node_id` or an opaque label `selector` — supplying both, or neither, is rejected.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param projectId Owning Project. The Action Orchestrator dispatch and read operations are scoped per Project, so every operator-facing endpoint requires the Project identifier in the path.
@@ -136,7 +136,7 @@ func (a *ActionsAPIService) DispatchExecutionExecute(r ApiDispatchExecutionReque
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/projects/{project_id}/executions:dispatch"
+	localVarPath := localBasePath + "/v1/projects/{project_id}/executions/dispatch"
 	localVarPath = strings.Replace(localVarPath, "{"+"project_id"+"}", url.PathEscape(parameterValueToString(r.projectId, "projectId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -501,7 +501,7 @@ func (r ApiListExecutionsRequest) Cursor(cursor string) ApiListExecutionsRequest
 	return r
 }
 
-// Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the read service.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListExecutionsRequest) Limit(limit int32) ApiListExecutionsRequest {
 	r.limit = &limit
 	return r
@@ -690,15 +690,8 @@ type ApiPostNodeExecutionCallbackRequest struct {
 	ctx                      context.Context
 	ApiService               ActionsAPI
 	id                       string
-	execId                   string
-	authorization            *string
+	executionId              string
 	executionCallbackRequest *ExecutionCallbackRequest
-}
-
-// &#x60;Bearer &lt;NSK plaintext&gt;&#x60; — the per-Node Node Secret Key issued at registration time. The NSK is bound to the Node addressed by the path &#x60;id&#x60;; a credential belonging to a different Node surfaces as 403 &#x60;nsk_node_mismatch&#x60;.
-func (r ApiPostNodeExecutionCallbackRequest) Authorization(authorization string) ApiPostNodeExecutionCallbackRequest {
-	r.authorization = &authorization
-	return r
 }
 
 func (r ApiPostNodeExecutionCallbackRequest) ExecutionCallbackRequest(executionCallbackRequest ExecutionCallbackRequest) ApiPostNodeExecutionCallbackRequest {
@@ -713,19 +706,19 @@ func (r ApiPostNodeExecutionCallbackRequest) Execute() (*ExecutionCallbackRespon
 /*
 PostNodeExecutionCallback Report an action-execution status advance from a Node.
 
-Accepts a per-Node action-execution result callback from plexd and drives the addressed invocation through the closed status state machine. The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      rejecting revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `nsk_node_mismatch` so a leaked NSK cannot be replayed      against a sibling Node's invocation.   3. Drives the invocation addressed by `{exec_id}` to the      reported `status` through a server-side compare-and-set      against the closed state machine      (`ack → started → (succeeded | failed | cancelled |      timeout)`). An illegal advance returns 409      `invalid_state_transition`; a re-post onto an already-settled      invocation returns 409 `execution_already_terminal`.   4. Collects the reported output. A bounded inline `output`      (≤ 16 KiB) is stored in the control plane; an inline body      over the ceiling is refused with 413      `inline_output_too_large`. When the Node declares an      over-ceiling output, the FIRST callback's 200 response      carries an `output_upload_url` — a presigned object-store      PUT URL the Node uploads the full body to before sending the      terminal callback.  DEFERRED-WIRING POSTURE: until the production composition root supplies the callback service and its NSK validator, every request to this endpoint returns 501 with `code: execution_callback_not_provisioned` so log scrapers can alert on the deferred-wiring state.
+Accepts a per-Node action-execution result callback from plexd and drives the addressed invocation through the closed status state machine. The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      rejecting revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `nsk_node_mismatch` so a leaked NSK cannot be replayed      against a sibling Node's invocation.   3. Drives the invocation addressed by `{execution_id}` to the      reported `status` through a server-side compare-and-set      against the closed state machine. A Node reports      `ack → started → (succeeded | failed | cancelled)` — the      `cancelled` terminal is a Node-side cancellation of its own      invocation (there is no operator cancel endpoint). `timeout`      is NOT reportable here: it is set server-side by the      background reconciler when a Node never reports a terminal      result. An illegal advance returns 409      `invalid_state_transition`; a re-post onto an already-settled      invocation returns 409 `execution_already_terminal`.   4. Collects the reported output. A bounded inline `output`      (≤ 16 KiB) is stored in the control plane; an inline body      over the ceiling is refused with 413      `inline_output_too_large`. When the Node declares an      over-ceiling output, the FIRST callback's 200 response      carries an `output_upload_url` — a presigned object-store      PUT URL the Node uploads the full body to before sending the      terminal callback.  DEFERRED-WIRING POSTURE: until the production composition root supplies the callback service and its NSK validator, every request to this endpoint returns 501 with `code: execution_callback_not_provisioned` so log scrapers can alert on the deferred-wiring state.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Node identifier (UUIDv7) — the callback scope.
-	@param execId Execution identifier (UUIDv7) the callback settles.
+	@param executionId Execution identifier (UUIDv7) the callback settles.
 	@return ApiPostNodeExecutionCallbackRequest
 */
-func (a *ActionsAPIService) PostNodeExecutionCallback(ctx context.Context, id string, execId string) ApiPostNodeExecutionCallbackRequest {
+func (a *ActionsAPIService) PostNodeExecutionCallback(ctx context.Context, id string, executionId string) ApiPostNodeExecutionCallbackRequest {
 	return ApiPostNodeExecutionCallbackRequest{
-		ApiService: a,
-		ctx:        ctx,
-		id:         id,
-		execId:     execId,
+		ApiService:  a,
+		ctx:         ctx,
+		id:          id,
+		executionId: executionId,
 	}
 }
 
@@ -745,16 +738,13 @@ func (a *ActionsAPIService) PostNodeExecutionCallbackExecute(r ApiPostNodeExecut
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/nodes/{id}/executions/{exec_id}"
+	localVarPath := localBasePath + "/v1/nodes/{id}/executions/{execution_id}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"exec_id"+"}", url.PathEscape(parameterValueToString(r.execId, "execId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"execution_id"+"}", url.PathEscape(parameterValueToString(r.executionId, "executionId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-	if r.authorization == nil {
-		return localVarReturnValue, nil, reportError("authorization is required and must be specified")
-	}
 	if r.executionCallbackRequest == nil {
 		return localVarReturnValue, nil, reportError("executionCallbackRequest is required and must be specified")
 	}
@@ -776,7 +766,6 @@ func (a *ActionsAPIService) PostNodeExecutionCallbackExecute(r ApiPostNodeExecut
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
 	// body params
 	localVarPostBody = r.executionCallbackRequest
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)

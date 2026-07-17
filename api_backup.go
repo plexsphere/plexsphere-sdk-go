@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -23,7 +23,7 @@ type BackupAPI interface {
 	/*
 		GetBackupCatalog Return the backup coverage catalog.
 
-		Returns the platform-scoped, read-only backup coverage catalog: the per-store coverage table (what is backed up, how, how often, and how long it is retained), the RPO/RTO targets per plane, and the explicit exclusions of what the platform deliberately does not back up. The read is gated by a platform-scope ReBAC check before any data is returned.
+		Returns the platform-scoped, read-only backup coverage catalog: the per-store coverage table (what is backed up, how, how often, and how long it is retained), the RPO/RTO targets per plane, and the explicit exclusions of what the platform deliberately does not back up. The read is gated by the `manage` relation on the platform singleton before any data is returned.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiGetBackupCatalogRequest
@@ -37,7 +37,7 @@ type BackupAPI interface {
 	/*
 		GetBackupRestorePlan Return the ordered disaster-recovery restore plan.
 
-		Returns the platform-scoped, read-only restore plan: the ordered sequence of steps operators follow during disaster recovery, each naming the store to restore, the action to take, and how to verify the step succeeded. The read is gated by a platform-scope ReBAC check before any data is returned.
+		Returns the platform-scoped, read-only restore plan: the ordered sequence of steps operators follow during disaster recovery, each naming the store to restore, the action to take, and how to verify the step succeeded. The read is gated by the `manage` relation on the platform singleton before any data is returned.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiGetBackupRestorePlanRequest
@@ -64,7 +64,7 @@ func (r ApiGetBackupCatalogRequest) Execute() (*BackupCatalog, *http.Response, e
 /*
 GetBackupCatalog Return the backup coverage catalog.
 
-Returns the platform-scoped, read-only backup coverage catalog: the per-store coverage table (what is backed up, how, how often, and how long it is retained), the RPO/RTO targets per plane, and the explicit exclusions of what the platform deliberately does not back up. The read is gated by a platform-scope ReBAC check before any data is returned.
+Returns the platform-scoped, read-only backup coverage catalog: the per-store coverage table (what is backed up, how, how often, and how long it is retained), the RPO/RTO targets per plane, and the explicit exclusions of what the platform deliberately does not back up. The read is gated by the `manage` relation on the platform singleton before any data is returned.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiGetBackupCatalogRequest
@@ -207,7 +207,7 @@ func (r ApiGetBackupRestorePlanRequest) Execute() (*RestorePlan, *http.Response,
 /*
 GetBackupRestorePlan Return the ordered disaster-recovery restore plan.
 
-Returns the platform-scoped, read-only restore plan: the ordered sequence of steps operators follow during disaster recovery, each naming the store to restore, the action to take, and how to verify the step succeeded. The read is gated by a platform-scope ReBAC check before any data is returned.
+Returns the platform-scoped, read-only restore plan: the ordered sequence of steps operators follow during disaster recovery, each naming the store to restore, the action to take, and how to verify the step succeeded. The read is gated by the `manage` relation on the platform singleton before any data is returned.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiGetBackupRestorePlanRequest

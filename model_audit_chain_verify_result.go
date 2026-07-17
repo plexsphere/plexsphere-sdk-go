@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -22,11 +22,11 @@ var _ MappedNullable = &AuditChainVerifyResult{}
 type AuditChainVerifyResult struct {
 	// `true` when every row in the inspected segment hashes correctly and chains to its predecessor; `false` when the verifier observed a divergence at `divergent_seq`.
 	Ok bool `json:"ok"`
-	// Seq of the first row whose recomputed hash did not match the stored value, or whose `prev_hash` did not match the previous row's `entry_hash`. `null` on a clean run.
+	// Seq of the first row whose recomputed hash did not match the stored value, or whose `prev_hash` did not match the previous row's `entry_hash`. Absent on a clean run.
 	DivergentSeq *int64 `json:"divergent_seq,omitempty"`
-	// Hash the verifier computed for `divergent_seq`, lowercase hex. `null` on a clean run.
+	// Hash the verifier computed for `divergent_seq`, lowercase hex. Absent on a clean run.
 	ExpectedHash *string `json:"expected_hash,omitempty" validate:"regexp=^[0-9a-f]{64}$"`
-	// Hash actually stored at `divergent_seq`, lowercase hex. `null` on a clean run.
+	// Hash actually stored at `divergent_seq`, lowercase hex. Absent on a clean run.
 	ObservedHash *string `json:"observed_hash,omitempty" validate:"regexp=^[0-9a-f]{64}$"`
 	// Inclusive lower bound the verifier actually walked.
 	SegmentFrom int64 `json:"segment_from"`

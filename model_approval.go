@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -36,15 +36,15 @@ type Approval struct {
 	State   ApprovalState          `json:"state"`
 	// Aggregate creation timestamp (UTC).
 	CreatedAt time.Time `json:"created_at"`
-	// Timestamp the proposal reached a terminal state (UTC). `null` or omitted while the proposal is still `proposed` or `pending-approval`.
+	// Timestamp the proposal reached a terminal state (UTC). Absent while the proposal is still `proposed` or `pending-approval`.
 	DecidedAt *time.Time `json:"decided_at,omitempty"`
-	// ReBAC subject string of the principal that decided the proposal. `null` or omitted while undecided and for the unattended `expired` path.
+	// ReBAC subject string of the principal that decided the proposal. Absent while undecided and for the unattended `expired` path.
 	DecidedBySubject *string `json:"decided_by_subject,omitempty"`
-	// Free-text rationale recorded with the decision. `null` or omitted while undecided and for the unattended `expired` path. For a break-glass override the rationale value is PII and is NOT surfaced here verbatim — only its field name is projected onto `caveat_context`.
+	// Free-text rationale recorded with the decision. Absent while undecided and for the unattended `expired` path. For a break-glass override the rationale value is PII and is NOT surfaced here verbatim — only its field name is projected onto `caveat_context`.
 	DecisionReason *string `json:"decision_reason,omitempty"`
 	// Deadline past which the background sweeper expires an un-decided proposal (UTC).
 	ExpiresAt time.Time `json:"expires_at"`
-	// Names-only projection of the caveat field NAMES referenced on the decision's audit row — for a break-glass override this carries the `reason` field name. Values never cross this boundary: the map keys are caveat NAMES and the arrays are caveat-parameter NAMES, mirroring the Platform Audit Log invariant. `null` or omitted while the proposal carries no decision audit row.
+	// Names-only projection of the caveat field NAMES referenced on the decision's audit row — for a break-glass override this carries the `reason` field name. Values never cross this boundary: the map keys are caveat NAMES and the arrays are caveat-parameter NAMES, mirroring the Platform Audit Log invariant. Absent while the proposal carries no decision audit row.
 	CaveatContext        map[string][]string `json:"caveat_context,omitempty"`
 	AdditionalProperties map[string]interface{}
 }

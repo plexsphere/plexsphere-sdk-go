@@ -11,9 +11,9 @@ Name | Type | Description | Notes
 **Status** | [**IntegrityViolationStatus**](IntegrityViolationStatus.md) |  | 
 **ArtifactId** | **string** | Stable identifier of the affected artifact (hook name, binary path label, or host-key file label).  | 
 **DetectedAt** | **time.Time** | Timestamp the agent detected the violation (UTC). | 
-**AcknowledgedAt** | Pointer to **time.Time** | Timestamp an operator acknowledged the violation (UTC). &#x60;null&#x60; or omitted while the violation is still &#x60;open&#x60;.  | [optional] 
-**AcknowledgedBySubject** | Pointer to **string** | Subject string of the operator that acknowledged the violation. &#x60;null&#x60; or omitted while the violation is still &#x60;open&#x60;.  | [optional] 
-**AcknowledgeReason** | Pointer to **string** | Free-text rationale recorded with the acknowledgement. &#x60;null&#x60; or omitted while the violation is still &#x60;open&#x60;.  | [optional] 
+**AcknowledgedAt** | Pointer to **time.Time** | Timestamp an operator acknowledged the violation (UTC). Absent while the violation is still &#x60;open&#x60;.  | [optional] 
+**AcknowledgedBySubject** | Pointer to **string** | Subject string of the operator that acknowledged the violation. Absent while the violation is still &#x60;open&#x60;.  | [optional] 
+**AcknowledgeReason** | Pointer to **string** | Free-text rationale recorded with the acknowledgement. Absent while the violation is still &#x60;open&#x60;.  | [optional] 
 
 ## Methods
 

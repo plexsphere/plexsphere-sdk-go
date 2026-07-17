@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -27,7 +27,7 @@ type CapacityAPI interface {
 		Returns the latest per-Domain capacity snapshot the platform collector samples on a fixed interval: one `used / target` reading for each of the six catalogued capacity dimensions (`nodes`, `sse_fanout`, `secret_reads`, `mediated_sessions`, `observability_ingest`, `action_executions`). The Dashboard capacity view and operators reading scale headroom consume this pull.  The handler:    1. Authenticates the caller and rejects requests without a      resolved Principal with 401.   2. Checks the `domain-view` ReBAC relation on the addressed Domain      BEFORE reading the snapshot so the endpoint cannot be used as a      Domain-id oracle; an unauthorised caller receives 403.   3. Returns the snapshot with 200 once the collector has sampled at      least once. Before the first sample completes the snapshot is      unavailable and the handler returns 503      `capacity_snapshot_unavailable` with a `Retry-After` header.  DEFERRED-WIRING POSTURE: until the production composition root supplies the collector-backed snapshot provider and the ReBAC RelationChecker, every request returns 501 so log scrapers can alert on the deferred-wiring state.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+		@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 		@return ApiGetDomainCapacityRequest
 	*/
 	GetDomainCapacity(ctx context.Context, domainId string) ApiGetDomainCapacityRequest
@@ -56,7 +56,7 @@ GetDomainCapacity Return the capacity-and-scale snapshot for a Domain.
 Returns the latest per-Domain capacity snapshot the platform collector samples on a fixed interval: one `used / target` reading for each of the six catalogued capacity dimensions (`nodes`, `sse_fanout`, `secret_reads`, `mediated_sessions`, `observability_ingest`, `action_executions`). The Dashboard capacity view and operators reading scale headroom consume this pull.  The handler:    1. Authenticates the caller and rejects requests without a      resolved Principal with 401.   2. Checks the `domain-view` ReBAC relation on the addressed Domain      BEFORE reading the snapshot so the endpoint cannot be used as a      Domain-id oracle; an unauthorised caller receives 403.   3. Returns the snapshot with 200 once the collector has sampled at      least once. Before the first sample completes the snapshot is      unavailable and the handler returns 503      `capacity_snapshot_unavailable` with a `Retry-After` header.  DEFERRED-WIRING POSTURE: until the production composition root supplies the collector-backed snapshot provider and the ReBAC RelationChecker, every request returns 501 so log scrapers can alert on the deferred-wiring state.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.
+	@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 	@return ApiGetDomainCapacityRequest
 */
 func (a *CapacityAPIService) GetDomainCapacity(ctx context.Context, domainId string) ApiGetDomainCapacityRequest {
@@ -83,8 +83,8 @@ func (a *CapacityAPIService) GetDomainCapacityExecute(r ApiGetDomainCapacityRequ
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/capacity"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/capacity"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

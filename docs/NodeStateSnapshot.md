@@ -4,7 +4,7 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**Peers** | [**[]NodeStatePeer**](NodeStatePeer.md) | Peer set the addressed Node should program into its WireGuard table. One entry per other Node in the addressed Node&#39;s Domain — the addressed Node itself is excluded so plexd does not program a self-peer . Ordered by &#x60;node_id&#x60; ascending so two consecutive pulls against the same ledger snapshot are byte-equal.  | 
+**Peers** | [**[]NodeStatePeer**](NodeStatePeer.md) | Peer set the addressed Node should program into its WireGuard table. One entry per other Node in the addressed Node&#39;s Domain — the addressed Node itself is excluded so plexd does not program a self-peer. Ordered by &#x60;node_id&#x60; ascending so two consecutive pulls against the same ledger snapshot are byte-equal.  | 
 **Reachability** | [**Reachability**](Reachability.md) | Latest &#x60;Reachability&#x60; projection for the addressed Node, carried inside the reconciliation-pull payload so plexd sees the same health view that &#x60;GET /v1/nodes/{id}/reachability&#x60; exposes without an additional round-trip.  | 
 **Policy** | [**NodeStatePolicy**](NodeStatePolicy.md) | Policy block — present-but-empty placeholder populates the wire shape. May be &#x60;null&#x60; until then; the field itself is always present so plexd&#39;s reconcile loop can diff by field presence.  | 
 **Bridge** | [**NodeStateBridge**](NodeStateBridge.md) | Bridge orchestrator block — present-but-empty placeholder  populates the wire shape. May be &#x60;null&#x60; until then; the field itself is always present.  | 

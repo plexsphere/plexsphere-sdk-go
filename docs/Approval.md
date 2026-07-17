@@ -12,11 +12,11 @@ Name | Type | Description | Notes
 **Payload** | Pointer to **map[string]interface{}** | Raw JSON action payload applied verbatim once the proposal is approved. Opaque to the approval workflow — it carries the parameters of the action the proposer intends to run.  | [optional] 
 **State** | [**ApprovalState**](ApprovalState.md) |  | 
 **CreatedAt** | **time.Time** | Aggregate creation timestamp (UTC). | 
-**DecidedAt** | Pointer to **time.Time** | Timestamp the proposal reached a terminal state (UTC). &#x60;null&#x60; or omitted while the proposal is still &#x60;proposed&#x60; or &#x60;pending-approval&#x60;.  | [optional] 
-**DecidedBySubject** | Pointer to **string** | ReBAC subject string of the principal that decided the proposal. &#x60;null&#x60; or omitted while undecided and for the unattended &#x60;expired&#x60; path.  | [optional] 
-**DecisionReason** | Pointer to **string** | Free-text rationale recorded with the decision. &#x60;null&#x60; or omitted while undecided and for the unattended &#x60;expired&#x60; path. For a break-glass override the rationale value is PII and is NOT surfaced here verbatim — only its field name is projected onto &#x60;caveat_context&#x60;.  | [optional] 
+**DecidedAt** | Pointer to **time.Time** | Timestamp the proposal reached a terminal state (UTC). Absent while the proposal is still &#x60;proposed&#x60; or &#x60;pending-approval&#x60;.  | [optional] 
+**DecidedBySubject** | Pointer to **string** | ReBAC subject string of the principal that decided the proposal. Absent while undecided and for the unattended &#x60;expired&#x60; path.  | [optional] 
+**DecisionReason** | Pointer to **string** | Free-text rationale recorded with the decision. Absent while undecided and for the unattended &#x60;expired&#x60; path. For a break-glass override the rationale value is PII and is NOT surfaced here verbatim — only its field name is projected onto &#x60;caveat_context&#x60;.  | [optional] 
 **ExpiresAt** | **time.Time** | Deadline past which the background sweeper expires an un-decided proposal (UTC).  | 
-**CaveatContext** | Pointer to **map[string][]string** | Names-only projection of the caveat field NAMES referenced on the decision&#39;s audit row — for a break-glass override this carries the &#x60;reason&#x60; field name. Values never cross this boundary: the map keys are caveat NAMES and the arrays are caveat-parameter NAMES, mirroring the Platform Audit Log invariant. &#x60;null&#x60; or omitted while the proposal carries no decision audit row.  | [optional] 
+**CaveatContext** | Pointer to **map[string][]string** | Names-only projection of the caveat field NAMES referenced on the decision&#39;s audit row — for a break-glass override this carries the &#x60;reason&#x60; field name. Values never cross this boundary: the map keys are caveat NAMES and the arrays are caveat-parameter NAMES, mirroring the Platform Audit Log invariant. Absent while the proposal carries no decision audit row.  | [optional] 
 
 ## Methods
 

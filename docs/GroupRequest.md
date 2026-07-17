@@ -8,8 +8,8 @@ Name | Type | Description | Notes
 **Slug** | **string** | URL-safe identifier unique within &#x60;domain_id&#x60;. Lowercase ASCII letters, digits, and internal dashes only; cannot start or end with a dash.  | 
 **DisplayName** | **string** | Human-friendly Group name. | 
 **Source** | [**GroupRequestSource**](GroupRequestSource.md) |  | 
-**IdpBindingId** | Pointer to **string** | IdP binding the Group is reconciled from. Required when &#x60;source&#x3D;idp&#x60;; must be omitted when &#x60;source&#x3D;manual&#x60; .  | [optional] 
-**IdpClaimValue** | Pointer to **string** | Verbatim IdP claim value the Group reconciles to. Required when &#x60;source&#x3D;idp&#x60;; must be omitted when &#x60;source&#x3D;manual&#x60; .  | [optional] 
+**IdpBindingId** | Pointer to **string** | IdP binding the Group is reconciled from. Required when &#x60;source&#x3D;idp&#x60;; must be omitted when &#x60;source&#x3D;manual&#x60;.  | [optional] 
+**IdpClaimValue** | Pointer to **string** | Verbatim IdP claim value the Group reconciles to. Required when &#x60;source&#x3D;idp&#x60;; must be omitted when &#x60;source&#x3D;manual&#x60;.  | [optional] 
 
 ## Methods
 

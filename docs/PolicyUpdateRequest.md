@@ -7,7 +7,7 @@ Name | Type | Description | Notes
 **DisplayName** | Pointer to **string** |  | [optional] 
 **Selector** | Pointer to [**PolicySelector**](PolicySelector.md) |  | [optional] 
 **Rules** | Pointer to [**[]PolicyRule**](PolicyRule.md) |  | [optional] 
-**ExpectedRevisionId** | Pointer to **string** | Revision identifier the client believes is current. When present, the PATCH only succeeds if the persisted head still matches; otherwise the call surfaces as &#x60;409 revision_conflict&#x60;.  | [optional] 
+**ExpectedRevisionId** | Pointer to **string** | Revision identifier the client believes is current. When present the handler also rejects a stale value up front; with or without it the append-and-advance CAS still forces a losing concurrent writer onto &#x60;409 revision_conflict&#x60;.  | [optional] 
 
 ## Methods
 

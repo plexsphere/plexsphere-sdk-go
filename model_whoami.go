@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -20,10 +20,11 @@ var _ MappedNullable = &Whoami{}
 
 // Whoami Resolved principal metadata for the current request.
 type Whoami struct {
-	PrincipalType WhoamiPrincipalType `json:"principal_type"`
+	PrincipalType  WhoamiPrincipalType   `json:"principal_type"`
+	PrincipalScope *WhoamiPrincipalScope `json:"principal_scope,omitempty"`
 	// Principal identifier (UUIDv7 serialised as a string).
 	Subject string `json:"subject"`
-	// Domain the principal belongs to.
+	// Domain the principal belongs to. Omitted for a platform-scoped principal, which belongs to no Domain.
 	DomainId *string `json:"domain_id,omitempty"`
 	// Primary email of the principal as projected by the upstream IdP at sign-in. Omitted when the IdP did not supply an `email` claim or the principal is a ServiceIdentity. A browser client renders it as the human-readable identity label.
 	Email *string `json:"email,omitempty"`
@@ -77,6 +78,38 @@ func (o *Whoami) GetPrincipalTypeOk() (*WhoamiPrincipalType, bool) {
 // SetPrincipalType sets field value
 func (o *Whoami) SetPrincipalType(v WhoamiPrincipalType) {
 	o.PrincipalType = v
+}
+
+// GetPrincipalScope returns the PrincipalScope field value if set, zero value otherwise.
+func (o *Whoami) GetPrincipalScope() WhoamiPrincipalScope {
+	if o == nil || IsNil(o.PrincipalScope) {
+		var ret WhoamiPrincipalScope
+		return ret
+	}
+	return *o.PrincipalScope
+}
+
+// GetPrincipalScopeOk returns a tuple with the PrincipalScope field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *Whoami) GetPrincipalScopeOk() (*WhoamiPrincipalScope, bool) {
+	if o == nil || IsNil(o.PrincipalScope) {
+		return nil, false
+	}
+	return o.PrincipalScope, true
+}
+
+// HasPrincipalScope returns a boolean if a field has been set.
+func (o *Whoami) HasPrincipalScope() bool {
+	if o != nil && !IsNil(o.PrincipalScope) {
+		return true
+	}
+
+	return false
+}
+
+// SetPrincipalScope gets a reference to the given WhoamiPrincipalScope and assigns it to the PrincipalScope field.
+func (o *Whoami) SetPrincipalScope(v WhoamiPrincipalScope) {
+	o.PrincipalScope = &v
 }
 
 // GetSubject returns the Subject field value
@@ -242,6 +275,9 @@ func (o Whoami) MarshalJSON() ([]byte, error) {
 func (o Whoami) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["principal_type"] = o.PrincipalType
+	if !IsNil(o.PrincipalScope) {
+		toSerialize["principal_scope"] = o.PrincipalScope
+	}
 	toSerialize["subject"] = o.Subject
 	if !IsNil(o.DomainId) {
 		toSerialize["domain_id"] = o.DomainId
@@ -300,6 +336,7 @@ func (o *Whoami) UnmarshalJSON(data []byte) (err error) {
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "principal_type")
+		delete(additionalProperties, "principal_scope")
 		delete(additionalProperties, "subject")
 		delete(additionalProperties, "domain_id")
 		delete(additionalProperties, "email")

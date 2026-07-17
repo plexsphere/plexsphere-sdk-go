@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -21,7 +21,7 @@ var _ MappedNullable = &BridgeUserAccessProviderList{}
 // BridgeUserAccessProviderList User-access providers on a bridge Resource, returned by `ListBridgeUserAccessProviders`. Ordered by slug ascending.
 type BridgeUserAccessProviderList struct {
 	// Providers ordered by slug ascending.
-	Providers            []BridgeUserAccessProviderResponse `json:"providers"`
+	Items                []BridgeUserAccessProviderResponse `json:"items"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -31,9 +31,9 @@ type _BridgeUserAccessProviderList BridgeUserAccessProviderList
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewBridgeUserAccessProviderList(providers []BridgeUserAccessProviderResponse) *BridgeUserAccessProviderList {
+func NewBridgeUserAccessProviderList(items []BridgeUserAccessProviderResponse) *BridgeUserAccessProviderList {
 	this := BridgeUserAccessProviderList{}
-	this.Providers = providers
+	this.Items = items
 	return &this
 }
 
@@ -45,28 +45,28 @@ func NewBridgeUserAccessProviderListWithDefaults() *BridgeUserAccessProviderList
 	return &this
 }
 
-// GetProviders returns the Providers field value
-func (o *BridgeUserAccessProviderList) GetProviders() []BridgeUserAccessProviderResponse {
+// GetItems returns the Items field value
+func (o *BridgeUserAccessProviderList) GetItems() []BridgeUserAccessProviderResponse {
 	if o == nil {
 		var ret []BridgeUserAccessProviderResponse
 		return ret
 	}
 
-	return o.Providers
+	return o.Items
 }
 
-// GetProvidersOk returns a tuple with the Providers field value
+// GetItemsOk returns a tuple with the Items field value
 // and a boolean to check if the value has been set.
-func (o *BridgeUserAccessProviderList) GetProvidersOk() ([]BridgeUserAccessProviderResponse, bool) {
+func (o *BridgeUserAccessProviderList) GetItemsOk() ([]BridgeUserAccessProviderResponse, bool) {
 	if o == nil {
 		return nil, false
 	}
-	return o.Providers, true
+	return o.Items, true
 }
 
-// SetProviders sets field value
-func (o *BridgeUserAccessProviderList) SetProviders(v []BridgeUserAccessProviderResponse) {
-	o.Providers = v
+// SetItems sets field value
+func (o *BridgeUserAccessProviderList) SetItems(v []BridgeUserAccessProviderResponse) {
+	o.Items = v
 }
 
 func (o BridgeUserAccessProviderList) MarshalJSON() ([]byte, error) {
@@ -79,7 +79,7 @@ func (o BridgeUserAccessProviderList) MarshalJSON() ([]byte, error) {
 
 func (o BridgeUserAccessProviderList) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	toSerialize["providers"] = o.Providers
+	toSerialize["items"] = o.Items
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -93,7 +93,7 @@ func (o *BridgeUserAccessProviderList) UnmarshalJSON(data []byte) (err error) {
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
-		"providers",
+		"items",
 	}
 
 	allProperties := make(map[string]interface{})
@@ -123,7 +123,7 @@ func (o *BridgeUserAccessProviderList) UnmarshalJSON(data []byte) (err error) {
 	additionalProperties := make(map[string]interface{})
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
-		delete(additionalProperties, "providers")
+		delete(additionalProperties, "items")
 		o.AdditionalProperties = additionalProperties
 	}
 

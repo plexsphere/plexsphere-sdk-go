@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -20,7 +20,7 @@ var _ MappedNullable = &ProjectCreateRequest{}
 
 // ProjectCreateRequest Body for `POST /v1/projects`. Field set mirrors the Project aggregate's `NewProject` invariants. The handler authorises the call against the parent Domain's `manage` ReBAC relation BEFORE invoking the service so an unauthorised caller never produces a `ProjectCreated` outbox row.
 type ProjectCreateRequest struct {
-	// Parent Domain identifier (UUIDv7). The handler authorises `manage` on `domain:<id>` BEFORE invoking the service .
+	// Parent Domain identifier (UUIDv7). The handler authorises `manage` on `domain:<id>` BEFORE invoking the service.
 	DomainId string `json:"domain_id"`
 	// Human-readable Project name. Whitespace-only is rejected.
 	Name string `json:"name"`
@@ -29,7 +29,7 @@ type ProjectCreateRequest struct {
 	// Optional free-form description. Whitespace-only strings are rejected by the aggregate (the operator most likely fat-fingered the field instead of meaning to clear it).
 	Description *string `json:"description,omitempty"`
 	// Optional canonical RFC 4632 sub-range reservation. Must be contained in the parent Domain's mesh_cidr and must not overlap a sibling Project's reservation. Surfaces as `409 sub_range_overlap` on conflict.
-	SubRangeCidr         *string `json:"sub_range_cidr,omitempty"`
+	SubRangeCidr         *string `json:"sub_range_cidr,omitempty" validate:"regexp=^([0-9]{1,3}\\\\.){3}[0-9]{1,3}\\/[0-9]{1,2}$|^[0-9a-fA-F:]+\\/[0-9]{1,3}$"`
 	AdditionalProperties map[string]interface{}
 }
 

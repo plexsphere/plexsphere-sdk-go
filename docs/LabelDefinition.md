@@ -10,10 +10,10 @@ Name | Type | Description | Notes
 **LocalKey** | **string** | Unqualified key token (for example &#x60;env&#x60;, &#x60;cost-center&#x60;).  | 
 **QualifiedKey** | **string** | Fully namespaced key (for example &#x60;platform/env&#x60;, &#x60;acme:checkout/owner&#x60;). Unique across the platform.  | 
 **ValueSchema** | [**LabelValueSchema**](LabelValueSchema.md) |  | 
-**ApplicableKinds** | **[]string** | Lowercase object-kind whitelist (resource, node, project, domain, workload, network, …). Assignments whose &#x60;object.kind&#x60; is not in this set are rejected with &#x60;scope-mismatch&#x60;.  | 
+**ApplicableKinds** | **[]string** | Lowercase object-kind whitelist (resource, node, project, domain, workload, network, …). Assignments whose &#x60;object.kind&#x60; is not in this set are rejected with &#x60;scope_mismatch&#x60;.  | 
 **OnDelete** | [**LabelDefinitionOnDelete**](LabelDefinitionOnDelete.md) |  | 
 **Cardinality** | **int32** | Declared per-object cardinality cap for Assignments of this Definition. &#x60;1&#x60; means at most one Assignment per object; &#x60;0&#x60; means unlimited (bounded only by the global 64-per-object ceiling).  | [default to 1]
-**Immutable** | **bool** | When &#x60;true&#x60;, the value schema is frozen and Assignments of this Definition may not have their value replaced .  | 
+**Immutable** | **bool** | When &#x60;true&#x60;, the value schema is frozen and Assignments of this Definition may not have their value replaced.  | 
 **CloudTagPropagation** | **bool** | When &#x60;true&#x60;, matching cloud tags are synchronised onto cloud resources by the Provisioning Broker.  | 
 **Description** | Pointer to **string** | Optional human description (at most 512 chars). | [optional] 
 **CreatedBy** | [**LabelDefinitionCreatedBy**](LabelDefinitionCreatedBy.md) |  | 

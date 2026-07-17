@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -18,7 +18,7 @@ import (
 // checks if the LookupSubjectsRequest type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &LookupSubjectsRequest{}
 
-// LookupSubjectsRequest Body for `POST /v1/authz/lookup-subjects`. The dual of `LookupResourcesRequest`: enumerates the subjects of `subject_type` that can reach `resource` via `relation`. An optional `caveat_context` carries the field NAMES the caveat program reads — never values.
+// LookupSubjectsRequest Body for `POST /v1/authz/lookup-subjects`. The dual of `LookupResourcesRequest`: enumerates the subjects of `subject_type` that can reach `resource` via `relation`. An optional `caveat_context` carries the CEL caveat evaluation context (field name to value) forwarded to the authorizer.
 type LookupSubjectsRequest struct {
 	// Object type whose instances are enumerated (e.g. `user`, `service-identity`). Returned `items` are `<subject_type>:<id>` object references.
 	SubjectType string `json:"subject_type"`
@@ -26,7 +26,7 @@ type LookupSubjectsRequest struct {
 	Relation string `json:"relation"`
 	// Object reference of the resource whose authorised subjects are enumerated (e.g. `project:0190a8b8-...`, `domain:...`).
 	Resource string `json:"resource"`
-	// Optional set of caveat field NAMES the request makes available to the caveat program. Values are never carried across the contract boundary; the field type is `object` for forward-compatibility but the contract requires NAMES-only payloads.
+	// Optional CEL caveat evaluation context — a map from caveat field NAME to VALUE — forwarded verbatim to the authorizer so a caveated relation can be evaluated at check time. Values DO cross this boundary (they are the evaluation inputs); it is the AUDIT projection of this call that records field NAMES only, never the values.
 	CaveatContext        map[string]interface{} `json:"caveat_context,omitempty"`
 	AdditionalProperties map[string]interface{}
 }

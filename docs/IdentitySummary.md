@@ -9,7 +9,7 @@ Name | Type | Description | Notes
 **DomainId** | **string** | Owning Domain identifier (UUIDv7). | 
 **DisplayName** | **string** | Operator-facing display string. For users this is the IdP- sourced full name; for service identities it is the operator-supplied label.  | 
 **ExternalSubjectPseudonym** | **string** | Per-Domain pseudonym of the IdP-side &#x60;external_subject&#x60; (32 bytes, lowercase hex). Always present so the listing surface is queryable without exposing plaintext PII to non-auditor callers.  | 
-**LastSignInAt** | Pointer to **time.Time** | Timestamp of the most recent successful sign-in for this principal, or &#x60;null&#x60; when the principal has never signed in (typical for service identities and freshly invited users).  | [optional] 
+**LastSignInAt** | Pointer to **time.Time** | Timestamp of the most recent successful sign-in for this principal; absent when the principal has never signed in (typical for service identities and freshly invited users).  | [optional] 
 **CreatedAt** | **time.Time** | Aggregate creation timestamp (UTC). | 
 
 ## Methods

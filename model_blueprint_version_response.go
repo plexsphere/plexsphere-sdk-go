@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -26,8 +26,8 @@ type BlueprintVersionResponse struct {
 	// Version identifier, unique within the parent Blueprint.
 	Version string `json:"version"`
 	// Closed-set infrastructure substrates this version can target. Non-empty.
-	ProviderKinds     []BlueprintVersionResponseProviderKindsInner `json:"provider_kinds"`
-	InjectionStrategy BlueprintVersionResponseInjectionStrategy    `json:"injection_strategy"`
+	ProviderKinds     []BlueprintVersionCreateRequestProviderKindsInner `json:"provider_kinds"`
+	InjectionStrategy BlueprintVersionResponseInjectionStrategy         `json:"injection_strategy"`
 	// Typed parameter declarations an operator fills in when provisioning a Resource from this version. May be empty when the version declares no parameters.
 	ParameterSchema []BlueprintParameter `json:"parameter_schema"`
 	// Version creation timestamp (UTC).
@@ -41,7 +41,7 @@ type _BlueprintVersionResponse BlueprintVersionResponse
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewBlueprintVersionResponse(id string, version string, providerKinds []BlueprintVersionResponseProviderKindsInner, injectionStrategy BlueprintVersionResponseInjectionStrategy, parameterSchema []BlueprintParameter, createdAt time.Time) *BlueprintVersionResponse {
+func NewBlueprintVersionResponse(id string, version string, providerKinds []BlueprintVersionCreateRequestProviderKindsInner, injectionStrategy BlueprintVersionResponseInjectionStrategy, parameterSchema []BlueprintParameter, createdAt time.Time) *BlueprintVersionResponse {
 	this := BlueprintVersionResponse{}
 	this.Id = id
 	this.Version = version
@@ -109,9 +109,9 @@ func (o *BlueprintVersionResponse) SetVersion(v string) {
 }
 
 // GetProviderKinds returns the ProviderKinds field value
-func (o *BlueprintVersionResponse) GetProviderKinds() []BlueprintVersionResponseProviderKindsInner {
+func (o *BlueprintVersionResponse) GetProviderKinds() []BlueprintVersionCreateRequestProviderKindsInner {
 	if o == nil {
-		var ret []BlueprintVersionResponseProviderKindsInner
+		var ret []BlueprintVersionCreateRequestProviderKindsInner
 		return ret
 	}
 
@@ -120,7 +120,7 @@ func (o *BlueprintVersionResponse) GetProviderKinds() []BlueprintVersionResponse
 
 // GetProviderKindsOk returns a tuple with the ProviderKinds field value
 // and a boolean to check if the value has been set.
-func (o *BlueprintVersionResponse) GetProviderKindsOk() ([]BlueprintVersionResponseProviderKindsInner, bool) {
+func (o *BlueprintVersionResponse) GetProviderKindsOk() ([]BlueprintVersionCreateRequestProviderKindsInner, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -128,7 +128,7 @@ func (o *BlueprintVersionResponse) GetProviderKindsOk() ([]BlueprintVersionRespo
 }
 
 // SetProviderKinds sets field value
-func (o *BlueprintVersionResponse) SetProviderKinds(v []BlueprintVersionResponseProviderKindsInner) {
+func (o *BlueprintVersionResponse) SetProviderKinds(v []BlueprintVersionCreateRequestProviderKindsInner) {
 	o.ProviderKinds = v
 }
 

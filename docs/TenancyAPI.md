@@ -7,11 +7,12 @@ Method | HTTP request | Description
 [**CreateDomain**](TenancyAPI.md#CreateDomain) | **Post** /v1/domains | Create a tenancy Domain.
 [**CreateInvitation**](TenancyAPI.md#CreateInvitation) | **Post** /v1/domains/{id}/invitations | Stage a pending Invitation on a Domain.
 [**CreateProject**](TenancyAPI.md#CreateProject) | **Post** /v1/projects | Create a tenancy Project.
+[**CreateServiceIdentity**](TenancyAPI.md#CreateServiceIdentity) | **Post** /v1/domains/{id}/service-identities | Create a service identity on a Domain.
 [**DeleteDomain**](TenancyAPI.md#DeleteDomain) | **Delete** /v1/domains/{id} | Delete a Domain.
 [**DeleteProject**](TenancyAPI.md#DeleteProject) | **Delete** /v1/projects/{id} | Delete a Project.
 [**GetDomain**](TenancyAPI.md#GetDomain) | **Get** /v1/domains/{id} | Fetch a Domain by identifier.
-[**GetIdentity**](TenancyAPI.md#GetIdentity) | **Get** /v1/domains/{id}/identities/{principalId} | Fetch a single Domain principal by identifier.
-[**GetInvitation**](TenancyAPI.md#GetInvitation) | **Get** /v1/domains/{id}/invitations/{invitationId} | Fetch a single Invitation by identifier.
+[**GetIdentity**](TenancyAPI.md#GetIdentity) | **Get** /v1/domains/{id}/identities/{principal_id} | Fetch a single Domain principal by identifier.
+[**GetInvitation**](TenancyAPI.md#GetInvitation) | **Get** /v1/domains/{id}/invitations/{invitation_id} | Fetch a single Invitation by identifier.
 [**GetProject**](TenancyAPI.md#GetProject) | **Get** /v1/projects/{id} | Fetch a Project by identifier.
 [**ListDomains**](TenancyAPI.md#ListDomains) | **Get** /v1/domains | List tenancy Domains.
 [**ListIdentities**](TenancyAPI.md#ListIdentities) | **Get** /v1/domains/{id}/identities | List principals (users + service identities) on a Domain.
@@ -19,7 +20,7 @@ Method | HTTP request | Description
 [**ListProjects**](TenancyAPI.md#ListProjects) | **Get** /v1/projects | List tenancy Projects.
 [**PatchDomain**](TenancyAPI.md#PatchDomain) | **Patch** /v1/domains/{id} | Patch mutable fields on a Domain.
 [**PatchProject**](TenancyAPI.md#PatchProject) | **Patch** /v1/projects/{id} | Patch mutable fields on a Project.
-[**RevokeInvitation**](TenancyAPI.md#RevokeInvitation) | **Delete** /v1/domains/{id}/invitations/{invitationId} | Revoke a pending Invitation.
+[**RevokeInvitation**](TenancyAPI.md#RevokeInvitation) | **Delete** /v1/domains/{id}/invitations/{invitation_id} | Revoke a pending Invitation.
 
 
 
@@ -77,7 +78,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -149,7 +150,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -215,7 +216,79 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+
+### HTTP request headers
+
+- **Content-Type**: application/json
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## CreateServiceIdentity
+
+> IdentitySummary CreateServiceIdentity(ctx, id).ServiceIdentityCreateRequest(serviceIdentityCreateRequest).Execute()
+
+Create a service identity on a Domain.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface. 
+	serviceIdentityCreateRequest := *openapiclient.NewServiceIdentityCreateRequest("DisplayName_example", "Subject_example", "Audience_example", openapiclient.ServiceFederationKind("oidc_cc")) // ServiceIdentityCreateRequest | 
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.TenancyAPI.CreateServiceIdentity(context.Background(), id).ServiceIdentityCreateRequest(serviceIdentityCreateRequest).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `TenancyAPI.CreateServiceIdentity``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `CreateServiceIdentity`: IdentitySummary
+	fmt.Fprintf(os.Stdout, "Response from `TenancyAPI.CreateServiceIdentity`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+**id** | **string** | Domain identifier (UUIDv7). Bound on &#x60;/v1/domains/{id}&#x60; for the tenancy CRUD surface.  | 
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiCreateServiceIdentityRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+
+ **serviceIdentityCreateRequest** | [**ServiceIdentityCreateRequest**](ServiceIdentityCreateRequest.md) |  | 
+
+### Return type
+
+[**IdentitySummary**](IdentitySummary.md)
+
+### Authorization
+
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -283,7 +356,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -316,7 +389,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface and on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces. 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -334,7 +407,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface and on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list.  | 
+**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface, on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list, and on &#x60;/v1/projects/{id}/credential-assignments&#x60; and &#x60;/v1/projects/{id}/cloud-assignments&#x60; for the assignment request/list surfaces.  | 
 
 ### Other Parameters
 
@@ -351,7 +424,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -421,7 +494,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -455,7 +528,7 @@ import (
 
 func main() {
 	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface. 
-	principalId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Principal identifier (UUIDv7). Bound on `/v1/domains/{id}/identities/{principalId}` for the per-Domain identity-read surface. 
+	principalId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Principal identifier (UUIDv7). Bound on `/v1/domains/{id}/identities/{principal_id}` for the per-Domain identity-read surface. 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -476,7 +549,7 @@ Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
 **id** | **string** | Domain identifier (UUIDv7). Bound on &#x60;/v1/domains/{id}&#x60; for the tenancy CRUD surface.  | 
-**principalId** | **string** | Principal identifier (UUIDv7). Bound on &#x60;/v1/domains/{id}/identities/{principalId}&#x60; for the per-Domain identity-read surface.  | 
+**principalId** | **string** | Principal identifier (UUIDv7). Bound on &#x60;/v1/domains/{id}/identities/{principal_id}&#x60; for the per-Domain identity-read surface.  | 
 
 ### Other Parameters
 
@@ -494,7 +567,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -528,7 +601,7 @@ import (
 
 func main() {
 	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface. 
-	invitationId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Invitation identifier (UUIDv7). Bound on `/v1/domains/{id}/invitations/{invitationId}` for the per- Domain invitation read / revoke surface. 
+	invitationId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Invitation identifier (UUIDv7). Bound on `/v1/domains/{id}/invitations/{invitation_id}` for the per- Domain invitation read / revoke surface. 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -549,7 +622,7 @@ Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
 **id** | **string** | Domain identifier (UUIDv7). Bound on &#x60;/v1/domains/{id}&#x60; for the tenancy CRUD surface.  | 
-**invitationId** | **string** | Invitation identifier (UUIDv7). Bound on &#x60;/v1/domains/{id}/invitations/{invitationId}&#x60; for the per- Domain invitation read / revoke surface.  | 
+**invitationId** | **string** | Invitation identifier (UUIDv7). Bound on &#x60;/v1/domains/{id}/invitations/{invitation_id}&#x60; for the per- Domain invitation read / revoke surface.  | 
 
 ### Other Parameters
 
@@ -567,7 +640,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -600,7 +673,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface and on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces. 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -620,7 +693,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface and on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list.  | 
+**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface, on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list, and on &#x60;/v1/projects/{id}/credential-assignments&#x60; and &#x60;/v1/projects/{id}/cloud-assignments&#x60; for the assignment request/list surfaces.  | 
 
 ### Other Parameters
 
@@ -637,7 +710,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -671,7 +744,7 @@ import (
 
 func main() {
 	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
-	limit := int32(56) // int32 | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the service.  (optional) (default to 50)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -697,7 +770,7 @@ Other parameters are passed through a pointer to a apiListDomainsRequest struct 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
- **limit** | **int32** | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the service.  | [default to 50]
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
 
 ### Return type
 
@@ -705,7 +778,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -739,8 +812,8 @@ import (
 
 func main() {
 	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface. 
-	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400 invalid_cursor` .  (optional)
-	limit := int32(56) // int32 | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the service.  (optional) (default to 50)
+	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
 	kind := openapiclient.IdentityKind("user") // IdentityKind | Optional principal-kind filter. Values outside the closed set surface as `400 invalid_kind`.  (optional)
 
 	configuration := openapiclient.NewConfiguration()
@@ -771,8 +844,8 @@ Other parameters are passed through a pointer to a apiListIdentitiesRequest stru
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 
- **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400 invalid_cursor&#x60; .  | 
- **limit** | **int32** | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the service.  | [default to 50]
+ **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
  **kind** | [**IdentityKind**](IdentityKind.md) | Optional principal-kind filter. Values outside the closed set surface as &#x60;400 invalid_kind&#x60;.  | 
 
 ### Return type
@@ -781,7 +854,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -815,9 +888,9 @@ import (
 
 func main() {
 	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface. 
-	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400 invalid_cursor` .  (optional)
-	limit := int32(56) // int32 | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the service.  (optional) (default to 50)
-	status := openapiclient.ListInvitations_status_parameter("pending") // ListInvitationsStatusParameter | Optional status filter. Values outside the closed set surface as `400 invalid_status`. Defaults to `all` .  (optional)
+	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
+	status := openapiclient.ListInvitations_status_parameter("pending") // ListInvitationsStatusParameter | Optional status filter. Values outside the closed set surface as `400 invalid_status`. Defaults to `all`.  (optional)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -847,9 +920,9 @@ Other parameters are passed through a pointer to a apiListInvitationsRequest str
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 
- **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400 invalid_cursor&#x60; .  | 
- **limit** | **int32** | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the service.  | [default to 50]
- **status** | [**ListInvitationsStatusParameter**](ListInvitationsStatusParameter.md) | Optional status filter. Values outside the closed set surface as &#x60;400 invalid_status&#x60;. Defaults to &#x60;all&#x60; .  | 
+ **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
+ **status** | [**ListInvitationsStatusParameter**](ListInvitationsStatusParameter.md) | Optional status filter. Values outside the closed set surface as &#x60;400 invalid_status&#x60;. Defaults to &#x60;all&#x60;.  | 
 
 ### Return type
 
@@ -857,7 +930,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -891,7 +964,7 @@ import (
 
 func main() {
 	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
-	limit := int32(56) // int32 | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the service.  (optional) (default to 50)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
 	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Optional filter scoping the page to a single parent Domain. Omit to page across every Domain the caller is authorised to see.  (optional)
 
 	configuration := openapiclient.NewConfiguration()
@@ -918,7 +991,7 @@ Other parameters are passed through a pointer to a apiListProjectsRequest struct
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
- **limit** | **int32** | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the service.  | [default to 50]
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
  **domainId** | **string** | Optional filter scoping the page to a single parent Domain. Omit to page across every Domain the caller is authorised to see.  | 
 
 ### Return type
@@ -927,7 +1000,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -999,7 +1072,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -1032,7 +1105,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface and on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces. 
 	projectPatchRequest := *openapiclient.NewProjectPatchRequest() // ProjectPatchRequest | 
 
 	configuration := openapiclient.NewConfiguration()
@@ -1053,7 +1126,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface and on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list.  | 
+**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface, on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list, and on &#x60;/v1/projects/{id}/credential-assignments&#x60; and &#x60;/v1/projects/{id}/cloud-assignments&#x60; for the assignment request/list surfaces.  | 
 
 ### Other Parameters
 
@@ -1071,7 +1144,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -1105,7 +1178,7 @@ import (
 
 func main() {
 	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface. 
-	invitationId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Invitation identifier (UUIDv7). Bound on `/v1/domains/{id}/invitations/{invitationId}` for the per- Domain invitation read / revoke surface. 
+	invitationId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Invitation identifier (UUIDv7). Bound on `/v1/domains/{id}/invitations/{invitation_id}` for the per- Domain invitation read / revoke surface. 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -1124,7 +1197,7 @@ Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
 **id** | **string** | Domain identifier (UUIDv7). Bound on &#x60;/v1/domains/{id}&#x60; for the tenancy CRUD surface.  | 
-**invitationId** | **string** | Invitation identifier (UUIDv7). Bound on &#x60;/v1/domains/{id}/invitations/{invitationId}&#x60; for the per- Domain invitation read / revoke surface.  | 
+**invitationId** | **string** | Invitation identifier (UUIDv7). Bound on &#x60;/v1/domains/{id}/invitations/{invitation_id}&#x60; for the per- Domain invitation read / revoke surface.  | 
 
 ### Other Parameters
 
@@ -1142,7 +1215,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 

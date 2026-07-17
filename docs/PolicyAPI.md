@@ -76,7 +76,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -147,7 +147,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -224,7 +224,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -299,7 +299,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -372,7 +372,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -448,7 +448,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -462,7 +462,7 @@ No authorization required
 
 ## ListPolicies
 
-> PolicyListResponse ListPolicies(ctx, projectId).Cursor(cursor).Limit(limit).Execute()
+> PolicyList ListPolicies(ctx, projectId).Cursor(cursor).Limit(limit).Execute()
 
 List Policies in a Project.
 
@@ -482,8 +482,8 @@ import (
 
 func main() {
 	projectId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Owning Project (UUIDv7). Bound on every `/v1/projects/{project_id}/policies/...` operation — the Policy aggregate is per-Project and the dual ReBAC check uses the Project as the second relation target. 
-	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`.  (optional)
-	limit := int32(56) // int32 | Maximum number of items to return in a single page. Clamped to 200 server-side.  (optional) (default to 50)
+	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -492,7 +492,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error when calling `PolicyAPI.ListPolicies``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
 	}
-	// response from `ListPolicies`: PolicyListResponse
+	// response from `ListPolicies`: PolicyList
 	fmt.Fprintf(os.Stdout, "Response from `PolicyAPI.ListPolicies`: %v\n", resp)
 }
 ```
@@ -513,16 +513,16 @@ Other parameters are passed through a pointer to a apiListPoliciesRequest struct
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 
- **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;.  | 
- **limit** | **int32** | Maximum number of items to return in a single page. Clamped to 200 server-side.  | [default to 50]
+ **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
 
 ### Return type
 
-[**PolicyListResponse**](PolicyListResponse.md)
+[**PolicyList**](PolicyList.md)
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -536,7 +536,7 @@ No authorization required
 
 ## ListPolicyRevisions
 
-> PolicyRevisionListResponse ListPolicyRevisions(ctx, projectId, policyId).Cursor(cursor).Limit(limit).Execute()
+> PolicyRevisionList ListPolicyRevisions(ctx, projectId, policyId).Cursor(cursor).Limit(limit).Execute()
 
 List a Policy's revision history.
 
@@ -557,8 +557,8 @@ import (
 func main() {
 	projectId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Owning Project (UUIDv7). Bound on every `/v1/projects/{project_id}/policies/...` operation — the Policy aggregate is per-Project and the dual ReBAC check uses the Project as the second relation target. 
 	policyId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Policy identifier (UUIDv7). Bound on every `/v1/projects/{project_id}/policies/{policy_id}/...` operation. 
-	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`.  (optional)
-	limit := int32(56) // int32 | Maximum number of items to return in a single page. Clamped to 200 server-side.  (optional) (default to 50)
+	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -567,7 +567,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error when calling `PolicyAPI.ListPolicyRevisions``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
 	}
-	// response from `ListPolicyRevisions`: PolicyRevisionListResponse
+	// response from `ListPolicyRevisions`: PolicyRevisionList
 	fmt.Fprintf(os.Stdout, "Response from `PolicyAPI.ListPolicyRevisions`: %v\n", resp)
 }
 ```
@@ -590,16 +590,16 @@ Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 
 
- **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;.  | 
- **limit** | **int32** | Maximum number of items to return in a single page. Clamped to 200 server-side.  | [default to 50]
+ **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
 
 ### Return type
 
-[**PolicyRevisionListResponse**](PolicyRevisionListResponse.md)
+[**PolicyRevisionList**](PolicyRevisionList.md)
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -674,7 +674,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 

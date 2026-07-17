@@ -5,7 +5,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **AcceptedAt** | **time.Time** | Server-side timestamp at which the heartbeat fact was committed. Distinct from &#x60;client_now&#x60; so the caller can estimate one-way latency and clock-skew.  | 
-**Reconcile** | **bool** | When &#x60;true&#x60;, the controller is asking the caller to issue a fresh &#x60;GET /v1/nodes/{id}/state&#x60; reconciliation pull because the snapshot the caller is operating against has drifted. Defaults to &#x60;false&#x60; — later stories flip this flag when the controller observes a divergence .  | 
+**Reconcile** | **bool** | When &#x60;true&#x60;, the controller is asking the caller to issue a fresh &#x60;GET /v1/nodes/{id}/state&#x60; reconciliation pull because the snapshot the caller is operating against has drifted. Defaults to &#x60;false&#x60; — later stories flip this flag when the controller observes a divergence.  | 
 **RotateKeys** | **bool** | When &#x60;true&#x60;, a mesh-key rotation is pending for the heartbeating Node: the caller MUST generate a fresh Curve25519 keypair and complete the rotation via &#x60;POST /v1/keys/rotate&#x60;. This flag is load-bearing — it is the heartbeat-channel half of the two-channel rotation dispatch (the SSE &#x60;rotate_keys&#x60; event is the other half), so a Node that reconnected rather than holding a live SSE stream still learns it must rotate within one heartbeat interval. &#x60;false&#x60; when no &#x60;peer_key_rotation&#x60; row is pending for the Node.  | 
 
 ## Methods

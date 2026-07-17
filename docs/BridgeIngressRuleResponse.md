@@ -9,7 +9,7 @@ Name | Type | Description | Notes
 **SniHost** | **string** | TLS SNI host the rule terminates. | 
 **TargetNodeId** | **string** | Node the rule forwards to. | 
 **TargetPort** | **int32** | TCP port on the target Node. | 
-**AcmeAccountRef** | Pointer to **string** | Opaque reference to the ACME account used to issue the rule&#39;s certificate. &#x60;null&#x60; when the operator supplies certificates out of band.  | [optional] 
+**AcmeAccountRef** | Pointer to **string** | Opaque reference to the ACME account used to issue the rule&#39;s certificate. Absent when the operator supplies certificates out of band.  | [optional] 
 **CreatedAt** | **time.Time** | Rule creation timestamp (UTC). | 
 **UpdatedAt** | **time.Time** | Last-modified timestamp (UTC). | 
 

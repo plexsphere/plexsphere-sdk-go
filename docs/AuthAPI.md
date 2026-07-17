@@ -7,7 +7,7 @@ Method | HTTP request | Description
 [**DeleteAuthSession**](AuthAPI.md#DeleteAuthSession) | **Delete** /v1/auth/whoami | Sign the current caller out.
 [**DeleteAuthTokenByID**](AuthAPI.md#DeleteAuthTokenByID) | **Delete** /v1/auth/tokens/{id} | Immediately revoke an API token.
 [**GetAuthCallback**](AuthAPI.md#GetAuthCallback) | **Get** /v1/auth/callback | OIDC redirect callback — exchanges &#x60;code&#x60; for a session.
-[**GetAuthIdPBindings**](AuthAPI.md#GetAuthIdPBindings) | **Get** /v1/auth/idp-bindings | List a Domain&#39;s effective IdP bindings for the sign-in chooser.
+[**GetAuthIdPBindings**](AuthAPI.md#GetAuthIdPBindings) | **Get** /v1/auth/idp-bindings | List the IdP bindings available to the sign-in chooser.
 [**GetAuthTokens**](AuthAPI.md#GetAuthTokens) | **Get** /v1/auth/tokens | List the caller&#39;s API tokens (no plaintext).
 [**GetAuthWhoami**](AuthAPI.md#GetAuthWhoami) | **Get** /v1/auth/whoami | Describe the authenticated principal.
 [**PostAuthDeviceApprove**](AuthAPI.md#PostAuthDeviceApprove) | **Post** /v1/auth/device/approve | Approve a pending RFC 8628 device-authorization session.
@@ -68,7 +68,7 @@ Other parameters are passed through a pointer to a apiDeleteAuthSessionRequest s
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -136,7 +136,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -216,9 +216,9 @@ No authorization required
 
 ## GetAuthIdPBindings
 
-> []DomainIdPBinding GetAuthIdPBindings(ctx).DomainId(domainId).Execute()
+> []DomainIdPBinding GetAuthIdPBindings(ctx).DomainId(domainId).Scope(scope).Execute()
 
-List a Domain's effective IdP bindings for the sign-in chooser.
+List the IdP bindings available to the sign-in chooser.
 
 
 
@@ -235,11 +235,12 @@ import (
 )
 
 func main() {
-	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Domain whose effective IdP bindings to list.
+	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Domain whose effective IdP bindings to list. Mutually exclusive with `scope=platform`; when both are supplied the scope takes precedence. Omitting both yields an empty list.  (optional)
+	scope := openapiclient.GetAuthIdPBindings_scope_parameter("platform") // GetAuthIdPBindingsScopeParameter | Set to `platform` to list the platform-scoped shared bindings for a Domain-independent platform-operator sign-in instead of a Domain's effective set.  (optional)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.AuthAPI.GetAuthIdPBindings(context.Background()).DomainId(domainId).Execute()
+	resp, r, err := apiClient.AuthAPI.GetAuthIdPBindings(context.Background()).DomainId(domainId).Scope(scope).Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error when calling `AuthAPI.GetAuthIdPBindings``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
@@ -260,7 +261,8 @@ Other parameters are passed through a pointer to a apiGetAuthIdPBindingsRequest 
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **domainId** | **string** | Domain whose effective IdP bindings to list. | 
+ **domainId** | **string** | Domain whose effective IdP bindings to list. Mutually exclusive with &#x60;scope&#x3D;platform&#x60;; when both are supplied the scope takes precedence. Omitting both yields an empty list.  | 
+ **scope** | [**GetAuthIdPBindingsScopeParameter**](GetAuthIdPBindingsScopeParameter.md) | Set to &#x60;platform&#x60; to list the platform-scoped shared bindings for a Domain-independent platform-operator sign-in instead of a Domain&#39;s effective set.  | 
 
 ### Return type
 
@@ -329,7 +331,7 @@ Other parameters are passed through a pointer to a apiGetAuthTokensRequest struc
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -390,7 +392,7 @@ Other parameters are passed through a pointer to a apiGetAuthWhoamiRequest struc
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -456,7 +458,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -489,7 +491,7 @@ import (
 )
 
 func main() {
-	deviceCodeRequest := *openapiclient.NewDeviceCodeRequest("DomainId_example") // DeviceCodeRequest | 
+	deviceCodeRequest := *openapiclient.NewDeviceCodeRequest() // DeviceCodeRequest | 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -779,7 +781,7 @@ Other parameters are passed through a pointer to a apiPostAuthSignOutGlobalReque
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -849,7 +851,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -915,7 +917,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 

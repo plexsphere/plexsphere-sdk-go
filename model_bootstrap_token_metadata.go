@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -19,7 +19,7 @@ import (
 // checks if the BootstrapTokenMetadata type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &BootstrapTokenMetadata{}
 
-// BootstrapTokenMetadata Hash-only metadata view of a persisted BootstrapToken aggregate . The plaintext is intentionally absent — it is only ever surfaced by `BootstrapTokenIssueResponse` and that window closes when the issue response is written. `consumed_at` and `revoked_at` are nullable because both transitions are terminal but optional.
+// BootstrapTokenMetadata Hash-only metadata view of a persisted BootstrapToken aggregate. The plaintext is intentionally absent — it is only ever surfaced by `BootstrapTokenIssueResponse` and that window closes when the issue response is written. `consumed_at` and `revoked_at` are nullable because both transitions are terminal but optional.
 type BootstrapTokenMetadata struct {
 	// BootstrapToken identifier (UUIDv7).
 	Id string `json:"id"`
@@ -32,9 +32,9 @@ type BootstrapTokenMetadata struct {
 	IssuedAt time.Time `json:"issued_at"`
 	// Absolute expiry timestamp (UTC).
 	ExpiresAt time.Time `json:"expires_at"`
-	// Redemption timestamp, or null when the token has not yet been redeemed. A non-null value is terminal — a consumed token cannot be redeemed again.
+	// Redemption timestamp; absent when the token has not yet been redeemed. A non-null value is terminal — a consumed token cannot be redeemed again.
 	ConsumedAt *time.Time `json:"consumed_at,omitempty"`
-	// Revocation timestamp, or null when the token is still live. A non-null value is terminal — a revoked token rejects redemption regardless of expiry.
+	// Revocation timestamp; absent when the token is still live. A non-null value is terminal — a revoked token rejects redemption regardless of expiry.
 	RevokedAt *time.Time `json:"revoked_at,omitempty"`
 	// User who issued the token.
 	IssuedByUserId       string `json:"issued_by_user_id"`

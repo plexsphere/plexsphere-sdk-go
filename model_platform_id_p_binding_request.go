@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -34,7 +34,7 @@ type PlatformIdPBindingRequest struct {
 	RequiredAcr []string `json:"required_acr,omitempty"`
 	// Required OIDC AMR values.
 	RequiredAmr []string `json:"required_amr,omitempty"`
-	// Just-in-time user-provisioning policy. One of `allow` or `deny`; the server rejects any other value with 400 `invalid-jit-policy`. Declared as a plain string rather than an inline enum so it shares the IdPBinding jit-policy vocabulary without minting a fourth generated enum type.
+	// Just-in-time user-provisioning policy. One of `allow` or `deny`; the server rejects any other value with 400 `invalid_jit_policy`. Declared as a plain string rather than an inline enum so it shares the IdPBinding jit-policy vocabulary without minting a fourth generated enum type.
 	JitPolicy string `json:"jit_policy"`
 	// Optional human-friendly handle for the binding, unique among active platform bindings (e.g. `github`). Normalised to lowercase kebab-case, so an operator may submit mixed case.
 	Alias                *string `json:"alias,omitempty"`

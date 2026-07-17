@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -18,7 +18,7 @@ import (
 // checks if the RegisterResponse type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &RegisterResponse{}
 
-// RegisterResponse Response body for POST /v1/register. Bundles every artifact plexd needs to finish its bootstrap: the freshly-allocated `node_id` + `mesh_ip`, the Domain's signing public key + key id (for SSE event verification), the per-Node NSK plaintext (returned EXACTLY ONCE — see the `x-plexsphere-once: true` marker on the `nsk` field), the initial wireguard peer snapshot for table programming, and the Domain's mesh CIDR for routing-table programming.  Operators MUST capture the `nsk` plaintext from this response and persist it locally on the registering Node — no API surface ever returns it again. The Spectral `plexsphere-write-once-post-must-be-issue-response` rule polices the `x-plexsphere-once: true` marker so the plaintext cannot accidentally appear on any other operation .
+// RegisterResponse Response body for POST /v1/register. Bundles every artifact plexd needs to finish its bootstrap: the freshly-allocated `node_id` + `mesh_ip`, the Domain's signing public key + key id (for SSE event verification), the per-Node NSK plaintext (returned EXACTLY ONCE — see the `x-plexsphere-once: true` marker on the `nsk` field), the initial wireguard peer snapshot for table programming, and the Domain's mesh CIDR for routing-table programming.  Operators MUST capture the `nsk` plaintext from this response and persist it locally on the registering Node — no API surface ever returns it again. The Spectral `plexsphere-write-once-post-must-be-issue-response` rule polices the `x-plexsphere-once: true` marker so the plaintext cannot accidentally appear on any other operation.
 type RegisterResponse struct {
 	// Freshly-allocated Node aggregate id (UUIDv7). Echoed in the response so plexd records its own identity.
 	NodeId string `json:"node_id"`
@@ -33,7 +33,7 @@ type RegisterResponse struct {
 	// Initial wireguard peer set the registering Node needs to bring its table up. Empty for the first Node enrolled into a Domain. Subsequent membership churn is delivered through the SSE stream rather than re-issued here.
 	PeerSnapshot []RegisterPeer `json:"peer_snapshot"`
 	// Domain's mesh CIDR (e.g. `100.64.0.0/10`). Carried so plexd can program its routing table without a follow-up Domain lookup.
-	DomainMeshCidr       string `json:"domain_mesh_cidr"`
+	DomainMeshCidr       string `json:"domain_mesh_cidr" validate:"regexp=^([0-9]{1,3}\\\\.){3}[0-9]{1,3}\\/[0-9]{1,2}$|^[0-9a-fA-F:]+\\/[0-9]{1,3}$"`
 	AdditionalProperties map[string]interface{}
 }
 
