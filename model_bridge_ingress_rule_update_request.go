@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -21,12 +21,12 @@ var _ MappedNullable = &BridgeIngressRuleUpdateRequest{}
 // BridgeIngressRuleUpdateRequest Body for `UpdateBridgeIngressRule`. Full replacement of the rule's mutable configuration — not a partial merge. The slug is the path identity and is not carried in the body.
 type BridgeIngressRuleUpdateRequest struct {
 	// TLS SNI host the rule terminates. Unique per `(resource_id, sni_host)`; a collision surfaces as `409 slug_conflict`.
-	SniHost string `json:"sni_host"`
+	SniHost string `json:"sni_host" validate:"regexp=^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"`
 	// Node the rule forwards to. A Node outside the bridge Resource's owning Domain surfaces as `400 target_node_not_in_domain`.
 	TargetNodeId string `json:"target_node_id"`
-	// TCP port on the target Node. Outside `1..65535` the write is rejected with `400 relay_port_out_of_range`.
+	// TCP port on the target Node. Outside `1..65535` the write is rejected with `400 port_out_of_range`.
 	TargetPort int32 `json:"target_port"`
-	// Optional opaque reference to the ACME account used to issue the rule's certificate. `null` or absent means the operator supplies certificates out of band.
+	// Optional opaque reference to the ACME account used to issue the rule's certificate. Absent means the operator supplies certificates out of band.
 	AcmeAccountRef       *string `json:"acme_account_ref,omitempty"`
 	AdditionalProperties map[string]interface{}
 }

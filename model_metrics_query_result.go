@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -18,9 +18,9 @@ import (
 // checks if the MetricsQueryResult type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &MetricsQueryResult{}
 
-// MetricsQueryResult Result of a metrics query, projected from the metrics backend's response. `status_code` is the backend's HTTP status and `body` is the backend's verbatim JSON payload so the Dashboard can render the series without the platform re-encoding them.
+// MetricsQueryResult Result of a metrics query, projected from the metrics backend's response. This envelope is only ever returned on a platform `200`: the pass-through boundary maps a backend 2xx to this body, a backend 4xx to a platform `400`, and a backend 429/5xx or an unreachable/timed-out backend to a platform `502`/`504`. So `status_code` is always a backend 2xx here; a backend error never rides inside a `200`.
 type MetricsQueryResult struct {
-	// HTTP status the metrics backend returned.
+	// The backend's 2xx HTTP status (a non-2xx backend response is mapped to a platform 4xx/5xx and never reaches this body).
 	StatusCode int32 `json:"status_code"`
 	// The metrics backend's verbatim response body, carried as an opaque JSON string so the platform does not re-shape the backend's series envelope.
 	Body                 string `json:"body"`

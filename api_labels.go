@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -38,7 +38,7 @@ type LabelsAPI interface {
 	/*
 		DeleteLabelDefinition Delete a Label Definition.
 
-		Deletes the Label Definition identified by `{id}` subject to its `on_delete` policy (block / cascade / orphan). A `block` policy with outstanding Assignments returns 409 `assignments-exist` .
+		Deletes the Label Definition identified by `{id}` subject to its `on_delete` policy (block / cascade / orphan). A `block` policy with outstanding Assignments returns 409 `assignments_exist`. A `cascade` policy deletes every referencing Assignment in the same transaction. An `orphan` policy detaches the Assignments — they stay readable per object via `GET /v1/objects/{kind}/{id}/labels` without a `definition_id`, but drop out of every Definition-scoped read — then deletes the Definition. All three policies return 204 on success.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Label Definition identifier (UUIDv7).
@@ -67,7 +67,7 @@ type LabelsAPI interface {
 	/*
 		GetLabelDefinition Fetch a Label Definition by identifier.
 
-		Returns the Label Definition identified by `{id}` .  The handler deliberately omits a ReBAC `Check` call. Visibility is enforced at the repo layer: Definitions the caller cannot see return `ErrDefinitionNotVisible` which surfaces as 404, so this endpoint never emits 403.
+		Returns the Label Definition identified by `{id}`.  The handler deliberately omits a ReBAC `Check` call. Visibility is enforced at the repo layer: Definitions the caller cannot see return `ErrDefinitionNotVisible` which surfaces as 404, so this endpoint never emits 403.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Label Definition identifier (UUIDv7).
@@ -82,7 +82,7 @@ type LabelsAPI interface {
 	/*
 		ListLabelDefinitions List Label Definitions in a scope.
 
-		Returns Label Definitions in deterministic order with cursor pagination. The scope discriminator names the scope the listing targets — platform, a specific Domain, or a specific Project .
+		Returns Label Definitions in deterministic order with cursor pagination. The scope discriminator names the scope the listing targets — platform, a specific Domain, or a specific Project.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiListLabelDefinitionsRequest
@@ -90,13 +90,13 @@ type LabelsAPI interface {
 	ListLabelDefinitions(ctx context.Context) ApiListLabelDefinitionsRequest
 
 	// ListLabelDefinitionsExecute executes the request
-	//  @return LabelDefinitionListResponse
-	ListLabelDefinitionsExecute(r ApiListLabelDefinitionsRequest) (*LabelDefinitionListResponse, *http.Response, error)
+	//  @return LabelDefinitionList
+	ListLabelDefinitionsExecute(r ApiListLabelDefinitionsRequest) (*LabelDefinitionList, *http.Response, error)
 
 	/*
 		ListObjectLabels List Label Assignments attached to an object.
 
-		Returns every Label Assignment attached to the object identified by `(kind, id)`. Orphaned Assignments (parent Definition deleted with `on_delete=orphan`) are excluded .
+		Returns every Label Assignment attached to the object identified by `(kind, id)`. Orphaned Assignments (parent Definition deleted with `on_delete=orphan`) are INCLUDED, each without a `definition_id`; they are excluded only from the selector and effective-set reads.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param kind Lowercase object-kind discriminator (resource, node, project, domain, workload, network, …).
@@ -126,7 +126,7 @@ type LabelsAPI interface {
 	/*
 		PutObjectLabel Upsert a Label Assignment on an object.
 
-		Upserts the Label Assignment linking the object to the supplied Definition with the supplied value. The services layer performs a dual ReBAC check — `assign` on the Definition AND `maintainer` on the target object — and emits a single audit entry .
+		Upserts the Label Assignment linking the object to the supplied Definition with the supplied value. The services layer performs a dual ReBAC check — `assign` on the Definition AND `maintainer` on the target object — and emits a single audit entry.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param kind Lowercase object-kind discriminator.
@@ -140,9 +140,23 @@ type LabelsAPI interface {
 	PutObjectLabelExecute(r ApiPutObjectLabelRequest) (*LabelAssignment, *http.Response, error)
 
 	/*
+		SearchObjectsByLabel Search objects by Label selector, filtered to the caller's access.
+
+		Resolves a Label `selector` to the objects that carry the matching Labels within `scope`, then filters each match by a ReBAC `relation` check for the authenticated principal — the direct answer to \"which objects carry Label X=Y that I can access?\". It is the browser/API counterpart of `plexctl label object search` and combines the Label axis (the selector) with the access axis (the relation) that previously required a manual `lookup-resources | jq` intersection.  Scope is mandatory: `scope` names the tenancy universe (`platform`, `domain`, or `project`) and `scope_id` carries the Domain/Project UUID (omitted for `platform`). The result is mixed-kind unless narrowed by the optional `kind` filter.  DECISION: pagination is filter-after-page. `limit` bounds the PRE-filter page read from the selector index; the ReBAC filter then drops matches the caller cannot access, so a returned page may hold FEWER than `limit` items even when `next_cursor` is present. Callers paginate until `next_cursor` is absent rather than until a short page. Over-fetch-to-fill is intentionally not implemented.  DECISION: per-object denials are silent — a match the caller cannot reach via `relation` is omitted from `items`, never surfaced as a 403. This mirrors `/v1/authz/lookup-resources`: the enumeration is data, and an empty `items` is a normal answer. There is no endpoint-level relation gate; the per-match check IS the gate, so the search cannot enumerate objects the caller has no access to.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return ApiSearchObjectsByLabelRequest
+	*/
+	SearchObjectsByLabel(ctx context.Context) ApiSearchObjectsByLabelRequest
+
+	// SearchObjectsByLabelExecute executes the request
+	//  @return ObjectSearchResponse
+	SearchObjectsByLabelExecute(r ApiSearchObjectsByLabelRequest) (*ObjectSearchResponse, *http.Response, error)
+
+	/*
 		UpdateLabelDefinition Update mutable fields on a Label Definition.
 
-		Updates the Label Definition identified by `{id}`. Immutable Definitions reject value-schema changes with 409 `immutable-violation`.
+		Updates the Label Definition identified by `{id}`. Immutable Definitions reject value-schema changes with 409 `immutable_violation`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Label Definition identifier (UUIDv7).
@@ -347,7 +361,7 @@ func (r ApiDeleteLabelDefinitionRequest) Execute() (*http.Response, error) {
 /*
 DeleteLabelDefinition Delete a Label Definition.
 
-Deletes the Label Definition identified by `{id}` subject to its `on_delete` policy (block / cascade / orphan). A `block` policy with outstanding Assignments returns 409 `assignments-exist` .
+Deletes the Label Definition identified by `{id}` subject to its `on_delete` policy (block / cascade / orphan). A `block` policy with outstanding Assignments returns 409 `assignments_exist`. A `cascade` policy deletes every referencing Assignment in the same transaction. An `orphan` policy detaches the Assignments — they stay readable per object via `GET /v1/objects/{kind}/{id}/labels` without a `definition_id`, but drop out of every Definition-scoped read — then deletes the Definition. All three policies return 204 on success.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Label Definition identifier (UUIDv7).
@@ -665,7 +679,7 @@ func (r ApiGetLabelDefinitionRequest) Execute() (*LabelDefinition, *http.Respons
 /*
 GetLabelDefinition Fetch a Label Definition by identifier.
 
-Returns the Label Definition identified by `{id}` .  The handler deliberately omits a ReBAC `Check` call. Visibility is enforced at the repo layer: Definitions the caller cannot see return `ErrDefinitionNotVisible` which surfaces as 404, so this endpoint never emits 403.
+Returns the Label Definition identified by `{id}`.  The handler deliberately omits a ReBAC `Check` call. Visibility is enforced at the repo layer: Definitions the caller cannot see return `ErrDefinitionNotVisible` which surfaces as 404, so this endpoint never emits 403.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Label Definition identifier (UUIDv7).
@@ -796,32 +810,32 @@ type ApiListLabelDefinitionsRequest struct {
 	limit      *int32
 }
 
-// Scope selector. Accepts the literal &#x60;platform&#x60;, or &#x60;domain:&lt;uuid&gt;&#x60;, or &#x60;project:&lt;uuid&gt;&#x60;. DECISION: scope is a single string rather than a pair of query params because the three forms are mutually exclusive and the SpiceDB scope-object derivation treats them as a single coordinate .
+// Scope selector. Accepts the literal &#x60;platform&#x60;, or &#x60;domain:&lt;uuid&gt;&#x60;, or &#x60;project:&lt;uuid&gt;&#x60;. DECISION: scope is a single string rather than a pair of query params because the three forms are mutually exclusive and the SpiceDB scope-object derivation treats them as a single coordinate.
 func (r ApiListLabelDefinitionsRequest) Scope(scope string) ApiListLabelDefinitionsRequest {
 	r.scope = &scope
 	return r
 }
 
-// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;.
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
 func (r ApiListLabelDefinitionsRequest) Cursor(cursor string) ApiListLabelDefinitionsRequest {
 	r.cursor = &cursor
 	return r
 }
 
-// Maximum number of items to return in a single page .
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListLabelDefinitionsRequest) Limit(limit int32) ApiListLabelDefinitionsRequest {
 	r.limit = &limit
 	return r
 }
 
-func (r ApiListLabelDefinitionsRequest) Execute() (*LabelDefinitionListResponse, *http.Response, error) {
+func (r ApiListLabelDefinitionsRequest) Execute() (*LabelDefinitionList, *http.Response, error) {
 	return r.ApiService.ListLabelDefinitionsExecute(r)
 }
 
 /*
 ListLabelDefinitions List Label Definitions in a scope.
 
-Returns Label Definitions in deterministic order with cursor pagination. The scope discriminator names the scope the listing targets — platform, a specific Domain, or a specific Project .
+Returns Label Definitions in deterministic order with cursor pagination. The scope discriminator names the scope the listing targets — platform, a specific Domain, or a specific Project.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiListLabelDefinitionsRequest
@@ -835,13 +849,13 @@ func (a *LabelsAPIService) ListLabelDefinitions(ctx context.Context) ApiListLabe
 
 // Execute executes the request
 //
-//	@return LabelDefinitionListResponse
-func (a *LabelsAPIService) ListLabelDefinitionsExecute(r ApiListLabelDefinitionsRequest) (*LabelDefinitionListResponse, *http.Response, error) {
+//	@return LabelDefinitionList
+func (a *LabelsAPIService) ListLabelDefinitionsExecute(r ApiListLabelDefinitionsRequest) (*LabelDefinitionList, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodGet
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *LabelDefinitionListResponse
+		localVarReturnValue *LabelDefinitionList
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "LabelsAPIService.ListLabelDefinitions")
@@ -980,7 +994,7 @@ func (r ApiListObjectLabelsRequest) Execute() (*LabelAssignmentList, *http.Respo
 /*
 ListObjectLabels List Label Assignments attached to an object.
 
-Returns every Label Assignment attached to the object identified by `(kind, id)`. Orphaned Assignments (parent Definition deleted with `on_delete=orphan`) are excluded .
+Returns every Label Assignment attached to the object identified by `(kind, id)`. Orphaned Assignments (parent Definition deleted with `on_delete=orphan`) are INCLUDED, each without a `definition_id`; they are excluded only from the selector and effective-set reads.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param kind Lowercase object-kind discriminator (resource, node, project, domain, workload, network, …).
@@ -1291,7 +1305,7 @@ func (r ApiPutObjectLabelRequest) Execute() (*LabelAssignment, *http.Response, e
 /*
 PutObjectLabel Upsert a Label Assignment on an object.
 
-Upserts the Label Assignment linking the object to the supplied Definition with the supplied value. The services layer performs a dual ReBAC check — `assign` on the Definition AND `maintainer` on the target object — and emits a single audit entry .
+Upserts the Label Assignment linking the object to the supplied Definition with the supplied value. The services layer performs a dual ReBAC check — `assign` on the Definition AND `maintainer` on the target object — and emits a single audit entry.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param kind Lowercase object-kind discriminator.
@@ -1466,6 +1480,160 @@ func (a *LabelsAPIService) PutObjectLabelExecute(r ApiPutObjectLabelRequest) (*L
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiSearchObjectsByLabelRequest struct {
+	ctx                 context.Context
+	ApiService          LabelsAPI
+	objectSearchRequest *ObjectSearchRequest
+}
+
+func (r ApiSearchObjectsByLabelRequest) ObjectSearchRequest(objectSearchRequest ObjectSearchRequest) ApiSearchObjectsByLabelRequest {
+	r.objectSearchRequest = &objectSearchRequest
+	return r
+}
+
+func (r ApiSearchObjectsByLabelRequest) Execute() (*ObjectSearchResponse, *http.Response, error) {
+	return r.ApiService.SearchObjectsByLabelExecute(r)
+}
+
+/*
+SearchObjectsByLabel Search objects by Label selector, filtered to the caller's access.
+
+Resolves a Label `selector` to the objects that carry the matching Labels within `scope`, then filters each match by a ReBAC `relation` check for the authenticated principal — the direct answer to \"which objects carry Label X=Y that I can access?\". It is the browser/API counterpart of `plexctl label object search` and combines the Label axis (the selector) with the access axis (the relation) that previously required a manual `lookup-resources | jq` intersection.  Scope is mandatory: `scope` names the tenancy universe (`platform`, `domain`, or `project`) and `scope_id` carries the Domain/Project UUID (omitted for `platform`). The result is mixed-kind unless narrowed by the optional `kind` filter.  DECISION: pagination is filter-after-page. `limit` bounds the PRE-filter page read from the selector index; the ReBAC filter then drops matches the caller cannot access, so a returned page may hold FEWER than `limit` items even when `next_cursor` is present. Callers paginate until `next_cursor` is absent rather than until a short page. Over-fetch-to-fill is intentionally not implemented.  DECISION: per-object denials are silent — a match the caller cannot reach via `relation` is omitted from `items`, never surfaced as a 403. This mirrors `/v1/authz/lookup-resources`: the enumeration is data, and an empty `items` is a normal answer. There is no endpoint-level relation gate; the per-match check IS the gate, so the search cannot enumerate objects the caller has no access to.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiSearchObjectsByLabelRequest
+*/
+func (a *LabelsAPIService) SearchObjectsByLabel(ctx context.Context) ApiSearchObjectsByLabelRequest {
+	return ApiSearchObjectsByLabelRequest{
+		ApiService: a,
+		ctx:        ctx,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ObjectSearchResponse
+func (a *LabelsAPIService) SearchObjectsByLabelExecute(r ApiSearchObjectsByLabelRequest) (*ObjectSearchResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ObjectSearchResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "LabelsAPIService.SearchObjectsByLabel")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/objects/search"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.objectSearchRequest == nil {
+		return localVarReturnValue, nil, reportError("objectSearchRequest is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.objectSearchRequest
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 413 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiUpdateLabelDefinitionRequest struct {
 	ctx                          context.Context
 	ApiService                   LabelsAPI
@@ -1485,7 +1653,7 @@ func (r ApiUpdateLabelDefinitionRequest) Execute() (*LabelDefinition, *http.Resp
 /*
 UpdateLabelDefinition Update mutable fields on a Label Definition.
 
-Updates the Label Definition identified by `{id}`. Immutable Definitions reject value-schema changes with 409 `immutable-violation`.
+Updates the Label Definition identified by `{id}`. Immutable Definitions reject value-schema changes with 409 `immutable_violation`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Label Definition identifier (UUIDv7).

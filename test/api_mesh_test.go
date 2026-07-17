@@ -36,21 +36,6 @@ func Test_plexsphere_MeshAPIService(t *testing.T) {
 
 	})
 
-	t.Run("Test MeshAPIService FetchNodeSecret", func(t *testing.T) {
-
-		t.Skip("skip test") // remove to run test
-
-		var id string
-		var name string
-
-		resp, httpRes, err := apiClient.MeshAPI.FetchNodeSecret(context.Background(), id, name).Execute()
-
-		require.Nil(t, err)
-		require.NotNil(t, resp)
-		assert.Equal(t, 200, httpRes.StatusCode)
-
-	})
-
 	t.Run("Test MeshAPIService GetDomainMeshTopology", func(t *testing.T) {
 
 		t.Skip("skip test") // remove to run test
@@ -100,6 +85,21 @@ func Test_plexsphere_MeshAPIService(t *testing.T) {
 		var id string
 
 		resp, httpRes, err := apiClient.MeshAPI.GetNodeReachability(context.Background(), id).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
+	t.Run("Test MeshAPIService GetNodeSecret", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var id string
+		var name string
+
+		resp, httpRes, err := apiClient.MeshAPI.GetNodeSecret(context.Background(), id, name).Execute()
 
 		require.Nil(t, err)
 		require.NotNil(t, resp)

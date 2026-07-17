@@ -15,7 +15,7 @@ Name | Type | Description | Notes
 **Immutable** | Pointer to **bool** |  | [optional] 
 **CloudTagPropagation** | Pointer to **bool** |  | [optional] 
 **OnDelete** | Pointer to [**LabelDefinitionRequestOnDelete**](LabelDefinitionRequestOnDelete.md) |  | [optional] 
-**Cardinality** | Pointer to **int32** | Declared per-object cardinality cap for Assignments of this Definition. Defaults to &#x60;1&#x60; when omitted .  | [optional] 
+**Cardinality** | Pointer to **int32** | Declared per-object cardinality cap for Assignments of this Definition. Defaults to &#x60;1&#x60; when omitted.  | [optional] 
 
 ## Methods
 

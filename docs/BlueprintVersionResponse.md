@@ -6,7 +6,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Id** | **string** | Surrogate identifier of this immutable version (UUIDv7) — the handle a Resource references as &#x60;blueprint_version_id&#x60; when it is provisioned. The version is keyed for humans by its &#x60;version&#x60; string within the parent Blueprint; this id is the stable machine handle &#x60;resource create&#x60; consumes.  | 
 **Version** | **string** | Version identifier, unique within the parent Blueprint. | 
-**ProviderKinds** | [**[]BlueprintVersionResponseProviderKindsInner**](BlueprintVersionResponseProviderKindsInner.md) | Closed-set infrastructure substrates this version can target. Non-empty.  | 
+**ProviderKinds** | [**[]BlueprintVersionCreateRequestProviderKindsInner**](BlueprintVersionCreateRequestProviderKindsInner.md) | Closed-set infrastructure substrates this version can target. Non-empty.  | 
 **InjectionStrategy** | [**BlueprintVersionResponseInjectionStrategy**](BlueprintVersionResponseInjectionStrategy.md) |  | 
 **ParameterSchema** | [**[]BlueprintParameter**](BlueprintParameter.md) | Typed parameter declarations an operator fills in when provisioning a Resource from this version. May be empty when the version declares no parameters.  | 
 **CreatedAt** | **time.Time** | Version creation timestamp (UTC). | 
@@ -15,7 +15,7 @@ Name | Type | Description | Notes
 
 ### NewBlueprintVersionResponse
 
-`func NewBlueprintVersionResponse(id string, version string, providerKinds []BlueprintVersionResponseProviderKindsInner, injectionStrategy BlueprintVersionResponseInjectionStrategy, parameterSchema []BlueprintParameter, createdAt time.Time, ) *BlueprintVersionResponse`
+`func NewBlueprintVersionResponse(id string, version string, providerKinds []BlueprintVersionCreateRequestProviderKindsInner, injectionStrategy BlueprintVersionResponseInjectionStrategy, parameterSchema []BlueprintParameter, createdAt time.Time, ) *BlueprintVersionResponse`
 
 NewBlueprintVersionResponse instantiates a new BlueprintVersionResponse object
 This constructor will assign default values to properties that have it defined,
@@ -72,20 +72,20 @@ SetVersion sets Version field to given value.
 
 ### GetProviderKinds
 
-`func (o *BlueprintVersionResponse) GetProviderKinds() []BlueprintVersionResponseProviderKindsInner`
+`func (o *BlueprintVersionResponse) GetProviderKinds() []BlueprintVersionCreateRequestProviderKindsInner`
 
 GetProviderKinds returns the ProviderKinds field if non-nil, zero value otherwise.
 
 ### GetProviderKindsOk
 
-`func (o *BlueprintVersionResponse) GetProviderKindsOk() (*[]BlueprintVersionResponseProviderKindsInner, bool)`
+`func (o *BlueprintVersionResponse) GetProviderKindsOk() (*[]BlueprintVersionCreateRequestProviderKindsInner, bool)`
 
 GetProviderKindsOk returns a tuple with the ProviderKinds field if it's non-nil, zero value otherwise
 and a boolean to check if the value has been set.
 
 ### SetProviderKinds
 
-`func (o *BlueprintVersionResponse) SetProviderKinds(v []BlueprintVersionResponseProviderKindsInner)`
+`func (o *BlueprintVersionResponse) SetProviderKinds(v []BlueprintVersionCreateRequestProviderKindsInner)`
 
 SetProviderKinds sets ProviderKinds field to given value.
 

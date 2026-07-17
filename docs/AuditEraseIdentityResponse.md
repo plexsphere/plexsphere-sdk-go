@@ -4,7 +4,7 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**SubjectPseudonym** | **string** | Per-Domain pseudonym derived from &#x60;identity_id&#x60; (32 bytes, lowercase hex).  | 
+**SubjectPseudonym** | **string** | Per-chain pseudonym derived from &#x60;identity_id&#x60; (32 bytes, lowercase hex).  | 
 **ErasedAt** | **time.Time** | Server-side timestamp the erasure was recorded. Reflects the time the self-audit &#x60;audit.erase-identity&#x60; entry was appended, not the wall-clock time of the original &#x60;audit_subject_pii&#x60; row&#39;s birth.  | 
 
 ## Methods

@@ -4,7 +4,7 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**Endpoint** | **string** | Canonical &#x60;host:port&#x60; wire form of the observed transport endpoint. The host is an IPv4 dotted quad or an IPv6 address bracketed per RFC 5952 (&#x60;[2001:db8::1]:51820&#x60;); the port is in the RFC 6056 ephemeral range 1..65535. Loopback, link-local, and unspecified addresses are refused with 400 &#x60;endpoint_unparseable&#x60;.  | 
+**Endpoint** | **string** | Canonical &#x60;host:port&#x60; wire form of the observed transport endpoint. The host is an IPv4 dotted quad or an IPv6 address bracketed per RFC 5952 (&#x60;[2001:db8::1]:51820&#x60;); the port is in the 1..65535 range. Loopback, link-local, and unspecified addresses are refused with 400 &#x60;endpoint_unparseable&#x60;.  | 
 **NatType** | [**EndpointRequestNatType**](EndpointRequestNatType.md) |  | 
 **ReportedAt** | **time.Time** | Agent wall-clock at the moment the observation was made. The handler rejects the request with 400 &#x60;endpoint_clock_skew&#x60; if the value drifts more than 60 seconds from server now.  | 
 

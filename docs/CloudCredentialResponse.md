@@ -10,8 +10,8 @@ Name | Type | Description | Notes
 **Version** | **int64** | Monotonic broker-row version. Starts at 1 on issuance and increments on every rotate.  | 
 **Status** | [**CloudCredentialStatus**](CloudCredentialStatus.md) |  | 
 **ExpiresAt** | **time.Time** | Wall-clock expiry budget (UTC). | 
-**RevokedAt** | Pointer to **time.Time** | Revocation timestamp (UTC). &#x60;null&#x60; until the credential is revoked by an operator.  | [optional] 
-**ExpiredAt** | Pointer to **time.Time** | Expiry-observed timestamp (UTC). &#x60;null&#x60; until the sweeper marks the credential expired.  | [optional] 
+**RevokedAt** | Pointer to **time.Time** | Revocation timestamp (UTC). Absent until the credential is revoked by an operator.  | [optional] 
+**ExpiredAt** | Pointer to **time.Time** | Expiry-observed timestamp (UTC). Absent until the sweeper marks the credential expired.  | [optional] 
 **CreatedAt** | **time.Time** | Aggregate creation timestamp (UTC). | 
 **UpdatedAt** | **time.Time** | Last-modified timestamp (UTC). Bumped by every lifecycle mutator — rotate, revoke, expire.  | 
 

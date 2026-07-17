@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -18,9 +18,9 @@ import (
 // checks if the NodeStateSnapshot type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &NodeStateSnapshot{}
 
-// NodeStateSnapshot Canonical reconciliation-pull envelope for a single Node . The four wire blocks — `peers`, `policy`, `bridge`, `state`, and `reports` — are always present so plexd's reconcile loop can diff by field presence rather than absence; later stories (policy fan-out, bridge orchestrator, node-state reports) populate the currently-empty blocks without changing the wire shape. Empty `peers` is `[]` (never `null`); the other blocks may be `null` until their owning story lands.
+// NodeStateSnapshot Canonical reconciliation-pull envelope for a single Node. The wire blocks — `peers`, `policy`, `bridge`, `state`, and `reports` — are always present so plexd's reconcile loop can diff by field presence rather than absence; later stories (policy fan-out, bridge orchestrator, node-state reports) populate the currently-empty blocks without changing the wire shape. Empty `peers` is `[]` (never `null`); the other blocks may be `null` until their owning story lands.
 type NodeStateSnapshot struct {
-	// Peer set the addressed Node should program into its WireGuard table. One entry per other Node in the addressed Node's Domain — the addressed Node itself is excluded so plexd does not program a self-peer . Ordered by `node_id` ascending so two consecutive pulls against the same ledger snapshot are byte-equal.
+	// Peer set the addressed Node should program into its WireGuard table. One entry per other Node in the addressed Node's Domain — the addressed Node itself is excluded so plexd does not program a self-peer. Ordered by `node_id` ascending so two consecutive pulls against the same ledger snapshot are byte-equal.
 	Peers []NodeStatePeer `json:"peers"`
 	// Latest `Reachability` projection for the addressed Node, carried inside the reconciliation-pull payload so plexd sees the same health view that `GET /v1/nodes/{id}/reachability` exposes without an additional round-trip.
 	Reachability Reachability `json:"reachability"`

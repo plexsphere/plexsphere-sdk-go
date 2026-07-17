@@ -8,7 +8,7 @@ Name | Type | Description | Notes
 **ProjectId** | **string** | Owning Project (UUIDv7) — exactly-one-parent rule.  | 
 **DomainId** | **string** | Owning Domain (UUIDv7). Denormalised from the parent Project so cross-Domain checks do not have to reload the Project on every Resource read.  | 
 **Kind** | **string** | Resource kind discriminator. | 
-**ExternalRef** | Pointer to **string** | Optional external-system reference. &#x60;null&#x60; when the Resource declared none.  | [optional] 
+**ExternalRef** | Pointer to **string** | Optional external-system reference. Absent when the Resource declared none.  | [optional] 
 **Origin** | [**ResourceOrigin**](ResourceOrigin.md) |  | 
 **CreatedAt** | **time.Time** | Resource creation timestamp (UTC). | 
 **UpdatedAt** | **time.Time** | Last-modified timestamp (UTC). | 

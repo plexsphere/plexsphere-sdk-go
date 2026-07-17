@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -18,10 +18,10 @@ import (
 // checks if the APITokenIssueRequest type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &APITokenIssueRequest{}
 
-// APITokenIssueRequest Body for POST /v1/auth/tokens. `env_prefix` is the environment segment embedded in the psk-shaped plaintext; the aggregate accepts any lowercase ASCII letter run but the public API is restricted to the three plexsphere-supported environments .
+// APITokenIssueRequest Body for POST /v1/auth/tokens. `env_prefix` is the environment segment embedded in the psk-shaped plaintext; the aggregate accepts any lowercase ASCII letter run but the public API is restricted to the three plexsphere-supported environments.
 type APITokenIssueRequest struct {
 	// Identifier of the user or ServiceIdentity the token binds to. Format is `user:<uuid>` or `service:<uuid>`.
-	IdentityRef string                        `json:"identity_ref"`
+	IdentityRef string                        `json:"identity_ref" validate:"regexp=^(user|service):[0-9a-fA-F-]{36}$"`
 	EnvPrefix   APITokenIssueRequestEnvPrefix `json:"env_prefix"`
 	// Optional TTL in seconds. If omitted, the server applies the deployment default.
 	TtlSeconds           *int32 `json:"ttl_seconds,omitempty"`

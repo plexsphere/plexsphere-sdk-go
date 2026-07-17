@@ -4,7 +4,7 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**ExternalSubject** | **string** | IdP-side subject identifier (typically the OIDC &#x60;sub&#x60; claim or operator-known login name) the invitation is staged for. Whitespace-only is rejected by the aggregate .  | 
+**ExternalSubject** | **string** | IdP-side subject identifier (typically the OIDC &#x60;sub&#x60; claim or operator-known login name) the invitation is staged for. Whitespace-only is rejected by the aggregate.  | 
 **TtlSeconds** | Pointer to **int32** | Lifetime of the invitation in seconds, applied to &#x60;created_at&#x60; to derive &#x60;expires_at&#x60;. Out-of-range values surface as &#x60;400 invalid_ttl&#x60;. Defaults to 86400 (24h); ceiling is 7 days.  | [optional] [default to 86400]
 **InitialTuples** | Pointer to [**[]InvitationInitialTuple**](InvitationInitialTuple.md) | Optional bounded list (max 32) of relation tuples to write into SpiceDB atomically when the invitation is accepted. Exceeding the cap surfaces as &#x60;422 too_many_initial_tuples&#x60;.  | [optional] 
 

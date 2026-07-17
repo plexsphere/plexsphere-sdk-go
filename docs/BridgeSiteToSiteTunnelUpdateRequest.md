@@ -6,7 +6,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Kind** | [**BridgeSiteToSiteTunnelKind**](BridgeSiteToSiteTunnelKind.md) |  | 
 **RemoteHost** | **string** | Hostname or address of the remote tunnel endpoint. | 
-**RemotePort** | **int32** | Port on the remote tunnel endpoint. Outside &#x60;1..65535&#x60; the write is rejected with &#x60;400 relay_port_out_of_range&#x60;.  | 
+**RemotePort** | **int32** | Port on the remote tunnel endpoint. Outside &#x60;1..65535&#x60; the write is rejected with &#x60;400 port_out_of_range&#x60;.  | 
 **AuthSecretRef** | **string** | Opaque reference to the tunnel&#39;s authentication material in the form &#x60;secret:&lt;domain&gt;/&lt;project&gt;/&lt;name&gt;(:&lt;version&gt;)?&#x60;.  | 
 **AllowedSubnets** | **[]string** | CIDR prefixes the tunnel routes. An empty list surfaces as &#x60;400 allowed_subnet_empty&#x60;.  | 
 **RoutingPolicy** | [**BridgeSiteToSiteTunnelRoutingPolicy**](BridgeSiteToSiteTunnelRoutingPolicy.md) |  | 

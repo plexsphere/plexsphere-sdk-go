@@ -5,7 +5,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Items** | [**[]BootstrapTokenMetadata**](BootstrapTokenMetadata.md) | BootstrapToken metadata in the current page. | 
-**NextCursor** | Pointer to **string** | Continuation token for the next page. Null or omitted when the iteration has reached end-of-stream.  | [optional] 
+**NextCursor** | Pointer to **string** | Continuation token for the next page. Absent when the iteration has reached end-of-stream.  | [optional] 
 
 ## Methods
 

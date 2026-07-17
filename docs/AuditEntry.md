@@ -4,8 +4,8 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**Seq** | **int64** | Per-Domain monotonic sequence number assigned at append time.  | 
-**DomainId** | **string** | Owning Domain. | 
+**Seq** | **int64** | Per-chain monotonic sequence number assigned at append time.  | 
+**DomainId** | **string** | Scope anchor of the owning chain — the owning Domain id on Domain-chain rows, the platform chain&#39;s anchor id on platform-residency rows.  | 
 **OccurredAt** | **time.Time** | Server-side timestamp the decision was reached (RFC 3339, UTC).  | 
 **Reason** | [**AuditReason**](AuditReason.md) |  | 
 **Subject** | [**AuditSubject**](AuditSubject.md) |  | 
@@ -16,8 +16,8 @@ Name | Type | Description | Notes
 **RequestContext** | [**AuditRequestContext**](AuditRequestContext.md) |  | 
 **EntryHash** | **string** | &#x60;sha256(prev_hash || sha256(canonical_bytes))&#x60; for this row, lowercase hex.  | 
 **PrevHash** | **string** | &#x60;entry_hash&#x60; of the preceding row, or 64 zero hex characters on the genesis row (&#x60;seq&#x3D;1&#x60;).  | 
-**ArchiveEtag** | Pointer to **string** | Object-store ETag of the per-Domain mirror copy, or &#x60;null&#x60; until the drain worker has uploaded the row.  | [optional] 
-**ArchivedAt** | Pointer to **time.Time** | Server-side timestamp the mirror upload completed, or &#x60;null&#x60; while the row is still in flight.  | [optional] 
+**ArchiveEtag** | Pointer to **string** | Object-store ETag of the per-Domain mirror copy; absent until the drain worker has uploaded the row.  | [optional] 
+**ArchivedAt** | Pointer to **time.Time** | Server-side timestamp the mirror upload completed; absent while the row is still in flight.  | [optional] 
 
 ## Methods
 

@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -55,7 +55,7 @@ type ArtifactsAPI interface {
 	/*
 		ListPlexdArtifacts List indexed plexd releases.
 
-		Returns a cursor-paginated page of indexed plexd release lines — each with its lifecycle support status, the supply-chain verification verdict, the per-architecture checksums, and the index timestamps. The registry is platform-global; the handler runs the platform read gate before the persistence read.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`, and `limit` is clamped to `[1, 200]` rather than rejected.
+		Returns a cursor-paginated page of indexed plexd release lines — each with its lifecycle support status, the supply-chain verification verdict, the per-architecture checksums, and the index timestamps. The registry is platform-global; the handler runs the platform read gate before the persistence read.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`, and an out-of-range `limit` is rejected with `400`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiListPlexdArtifactsRequest
@@ -71,16 +71,9 @@ type ArtifactsAPI interface {
 type ArtifactsAPIService service
 
 type ApiGetPlexdArtifactRequest struct {
-	ctx           context.Context
-	ApiService    ArtifactsAPI
-	version       string
-	authorization *string
-}
-
-// &#x60;Bearer &lt;access token&gt;&#x60; — the operator bearer credential the request authenticates with. A missing, malformed, or rejected token surfaces as &#x60;401&#x60;.
-func (r ApiGetPlexdArtifactRequest) Authorization(authorization string) ApiGetPlexdArtifactRequest {
-	r.authorization = &authorization
-	return r
+	ctx        context.Context
+	ApiService ArtifactsAPI
+	version    string
 }
 
 func (r ApiGetPlexdArtifactRequest) Execute() (*PlexdArtifact, *http.Response, error) {
@@ -126,9 +119,6 @@ func (a *ArtifactsAPIService) GetPlexdArtifactExecute(r ApiGetPlexdArtifactReque
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-	if r.authorization == nil {
-		return localVarReturnValue, nil, reportError("authorization is required and must be specified")
-	}
 
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
@@ -147,7 +137,6 @@ func (a *ArtifactsAPIService) GetPlexdArtifactExecute(r ApiGetPlexdArtifactReque
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -218,16 +207,9 @@ func (a *ArtifactsAPIService) GetPlexdArtifactExecute(r ApiGetPlexdArtifactReque
 }
 
 type ApiGetPlexdArtifactSignatureRequest struct {
-	ctx           context.Context
-	ApiService    ArtifactsAPI
-	version       string
-	authorization *string
-}
-
-// &#x60;Bearer &lt;access token&gt;&#x60; — the operator bearer credential the request authenticates with. A missing, malformed, or rejected token surfaces as &#x60;401&#x60;.
-func (r ApiGetPlexdArtifactSignatureRequest) Authorization(authorization string) ApiGetPlexdArtifactSignatureRequest {
-	r.authorization = &authorization
-	return r
+	ctx        context.Context
+	ApiService ArtifactsAPI
+	version    string
 }
 
 func (r ApiGetPlexdArtifactSignatureRequest) Execute() (*os.File, *http.Response, error) {
@@ -273,9 +255,6 @@ func (a *ArtifactsAPIService) GetPlexdArtifactSignatureExecute(r ApiGetPlexdArti
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-	if r.authorization == nil {
-		return localVarReturnValue, nil, reportError("authorization is required and must be specified")
-	}
 
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
@@ -294,7 +273,6 @@ func (a *ArtifactsAPIService) GetPlexdArtifactSignatureExecute(r ApiGetPlexdArti
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -365,17 +343,10 @@ func (a *ArtifactsAPIService) GetPlexdArtifactSignatureExecute(r ApiGetPlexdArti
 }
 
 type ApiListPlexdArtifactsRequest struct {
-	ctx           context.Context
-	ApiService    ArtifactsAPI
-	authorization *string
-	cursor        *string
-	limit         *int32
-}
-
-// &#x60;Bearer &lt;access token&gt;&#x60; — the operator bearer credential the request authenticates with. A missing, malformed, or rejected token surfaces as &#x60;401&#x60;.
-func (r ApiListPlexdArtifactsRequest) Authorization(authorization string) ApiListPlexdArtifactsRequest {
-	r.authorization = &authorization
-	return r
+	ctx        context.Context
+	ApiService ArtifactsAPI
+	cursor     *string
+	limit      *int32
 }
 
 // Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
@@ -384,7 +355,7 @@ func (r ApiListPlexdArtifactsRequest) Cursor(cursor string) ApiListPlexdArtifact
 	return r
 }
 
-// Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the read service.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListPlexdArtifactsRequest) Limit(limit int32) ApiListPlexdArtifactsRequest {
 	r.limit = &limit
 	return r
@@ -397,7 +368,7 @@ func (r ApiListPlexdArtifactsRequest) Execute() (*PlexdArtifactRefList, *http.Re
 /*
 ListPlexdArtifacts List indexed plexd releases.
 
-Returns a cursor-paginated page of indexed plexd release lines — each with its lifecycle support status, the supply-chain verification verdict, the per-architecture checksums, and the index timestamps. The registry is platform-global; the handler runs the platform read gate before the persistence read.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`, and `limit` is clamped to `[1, 200]` rather than rejected.
+Returns a cursor-paginated page of indexed plexd release lines — each with its lifecycle support status, the supply-chain verification verdict, the per-architecture checksums, and the index timestamps. The registry is platform-global; the handler runs the platform read gate before the persistence read.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`, and an out-of-range `limit` is rejected with `400`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiListPlexdArtifactsRequest
@@ -430,9 +401,6 @@ func (a *ArtifactsAPIService) ListPlexdArtifactsExecute(r ApiListPlexdArtifactsR
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-	if r.authorization == nil {
-		return localVarReturnValue, nil, reportError("authorization is required and must be specified")
-	}
 
 	if r.cursor != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "cursor", r.cursor, "form", "")
@@ -461,7 +429,6 @@ func (a *ArtifactsAPIService) ListPlexdArtifactsExecute(r ApiListPlexdArtifactsR
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -507,7 +474,7 @@ func (a *ArtifactsAPIService) ListPlexdArtifactsExecute(r ApiListPlexdArtifactsR
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 403 {
-			var v PermissionDenied
+			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()

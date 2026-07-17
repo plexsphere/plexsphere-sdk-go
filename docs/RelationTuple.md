@@ -8,7 +8,7 @@ Name | Type | Description | Notes
 **Subject** | **string** | Object reference of the subject side. | 
 **Relation** | **string** | Relation name (e.g. &#x60;maintainer&#x60;, &#x60;read&#x60;). | 
 **Resource** | **string** | Object reference of the resource side. | 
-**CaveatContext** | Pointer to **map[string]interface{}** | Optional set of caveat field NAMES the tuple binds. NAMES only — values never cross the contract boundary.  | [optional] 
+**CaveatContext** | Pointer to **map[string]interface{}** | Optional CEL caveat evaluation context — a map from caveat field NAME to VALUE — bound to the tuple and evaluated by SpiceDB at every Check. Values DO cross this boundary; only the audit row this mutation emits is names-only.  | [optional] 
 **CreatedAt** | **time.Time** | Aggregate creation timestamp (UTC). | 
 
 ## Methods

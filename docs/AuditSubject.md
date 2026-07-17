@@ -5,7 +5,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Pseudonym** | **string** | Per-Domain pseudonym of the subject (32 bytes, lowercase hex). Stable for the lifetime of the chain and never reversible to plaintext from the chain alone.  | 
-**IdentityIdRef** | Pointer to **string** | Live Identity id the pseudonym maps to, or &#x60;null&#x60; if the mapping has been erased. Cleared by &#x60;EraseIdentityFromAudit&#x60; .  | [optional] 
+**IdentityIdRef** | Pointer to **string** | Live Identity id the pseudonym maps to; absent if the mapping has been erased. Cleared by &#x60;EraseIdentityFromAudit&#x60;.  | [optional] 
 
 ## Methods
 

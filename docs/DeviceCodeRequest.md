@@ -4,16 +4,16 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**DomainId** | **string** | Domain the caller is authenticating against. | 
-**IdpBindingId** | Pointer to **string** | Explicit IdP binding within the Domain. Optional: when omitted, the binding is resolved by alias, then the Domain&#39;s primary binding, then its single active binding. A Domain with two or more active bindings and no primary requires this field (or idp_binding_alias) to disambiguate.  | [optional] 
-**IdpBindingAlias** | Pointer to **string** | Human-friendly alias of an IdP binding within the Domain (e.g. &#x60;github&#x60;). Optional. Resolution precedence is explicit id, then alias, then the Domain&#39;s primary binding, then its single active binding. Mutually exclusive with idp_binding_id.  | [optional] 
+**DomainId** | Pointer to **string** | Domain the caller is authenticating against. Optional: omitting it together with a platform-shared binding named via &#x60;idp_binding_id&#x60; or &#x60;idp_binding_alias&#x60; starts a Domain-independent platform-operator device authorization. A per-Domain binding named without a &#x60;domain_id&#x60; is rejected 400 on this surface.  | [optional] 
+**IdpBindingId** | Pointer to **string** | Explicit IdP binding within the Domain. Optional: when omitted, the binding is resolved by alias, then the Domain&#39;s primary binding, then its single active binding. A Domain with two or more active bindings and no primary requires this field (or idp_binding_alias) to disambiguate. With no &#x60;domain_id&#x60;, must name a platform-shared binding to start a platform-operator device authorization.  | [optional] 
+**IdpBindingAlias** | Pointer to **string** | Human-friendly alias of an IdP binding within the Domain (e.g. &#x60;github&#x60;). Optional. Resolution precedence is explicit id, then alias, then the Domain&#39;s primary binding, then its single active binding. Mutually exclusive with idp_binding_id. With no &#x60;domain_id&#x60;, must name a platform-shared binding&#39;s alias (globally unique among active platform bindings) to start a platform-operator device authorization.  | [optional] 
 **ClientId** | Pointer to **string** | Optional OIDC client identifier override. | [optional] 
 
 ## Methods
 
 ### NewDeviceCodeRequest
 
-`func NewDeviceCodeRequest(domainId string, ) *DeviceCodeRequest`
+`func NewDeviceCodeRequest() *DeviceCodeRequest`
 
 NewDeviceCodeRequest instantiates a new DeviceCodeRequest object
 This constructor will assign default values to properties that have it defined,
@@ -47,6 +47,11 @@ and a boolean to check if the value has been set.
 
 SetDomainId sets DomainId field to given value.
 
+### HasDomainId
+
+`func (o *DeviceCodeRequest) HasDomainId() bool`
+
+HasDomainId returns a boolean if a field has been set.
 
 ### GetIdpBindingId
 

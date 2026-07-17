@@ -5,7 +5,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **State** | [**ReachabilityState**](ReachabilityState.md) |  | 
-**LastHeartbeatAt** | Pointer to **time.Time** | Server-side timestamp of the most recently accepted heartbeat, or &#x60;null&#x60; until the first heartbeat is accepted.  | [optional] 
+**LastHeartbeatAt** | Pointer to **time.Time** | Server-side timestamp of the most recently accepted heartbeat; absent until the first heartbeat is accepted.  | [optional] 
 **ChangedAt** | **time.Time** | Server-side timestamp of the most recent transition into the current &#x60;state&#x60;. Always present — for a Node that has never sent a heartbeat this is the timestamp at which the reachability row was first materialised.  | 
 
 ## Methods

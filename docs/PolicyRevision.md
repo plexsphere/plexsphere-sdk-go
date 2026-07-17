@@ -6,12 +6,12 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Id** | **string** | Revision identifier (UUIDv7). | 
 **PolicyId** | **string** | Parent Policy identifier. | 
-**ParentId** | Pointer to **string** | Predecessor revision identifier. &#x60;null&#x60; on the initial revision of a fresh Policy; non-null on every subsequent revision.  | [optional] 
+**ParentId** | Pointer to **string** | Predecessor revision identifier. Absent on the initial revision of a fresh Policy; non-null on every subsequent revision.  | [optional] 
 **Selector** | [**PolicySelector**](PolicySelector.md) |  | 
 **Rules** | [**[]PolicyRule**](PolicyRule.md) | Ordered rule list at this revision. Capped at 1024 entries by the aggregate; the cap is mirrored as a CHECK constraint in the persistence layer so a wire-level oversize is rejected before it reaches the editor.  | 
 **CreatedAt** | **time.Time** |  | 
 **CreatedBy** | **string** | Identifier of the principal that authored the revision.  | 
-**CorrelationId** | Pointer to **string** | Upstream request correlation identifier propagated into the audit row and outbox event. &#x60;null&#x60; when the revision was authored outside an inbound HTTP request.  | [optional] 
+**CorrelationId** | Pointer to **string** | Upstream request correlation identifier propagated into the audit row and outbox event. Absent when the revision was authored outside an inbound HTTP request.  | [optional] 
 
 ## Methods
 

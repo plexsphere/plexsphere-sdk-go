@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -18,11 +18,11 @@ import (
 // checks if the AuditSubject type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &AuditSubject{}
 
-// AuditSubject Subject-side projection on an audit row. `pseudonym` is the per-Domain HMAC of the subject identity — the chain-input form, never plaintext. The `identity_id_ref` is a pointer to the live Identity row when one is still resolvable; it is `null` after the right-to- erasure workflow has purged the `audit_subject_pii` mapping for the subject.
+// AuditSubject Subject-side projection on an audit row. `pseudonym` is the per-Domain HMAC of the subject identity — the chain-input form, never plaintext. The `identity_id_ref` is a pointer to the live Identity row when one is still resolvable; it is absent after the right-to- erasure workflow has purged the `audit_subject_pii` mapping for the subject.
 type AuditSubject struct {
 	// Per-Domain pseudonym of the subject (32 bytes, lowercase hex). Stable for the lifetime of the chain and never reversible to plaintext from the chain alone.
 	Pseudonym string `json:"pseudonym" validate:"regexp=^[0-9a-f]{64}$"`
-	// Live Identity id the pseudonym maps to, or `null` if the mapping has been erased. Cleared by `EraseIdentityFromAudit` .
+	// Live Identity id the pseudonym maps to; absent if the mapping has been erased. Cleared by `EraseIdentityFromAudit`.
 	IdentityIdRef        *string `json:"identity_id_ref,omitempty"`
 	AdditionalProperties map[string]interface{}
 }

@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -24,7 +24,7 @@ type BootstrapTokensAPI interface {
 	/*
 		GetBootstrapTokenMetadata Fetch BootstrapToken metadata by identifier.
 
-		Returns metadata for the BootstrapToken identified by `{id}` within the target Project. The plaintext is NEVER returned — the persistence layer holds only an Argon2id hash, and the plaintext window closed when the issue response was written .
+		Returns metadata for the BootstrapToken identified by `{id}` within the target Project. The plaintext is NEVER returned — the persistence layer holds only an Argon2id hash, and the plaintext window closed when the issue response was written.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param projectId Owning Project. The BootstrapToken aggregate is scoped per Project so every administration endpoint requires the Project identifier in the path.
@@ -40,7 +40,7 @@ type BootstrapTokensAPI interface {
 	/*
 		IssueBootstrapToken Issue a BootstrapToken for a Project.
 
-		Mints a fresh BootstrapToken scoped to the supplied Project . The aggregate enforces the issuance invariants (`kind` in `{node, bridge}`, `env_prefix` matches `^[a-z]+$`, TTL inside `[300, 86400]` seconds); violations surface as a 400 Problem from validation, not as a SQL CHECK failure.  The response body is the **only** time the plaintext token is ever exposed. The persistence layer stores an Argon2id hash only, so once the response has been written the plaintext can no longer be retrieved through any API surface. Operators MUST capture the plaintext from this response and hand it to the redeeming Node/Bridge out-of-band; a lost plaintext requires re-issuing the token.
+		Mints a fresh BootstrapToken scoped to the supplied Project. The aggregate enforces the issuance invariants (`kind` in `{node, bridge}`, `env_prefix` matches `^[a-z]+$`, TTL inside `[300, 86400]` seconds); violations surface as a 400 Problem from validation, not as a SQL CHECK failure.  The response body is the **only** time the plaintext token is ever exposed. The persistence layer stores an Argon2id hash only, so once the response has been written the plaintext can no longer be retrieved through any API surface. Operators MUST capture the plaintext from this response and hand it to the redeeming Node/Bridge out-of-band; a lost plaintext requires re-issuing the token.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param projectId Owning Project. The BootstrapToken aggregate is scoped per Project so every administration endpoint requires the Project identifier in the path.
@@ -70,7 +70,7 @@ type BootstrapTokensAPI interface {
 	/*
 		PostRegister Redeem a BootstrapToken to enrol a Node into a Domain.
 
-		Consumes a previously-issued BootstrapToken plaintext and provisions a complete Node identity inside the redeeming Domain. The handler:    1. Validates the inbound public key (length 32 after base64      decode, all-zero rejection) BEFORE any token consumption      attempt so a malformed key cannot also waste a token      .   2. Runs the BootstrapToken plaintext through      `bootstraptokens.Validator.Consume` for one-shot,      project-scoped, kind-scoped enforcement.   3. Allocates a mesh-IP from the Domain's pool — flat by      default, drawn from the optional Project sub-range when      one applies.   4. Issues the per-Node Node Secret Key (NSK) plaintext +      wrapped persistence form through the configured wrap-key      adapter.   5. Persists Node + IP-allocation + NSK + outbox event in      one pgx transaction; a partial failure rolls back every      step including the BootstrapToken consume.  The endpoint is the unauthenticated bootstrap seam — the BootstrapToken plaintext IS the credential the redeeming substrate presents — so the caller does NOT pass an Authorization header here. The Spectral `plexsphere-write-once-post-must-be-issue-response` rule guards the `nsk` field's `x-plexsphere-once: true` marker so the plaintext is only ever returned by THIS one operation .
+		Consumes a previously-issued BootstrapToken plaintext and provisions a complete Node identity inside the redeeming Domain. The handler:    1. Validates the inbound public key (length 32 after base64      decode, all-zero rejection) BEFORE any token consumption      attempt so a malformed key cannot also waste a token.   2. Runs the BootstrapToken plaintext through      `bootstraptokens.Validator.Consume` for one-shot,      project-scoped, kind-scoped enforcement.   3. Allocates a mesh-IP from the Domain's pool — flat by      default, drawn from the optional Project sub-range when      one applies.   4. Issues the per-Node Node Secret Key (NSK) plaintext +      wrapped persistence form through the configured wrap-key      adapter.   5. Persists Node + IP-allocation + NSK + outbox event in      one pgx transaction; a partial failure rolls back every      step including the BootstrapToken consume.  The endpoint is the unauthenticated bootstrap seam — the BootstrapToken plaintext IS the credential the redeeming substrate presents — so the caller does NOT pass an Authorization header here. The Spectral `plexsphere-write-once-post-must-be-issue-response` rule guards the `nsk` field's `x-plexsphere-once: true` marker so the plaintext is only ever returned by THIS one operation.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiPostRegisterRequest
@@ -114,7 +114,7 @@ func (r ApiGetBootstrapTokenMetadataRequest) Execute() (*BootstrapTokenMetadata,
 /*
 GetBootstrapTokenMetadata Fetch BootstrapToken metadata by identifier.
 
-Returns metadata for the BootstrapToken identified by `{id}` within the target Project. The plaintext is NEVER returned — the persistence layer holds only an Argon2id hash, and the plaintext window closed when the issue response was written .
+Returns metadata for the BootstrapToken identified by `{id}` within the target Project. The plaintext is NEVER returned — the persistence layer holds only an Argon2id hash, and the plaintext window closed when the issue response was written.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param projectId Owning Project. The BootstrapToken aggregate is scoped per Project so every administration endpoint requires the Project identifier in the path.
@@ -270,7 +270,7 @@ func (r ApiIssueBootstrapTokenRequest) Execute() (*BootstrapTokenIssueResponse, 
 /*
 IssueBootstrapToken Issue a BootstrapToken for a Project.
 
-Mints a fresh BootstrapToken scoped to the supplied Project . The aggregate enforces the issuance invariants (`kind` in `{node, bridge}`, `env_prefix` matches `^[a-z]+$`, TTL inside `[300, 86400]` seconds); violations surface as a 400 Problem from validation, not as a SQL CHECK failure.  The response body is the **only** time the plaintext token is ever exposed. The persistence layer stores an Argon2id hash only, so once the response has been written the plaintext can no longer be retrieved through any API surface. Operators MUST capture the plaintext from this response and hand it to the redeeming Node/Bridge out-of-band; a lost plaintext requires re-issuing the token.
+Mints a fresh BootstrapToken scoped to the supplied Project. The aggregate enforces the issuance invariants (`kind` in `{node, bridge}`, `env_prefix` matches `^[a-z]+$`, TTL inside `[300, 86400]` seconds); violations surface as a 400 Problem from validation, not as a SQL CHECK failure.  The response body is the **only** time the plaintext token is ever exposed. The persistence layer stores an Argon2id hash only, so once the response has been written the plaintext can no longer be retrieved through any API surface. Operators MUST capture the plaintext from this response and hand it to the redeeming Node/Bridge out-of-band; a lost plaintext requires re-issuing the token.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param projectId Owning Project. The BootstrapToken aggregate is scoped per Project so every administration endpoint requires the Project identifier in the path.
@@ -428,13 +428,13 @@ type ApiListBootstrapTokensRequest struct {
 	limit      *int32
 }
 
-// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;.
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
 func (r ApiListBootstrapTokensRequest) Cursor(cursor string) ApiListBootstrapTokensRequest {
 	r.cursor = &cursor
 	return r
 }
 
-// Maximum number of items to return in a single page .
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListBootstrapTokensRequest) Limit(limit int32) ApiListBootstrapTokensRequest {
 	r.limit = &limit
 	return r
@@ -620,7 +620,7 @@ func (r ApiPostRegisterRequest) Execute() (*RegisterResponse, *http.Response, er
 /*
 PostRegister Redeem a BootstrapToken to enrol a Node into a Domain.
 
-Consumes a previously-issued BootstrapToken plaintext and provisions a complete Node identity inside the redeeming Domain. The handler:    1. Validates the inbound public key (length 32 after base64      decode, all-zero rejection) BEFORE any token consumption      attempt so a malformed key cannot also waste a token      .   2. Runs the BootstrapToken plaintext through      `bootstraptokens.Validator.Consume` for one-shot,      project-scoped, kind-scoped enforcement.   3. Allocates a mesh-IP from the Domain's pool — flat by      default, drawn from the optional Project sub-range when      one applies.   4. Issues the per-Node Node Secret Key (NSK) plaintext +      wrapped persistence form through the configured wrap-key      adapter.   5. Persists Node + IP-allocation + NSK + outbox event in      one pgx transaction; a partial failure rolls back every      step including the BootstrapToken consume.  The endpoint is the unauthenticated bootstrap seam — the BootstrapToken plaintext IS the credential the redeeming substrate presents — so the caller does NOT pass an Authorization header here. The Spectral `plexsphere-write-once-post-must-be-issue-response` rule guards the `nsk` field's `x-plexsphere-once: true` marker so the plaintext is only ever returned by THIS one operation .
+Consumes a previously-issued BootstrapToken plaintext and provisions a complete Node identity inside the redeeming Domain. The handler:    1. Validates the inbound public key (length 32 after base64      decode, all-zero rejection) BEFORE any token consumption      attempt so a malformed key cannot also waste a token.   2. Runs the BootstrapToken plaintext through      `bootstraptokens.Validator.Consume` for one-shot,      project-scoped, kind-scoped enforcement.   3. Allocates a mesh-IP from the Domain's pool — flat by      default, drawn from the optional Project sub-range when      one applies.   4. Issues the per-Node Node Secret Key (NSK) plaintext +      wrapped persistence form through the configured wrap-key      adapter.   5. Persists Node + IP-allocation + NSK + outbox event in      one pgx transaction; a partial failure rolls back every      step including the BootstrapToken consume.  The endpoint is the unauthenticated bootstrap seam — the BootstrapToken plaintext IS the credential the redeeming substrate presents — so the caller does NOT pass an Authorization header here. The Spectral `plexsphere-write-once-post-must-be-issue-response` rule guards the `nsk` field's `x-plexsphere-once: true` marker so the plaintext is only ever returned by THIS one operation.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiPostRegisterRequest

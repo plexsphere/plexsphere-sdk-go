@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -15,12 +15,11 @@ import (
 	"fmt"
 )
 
-// RebacCheckResponseReason Machine-readable denial reason. Set only when `decision` is `denied`. Values match `internal/audit.Reason.String` extended with `granted` (allowance bookkeeping) and `unknown` (defensive default the authorizer never emits on a happy path). `out_of_scope`, `insufficient_relation`, and `caveat_violation` mirror the `PermissionDenied.reason` enum used by the 403 surface elsewhere in this spec.
+// RebacCheckResponseReason Machine-readable denial reason. Set only when `decision` is `denied`, so the allowance value of `internal/audit.Reason.String` never appears here; `unknown` is the defensive default the authorizer never emits on a happy path. `out_of_scope`, `insufficient_relation`, and `caveat_violation` mirror the `PermissionDenied.reason` enum used by the 403 surface elsewhere in this spec.
 type RebacCheckResponseReason string
 
 // List of RebacCheckResponse_reason
 const (
-	REBACCHECKRESPONSEREASON_GRANTED                  RebacCheckResponseReason = "granted"
 	REBACCHECKRESPONSEREASON_OUT_OF_SCOPE             RebacCheckResponseReason = "out_of_scope"
 	REBACCHECKRESPONSEREASON_INSUFFICIENT_RELATION    RebacCheckResponseReason = "insufficient_relation"
 	REBACCHECKRESPONSEREASON_CAVEAT_VIOLATION         RebacCheckResponseReason = "caveat_violation"
@@ -30,7 +29,6 @@ const (
 
 // All allowed values of RebacCheckResponseReason enum
 var AllowedRebacCheckResponseReasonEnumValues = []RebacCheckResponseReason{
-	"granted",
 	"out_of_scope",
 	"insufficient_relation",
 	"caveat_violation",

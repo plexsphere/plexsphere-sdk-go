@@ -4,7 +4,7 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**DomainId** | **string** | Parent Domain identifier (UUIDv7). The handler authorises &#x60;manage&#x60; on &#x60;domain:&lt;id&gt;&#x60; BEFORE invoking the service .  | 
+**DomainId** | **string** | Parent Domain identifier (UUIDv7). The handler authorises &#x60;manage&#x60; on &#x60;domain:&lt;id&gt;&#x60; BEFORE invoking the service.  | 
 **Name** | **string** | Human-readable Project name. Whitespace-only is rejected. | 
 **Slug** | **string** | Kebab-case URL handle. The aggregate&#39;s &#x60;ParseSlug&#x60; enforces the same regex; surfacing the pattern here lets the generated client validate before the round-trip.  | 
 **Description** | Pointer to **string** | Optional free-form description. Whitespace-only strings are rejected by the aggregate (the operator most likely fat-fingered the field instead of meaning to clear it).  | [optional] 

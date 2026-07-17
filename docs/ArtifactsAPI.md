@@ -12,7 +12,7 @@ Method | HTTP request | Description
 
 ## GetPlexdArtifact
 
-> PlexdArtifact GetPlexdArtifact(ctx, version).Authorization(authorization).Execute()
+> PlexdArtifact GetPlexdArtifact(ctx, version).Execute()
 
 Fetch one indexed plexd release by version.
 
@@ -32,11 +32,10 @@ import (
 
 func main() {
 	version := "version_example" // string | plexd release version the registry indexes — the upstream release tag, for example a semver tag such as `v1.4.2`. Bound on `/v1/artifacts/plexd/{version}` and its `.sigstore` companion for the read-only plexd release registry surface. 
-	authorization := "authorization_example" // string | `Bearer <access token>` — the operator bearer credential the request authenticates with. A missing, malformed, or rejected token surfaces as `401`. 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.ArtifactsAPI.GetPlexdArtifact(context.Background(), version).Authorization(authorization).Execute()
+	resp, r, err := apiClient.ArtifactsAPI.GetPlexdArtifact(context.Background(), version).Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error when calling `ArtifactsAPI.GetPlexdArtifact``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
@@ -62,7 +61,6 @@ Other parameters are passed through a pointer to a apiGetPlexdArtifactRequest st
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 
- **authorization** | **string** | &#x60;Bearer &lt;access token&gt;&#x60; — the operator bearer credential the request authenticates with. A missing, malformed, or rejected token surfaces as &#x60;401&#x60;.  | 
 
 ### Return type
 
@@ -70,7 +68,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -84,7 +82,7 @@ No authorization required
 
 ## GetPlexdArtifactSignature
 
-> *os.File GetPlexdArtifactSignature(ctx, version).Authorization(authorization).Execute()
+> *os.File GetPlexdArtifactSignature(ctx, version).Execute()
 
 Fetch the verbatim Sigstore bundle for a plexd release.
 
@@ -104,11 +102,10 @@ import (
 
 func main() {
 	version := "version_example" // string | plexd release version the registry indexes — the upstream release tag, for example a semver tag such as `v1.4.2`. Bound on `/v1/artifacts/plexd/{version}` and its `.sigstore` companion for the read-only plexd release registry surface. 
-	authorization := "authorization_example" // string | `Bearer <access token>` — the operator bearer credential the request authenticates with. A missing, malformed, or rejected token surfaces as `401`. 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.ArtifactsAPI.GetPlexdArtifactSignature(context.Background(), version).Authorization(authorization).Execute()
+	resp, r, err := apiClient.ArtifactsAPI.GetPlexdArtifactSignature(context.Background(), version).Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error when calling `ArtifactsAPI.GetPlexdArtifactSignature``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
@@ -134,7 +131,6 @@ Other parameters are passed through a pointer to a apiGetPlexdArtifactSignatureR
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 
- **authorization** | **string** | &#x60;Bearer &lt;access token&gt;&#x60; — the operator bearer credential the request authenticates with. A missing, malformed, or rejected token surfaces as &#x60;401&#x60;.  | 
 
 ### Return type
 
@@ -142,7 +138,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -156,7 +152,7 @@ No authorization required
 
 ## ListPlexdArtifacts
 
-> PlexdArtifactRefList ListPlexdArtifacts(ctx).Authorization(authorization).Cursor(cursor).Limit(limit).Execute()
+> PlexdArtifactRefList ListPlexdArtifacts(ctx).Cursor(cursor).Limit(limit).Execute()
 
 List indexed plexd releases.
 
@@ -175,13 +171,12 @@ import (
 )
 
 func main() {
-	authorization := "authorization_example" // string | `Bearer <access token>` — the operator bearer credential the request authenticates with. A missing, malformed, or rejected token surfaces as `401`. 
 	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
-	limit := int32(56) // int32 | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the read service.  (optional) (default to 50)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.ArtifactsAPI.ListPlexdArtifacts(context.Background()).Authorization(authorization).Cursor(cursor).Limit(limit).Execute()
+	resp, r, err := apiClient.ArtifactsAPI.ListPlexdArtifacts(context.Background()).Cursor(cursor).Limit(limit).Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error when calling `ArtifactsAPI.ListPlexdArtifacts``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
@@ -202,9 +197,8 @@ Other parameters are passed through a pointer to a apiListPlexdArtifactsRequest 
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **authorization** | **string** | &#x60;Bearer &lt;access token&gt;&#x60; — the operator bearer credential the request authenticates with. A missing, malformed, or rejected token surfaces as &#x60;401&#x60;.  | 
  **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
- **limit** | **int32** | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the read service.  | [default to 50]
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
 
 ### Return type
 
@@ -212,7 +206,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 

@@ -4,7 +4,7 @@ All URIs are relative to *http://localhost*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**GetDomainCapacity**](CapacityAPI.md#GetDomainCapacity) | **Get** /v1/domains/{domainId}/capacity | Return the capacity-and-scale snapshot for a Domain.
+[**GetDomainCapacity**](CapacityAPI.md#GetDomainCapacity) | **Get** /v1/domains/{domain_id}/capacity | Return the capacity-and-scale snapshot for a Domain.
 
 
 
@@ -29,7 +29,7 @@ import (
 )
 
 func main() {
-	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path. 
+	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents. 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -49,7 +49,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**domainId** | **string** | Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain&#39;s chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.  | 
+**domainId** | **string** | Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.  | 
 
 ### Other Parameters
 
@@ -66,7 +66,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 

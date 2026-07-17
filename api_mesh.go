@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -39,28 +39,12 @@ type MeshAPI interface {
 	DeleteNodeStateReportExecute(r ApiDeleteNodeStateReportRequest) (*http.Response, error)
 
 	/*
-		FetchNodeSecret Fetch a Secret Store entry rewrapped under the calling Node's NSK.
-
-		Returns the named Secret Store entry for the addressed Node as an AES-256-GCM ciphertext envelope rewrapped under the calling Node's Node Secret Key (NSK). The Secret Store is the platform's only meet-and-rewrap point between the OpenBao backend and the per-Node NSK: the handler reads the OpenBao plaintext, recovers the NSK, and rewraps the payload in-process so that ONLY NSK-wrapped ciphertext ever crosses the wire. The transient OpenBao plaintext and the recovered NSK are zeroed on every exit path; no plaintext is ever persisted, logged, cached, or placed on the event bus.  The 200 body is the raw envelope `<12-byte nonce> || <ciphertext + 16-byte GCM tag>`, served as `application/octet-stream`. The caller recovers the seeded plaintext byte-for-byte with `AES-256-GCM-Open` under its NSK. The response carries the served version in `X-Plexsphere-Secret-Version`, the NSK key id used for the wrap in `X-Plexsphere-Secret-KID` (so plexd can pick the right NSK during a rotation overlap), and `Cache-Control: no-store` so no intermediary ever retains the ciphertext.  The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      refusing missing or revoked credentials with 401. Only a      Node proving possession of its NSK can reach the rewrap      pipeline.   2. Resolves the addressed secret metadata, applies the      per-Node and per-Domain rate limits, and runs the      `node-agent` ReBAC visibility check on the addressed Node.      An authenticated caller without the relation receives 403      `PermissionDenied`; the denial is recorded with      `insufficient_relation`.   3. Reads the entry from the OpenBao backend — the current      version when `version` is omitted, or the requested version      when present — reconciling the served version against the      metadata; the OpenBao-returned version wins for the header.   4. Rewraps the payload under the recovered NSK with a fresh      12-byte nonce and emits exactly one granted audit row. A      backend read that fails AFTER a granted authorization still      records the granted audit row — operational outcomes are      carried on the fetch-duration metric, never on the audit      chain.  The response body is capped at 1 MiB of ciphertext.  DEFERRED-WIRING POSTURE: when the Secret Store backend is not configured (empty backend DSN) the production composition root leaves this surface disabled and every request returns 501 with `code: secrets_not_provisioned` so log scrapers can alert on the deferred-wiring state.
-
-		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Node identifier (UUIDv7) — the secret-fetch scope.
-		@param name Secret name within the owning Project. Lower-case, starts with a letter, and is limited to letters, digits, hyphen, and underscore (1 to 63 characters).
-		@return ApiFetchNodeSecretRequest
-	*/
-	FetchNodeSecret(ctx context.Context, id string, name string) ApiFetchNodeSecretRequest
-
-	// FetchNodeSecretExecute executes the request
-	//  @return *os.File
-	FetchNodeSecretExecute(r ApiFetchNodeSecretRequest) (*os.File, *http.Response, error)
-
-	/*
 		GetDomainMeshTopology Return the mesh topology for a Domain.
 
 		Returns the read-side projection of the mesh fabric that backs the dashboard mesh-map view and the `plexctl mesh topology` CLI: every live Peer Node anchored to the Domain together with the directed edges between them. The handler:    1. Authenticates the caller and rejects requests without a      resolved Principal with 401.   2. Checks the `domain-view` ReBAC relation on the addressed      Domain BEFORE any existence check so the endpoint cannot      be used as a Domain-id oracle.   3. Resolves the per-Domain peer graph from the SSE peer-      delta projection — `nodes` carries each anchored Node's      mesh-IP and reachability, `edges` carries each pairwise      relationship with its `mode` (`direct` or `relayed`), the      handshake age, and the bridge Node currently serving as      the relay fallback when one is assigned.  The payload mirrors the SSE peer-graph events one-for-one so a renderer that consumes the live stream and a renderer that polls this pull converge on byte-identical state.  DEFERRED-WIRING POSTURE: until the production composition root supplies the mesh-topology projection and the ReBAC RelationChecker the handler depends on, every request to this endpoint returns 501 with `code: mesh_topology_not_provisioned` so log scrapers can alert on the deferred-wiring state.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param domainId Domain identifier (UUIDv7) — the topology scope.
+		@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 		@return ApiGetDomainMeshTopologyRequest
 	*/
 	GetDomainMeshTopology(ctx context.Context, domainId string) ApiGetDomainMeshTopologyRequest
@@ -72,7 +56,7 @@ type MeshAPI interface {
 	/*
 		GetNodeEvents Stream signed envelope events for a Node over SSE.
 
-		Opens a Server-Sent Events stream of canonical signed `Envelope` records scoped to the addressed Node. Each `data:` frame is the JSON wire body produced by `internal/signing/envelope.CanonicalBytes`. The server runs ed25519 verification against the per-Domain signing public key before emitting the frame; consumers SHOULD verify the trailing `signature:` field again as a defence-in-depth measure.  The `id:` field on every event frame is the JetStream stream sequence number for that envelope. Clients resume by re- connecting with `Last-Event-ID: <numeric>` set to the last sequence they durably processed; the server replays from the next sequence (`> last`). When the header is absent or empty the stream tails from now — historical events are NOT backfilled.  The server emits a 25-second SSE comment-frame keep-alive (`:keep-alive\\n\\n`) so idle proxies do not collapse the connection. The `X-Plexsphere-API-Version` response header carries the contract version the stream conforms to; `Cache-Control: no-cache` opts the response out of any intermediary caching layer.  DEFERRED-WIRING POSTURE: the production composition root does not yet supply the SignatureVerifier, RelationChecker, or NodeRepo ports the handler depends on. Until those ports are wired, every request to this endpoint returns 501 with `code: signed_event_bus_not_provisioned`. See docs/architecture/mesh-event-bus-roadmap.md for the deferred work tracking.
+		Opens a Server-Sent Events stream of canonical signed `Envelope` records scoped to the addressed Node. Each `data:` frame is the JSON wire body produced by `internal/signing/envelope.CanonicalBytes`. The server runs ed25519 verification against the per-Domain signing public key before emitting the frame; consumers SHOULD verify the trailing `signature:` field again as a defence-in-depth measure.  The `id:` field on every event frame is the JetStream stream sequence number for that envelope. Clients resume by re- connecting with `Last-Event-ID: <numeric>` set to the last sequence they durably processed; the server replays from the next sequence (`> last`). When the header is absent or empty the stream tails from now — historical events are NOT backfilled.  The server emits a 25-second SSE comment-frame keep-alive (`:keep-alive\\n\\n`) so idle proxies do not collapse the connection. The `X-Plexsphere-API-Version` response header carries the contract version the stream conforms to; `Cache-Control: no-cache` opts the response out of any intermediary caching layer.  DESCOPED FOR THE FIRST PRODUCTION RELEASE: the signed SSE event bus does not ship in the first production release — reconciliation-pull (GET /v1/nodes/{id}/state) is the working delivery channel for mesh state. The production composition root wires none of the load-bearing EventStream, NonceStore, SignatureVerifier, RelationChecker, or NodeRepo ports, so every request to this endpoint returns 501 with `code: signed_event_bus_not_provisioned`, fail-closed by construction. See docs/architecture/mesh-event-bus-roadmap.md for the descope decision and the full un-descope checklist.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Node identifier (UUIDv7) — the SSE stream scope.
@@ -102,7 +86,7 @@ type MeshAPI interface {
 	/*
 		GetNodeReachability Read the reachability projection for a Node.
 
-		Returns the latest `Reachability` projection for the addressed Node — the per-Node state-machine the heartbeat handler advances on every accepted heartbeat. The projection is the authoritative health view the operator UI and reconciliation surface consume; it transitions `healthy` → `stale` after 90s without a heartbeat and `stale` → `unreachable` after 300s, with `changed_at` tracking the most recent transition.  The endpoint reuses the `node-agent` ReBAC relation already guarding `GET /v1/nodes/{id}/state` and `GET /v1/nodes/{id}/events`, so any caller authorised to issue a reconciliation pull is also authorised to read the reachability projection. Unauthenticated callers receive 401; authenticated callers without the relation receive 403; an unknown Node id surfaces as 404 only after the authorisation gate passes so the endpoint cannot be used as a Node-id oracle .  DEFERRED-WIRING POSTURE: until the production composition root supplies the ReachabilityRepo, RelationChecker, and NodeRepo ports the handler depends on, every request to this endpoint returns 501 with `code: reachability_not_provisioned` so log scrapers can alert on the deferred-wiring state. See docs/architecture/mesh-event-bus-roadmap.md for the deferred work tracking.
+		Returns the latest `Reachability` projection for the addressed Node — the per-Node state-machine the heartbeat handler advances on every accepted heartbeat. The projection is the authoritative health view the operator UI and reconciliation surface consume; it transitions `healthy` → `stale` after 90s without a heartbeat and `stale` → `unreachable` after 300s, with `changed_at` tracking the most recent transition.  The endpoint reuses the `node-agent` ReBAC relation already guarding `GET /v1/nodes/{id}/state` and `GET /v1/nodes/{id}/events`, so any caller authorised to issue a reconciliation pull is also authorised to read the reachability projection. Unauthenticated callers receive 401; authenticated callers without the relation receive 403; an unknown Node id surfaces as 404 only after the authorisation gate passes so the endpoint cannot be used as a Node-id oracle.  DEFERRED-WIRING POSTURE: until the production composition root supplies the ReachabilityRepo, RelationChecker, and NodeRepo ports the handler depends on, every request to this endpoint returns 501 with `code: reachability_not_provisioned` so log scrapers can alert on the deferred-wiring state. See docs/architecture/mesh-event-bus-roadmap.md for the deferred work tracking.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Node identifier (UUIDv7) — the reachability scope.
@@ -115,9 +99,25 @@ type MeshAPI interface {
 	GetNodeReachabilityExecute(r ApiGetNodeReachabilityRequest) (*Reachability, *http.Response, error)
 
 	/*
+		GetNodeSecret Fetch a Secret Store entry rewrapped under the calling Node's NSK.
+
+		Returns the named Secret Store entry for the addressed Node as an AES-256-GCM ciphertext envelope rewrapped under the calling Node's Node Secret Key (NSK). The Secret Store is the platform's only meet-and-rewrap point between the OpenBao backend and the per-Node NSK: the handler reads the OpenBao plaintext, recovers the NSK, and rewraps the payload in-process so that ONLY NSK-wrapped ciphertext ever crosses the wire. The transient OpenBao plaintext and the recovered NSK are zeroed on every exit path; no plaintext is ever persisted, logged, cached, or placed on the event bus.  The 200 body is the raw envelope `<12-byte nonce> || <ciphertext + 16-byte GCM tag>`, served as `application/octet-stream`. The caller recovers the seeded plaintext byte-for-byte with `AES-256-GCM-Open` under its NSK. The response carries the served version in `X-Plexsphere-Secret-Version`, the NSK key id used for the wrap in `X-Plexsphere-Secret-KID` (so plexd can pick the right NSK during a rotation overlap), and `Cache-Control: no-store` so no intermediary ever retains the ciphertext.  The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      refusing missing or revoked credentials with 401. Only a      Node proving possession of its NSK can reach the rewrap      pipeline.   2. Applies the per-Node and per-Domain rate limits, resolves      the addressed secret metadata, and runs the ReBAC hard      gate — the caller must hold the `read` relation on the      resolved `secret:<id>`.      An authenticated caller without the relation receives 403      `PermissionDenied`; the denial is recorded with      `insufficient_relation`.   3. Reads the entry from the OpenBao backend — the current      version when `version` is omitted, or the requested version      when present — reconciling the served version against the      metadata; the OpenBao-returned version wins for the header.   4. Rewraps the payload under the recovered NSK with a fresh      12-byte nonce and emits exactly one granted audit row. A      backend read that fails AFTER a granted authorization still      records the granted audit row — operational outcomes are      carried on the fetch-duration metric, never on the audit      chain.  The response body is capped at 1 MiB of ciphertext.  DEFERRED-WIRING POSTURE: when the Secret Store backend is not configured (empty backend DSN) the production composition root leaves this surface disabled and every request returns 501 with `code: secrets_not_provisioned` so log scrapers can alert on the deferred-wiring state.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param id Node identifier (UUIDv7) — the secret-fetch scope.
+		@param name Secret name within the owning Project. Lower-case, starts with a letter, and is limited to letters, digits, hyphen, and underscore (1 to 63 characters).
+		@return ApiGetNodeSecretRequest
+	*/
+	GetNodeSecret(ctx context.Context, id string, name string) ApiGetNodeSecretRequest
+
+	// GetNodeSecretExecute executes the request
+	//  @return *os.File
+	GetNodeSecretExecute(r ApiGetNodeSecretRequest) (*os.File, *http.Response, error)
+
+	/*
 		GetNodeState Reconciliation pull for a Node — return the canonical NodeStateSnapshot.
 
-		Returns the canonical `NodeStateSnapshot` for the addressed Node. The snapshot is the authoritative cold-start view that plexd consumes when it first comes up, when its SSE connection has been disconnected for longer than the replay window, or when an out-of-band request arrives to re-derive the desired state. The four wire blocks — `peers`, `policy`, `bridge`, and `state`/`reports` — are always present so plexd's reconcile loop can diff by field presence rather than absence; later stories populate the currently-empty blocks without changing the wire shape .  The peer projection is a single SQL round-trip ordered by `node_id ASC` so two consecutive pulls against the same ledger snapshot are byte-equal — plexd's reconcile loop reduces redundant rewrites by hashing the response.  The endpoint reuses the `node-agent` ReBAC relation already guarding `GET /v1/nodes/{id}/events`, so any caller authorised to subscribe to a Node's SSE event stream is also authorised to issue a reconciliation pull. Unauthenticated callers receive 401; authenticated callers without the relation receive 403; an unknown Node id surfaces as 404 only after the authorisation gate passes so the endpoint cannot be used as a Node-id oracle.  DEFERRED-WIRING POSTURE: until the production composition root supplies the `SnapshotProvider`, `RelationChecker`, and `NodeRepo` ports the handler depends on, every request to this endpoint returns 501 with `code: signed_event_bus_not_provisioned` so log scrapers can alert on the deferred-wiring state. See docs/architecture/mesh-event-bus-roadmap.md for the deferred work tracking.
+		Returns the canonical `NodeStateSnapshot` for the addressed Node. The snapshot is the authoritative cold-start view that plexd consumes when it first comes up, when its SSE connection has been disconnected for longer than the replay window, or when an out-of-band request arrives to re-derive the desired state. The wire blocks — `peers`, `policy`, `bridge`, `state`, and `reports` — are always present so plexd's reconcile loop can diff by field presence rather than absence; later stories populate the currently-empty blocks without changing the wire shape.  The peer projection is a single SQL round-trip ordered by `node_id ASC` so two consecutive pulls against the same ledger snapshot are byte-equal — plexd's reconcile loop reduces redundant rewrites by hashing the response.  The endpoint reuses the `node-agent` ReBAC relation already guarding `GET /v1/nodes/{id}/events`, so any caller authorised to subscribe to a Node's SSE event stream is also authorised to issue a reconciliation pull. Unauthenticated callers receive 401; authenticated callers without the relation receive 403; an unknown Node id surfaces as 404 only after the authorisation gate passes so the endpoint cannot be used as a Node-id oracle.  DEFERRED-WIRING POSTURE: until the production composition root supplies the `SnapshotProvider`, `RelationChecker`, and `NodeRepo` ports the handler depends on, every request to this endpoint returns 501 with `code: signed_event_bus_not_provisioned` so log scrapers can alert on the deferred-wiring state. See docs/architecture/mesh-event-bus-roadmap.md for the deferred work tracking.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Node identifier (UUIDv7) — the snapshot scope.
@@ -161,7 +161,7 @@ type MeshAPI interface {
 	/*
 		PostNodeHeartbeat Record a Node liveness heartbeat and return reconcile/rotate hints.
 
-		Accepts a per-Node liveness heartbeat from plexd and updates the reachability projection that drives the mesh-wide health view . The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      rejecting revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `node_id_mismatch` so a leaked NSK cannot be replayed      against a sibling Node.   3. Validates the request body — `client_now` MUST be within      60s of server now (otherwise 400 `clock_skew`),      `binary_checksum` MUST be present and decode to a 32-byte      SHA-256 digest (otherwise 400 `binary_checksum_empty`)      .   4. Persists the heartbeat fact and updates the per-Node      reachability state-machine (`healthy` → `stale` after 90s,      `stale` → `unreachable` after 300s) so the projection at      `GET /v1/nodes/{id}/reachability` reflects the new fact      on the next read.  The 200 response carries `accepted_at` (server timestamp at commit) and two reconciliation flags. `reconcile` defaults to `false` and later stories flip it when the controller wants plexd to issue a fresh reconciliation pull. `rotate_keys` is load-bearing: it is set to `true` whenever a `peer_key_rotation` row is pending for the heartbeating Node, telling the caller to generate a fresh Curve25519 keypair and complete the rotation via `POST /v1/keys/rotate`.  DEFERRED-WIRING POSTURE: until the production composition root supplies the NSK validator, ReachabilityRepo, and clock-skew evaluator the handler depends on, every request to this endpoint returns 501 with `code: heartbeat_not_provisioned` so log scrapers can alert on the deferred-wiring state. See docs/architecture/mesh-event-bus-roadmap.md for the deferred work tracking.
+		Accepts a per-Node liveness heartbeat from plexd and updates the reachability projection that drives the mesh-wide health view. The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      rejecting revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `node_id_mismatch` so a leaked NSK cannot be replayed      against a sibling Node.   3. Validates the request body — `client_now` MUST be within      60s of server now (otherwise 400 `clock_skew`),      `binary_checksum` MUST be present and decode to a 32-byte      SHA-256 digest (otherwise 400 `binary_checksum_empty`).   4. Persists the heartbeat fact and updates the per-Node      reachability state-machine (`healthy` → `stale` after 90s,      `stale` → `unreachable` after 300s) so the projection at      `GET /v1/nodes/{id}/reachability` reflects the new fact      on the next read.  The 200 response carries `accepted_at` (server timestamp at commit) and two reconciliation flags. `reconcile` defaults to `false` and later stories flip it when the controller wants plexd to issue a fresh reconciliation pull. `rotate_keys` is load-bearing: it is set to `true` whenever a `peer_key_rotation` row is pending for the heartbeating Node, telling the caller to generate a fresh Curve25519 keypair and complete the rotation via `POST /v1/keys/rotate`.  DEFERRED-WIRING POSTURE: until the production composition root supplies the NSK validator, ReachabilityRepo, and clock-skew evaluator the handler depends on, every request to this endpoint returns 501 with `code: heartbeat_not_provisioned` so log scrapers can alert on the deferred-wiring state. See docs/architecture/mesh-event-bus-roadmap.md for the deferred work tracking.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Node identifier (UUIDv7) — the heartbeat scope.
@@ -176,7 +176,7 @@ type MeshAPI interface {
 	/*
 		PostNodeIntegrityViolations Ingest a batch of integrity-violation reports for a Node.
 
-		Accepts a batch of `IntegrityViolation` reports from plexd describing tamper-evidence divergences the agent detected on the local Node: a mismatched binary checksum, a tampered Lua hook checksum, or a rotated SSH host-key fingerprint. The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      refusing missing or revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `node_id_mismatch` so a leaked NSK cannot be replayed      against a sibling Node.   3. Caps the request body at 32 KiB; oversize bodies receive      413 `integrity_violations_body_too_large` without ever      touching the JSON decoder.   4. Decodes the body with `DisallowUnknownFields`; a malformed      envelope or an unknown field surfaces as 400      `malformed_integrity_violations_request`.   5. Canonicalises every entry through the      `tenancy.NewIntegrityViolation` value-object constructor      which enforces every per-violation invariant: `kind` in      the closed set `{binary_checksum, hook_checksum,      ssh_host_key}`, `detected_by` in the closed set      `{startup_scan, inotify, pre_dispatch}`, `artifact_id`      non-empty after trimming, `observed_checksum`/      `expected_checksum` exactly 32 bytes for the checksum      kinds, `observed_fingerprint`/`expected_fingerprint`      matching `SHA256:<base64>` for the `ssh_host_key` kind,      and the per-kind column-mismatch guard that rejects a      checksum kind carrying fingerprint fields and vice versa.   6. Hands the canonical batch to the Node aggregate's      `RecordIntegrityViolations` method which enforces the      batch-level invariants: at least one entry      (`integrity_violations_empty`) and at most 128 entries      (`integrity_violations_too_many`).   7. Persists every violation row and appends a single      `integrity_alert` outbox event inside one transaction so      the operator signal and the audit evidence land together      or neither lands.  The 202 response carries `accepted_at` (server commit timestamp) and `violation_count` (echo of the persisted batch size) so the agent can record the receipt and reconcile with its local replay-queue. The response carries no payload echo and no per-row identifiers; the operator UI consumes the persisted rows from the dedicated audit and integrity surfaces.  DEFERRED-WIRING POSTURE: until the production composition root supplies the IntegrityViolationsRecorder, NSKResolver, and NodeRepo ports the handler depends on, every request to this endpoint returns 501 with `code: integrity_violations_not_provisioned` so log scrapers can alert on the deferred-wiring state.
+		Accepts a batch of `IntegrityViolation` reports from plexd describing tamper-evidence divergences the agent detected on the local Node: a mismatched binary checksum, a tampered Lua hook checksum, or a rotated SSH host-key fingerprint. The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      refusing missing or revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `node_id_mismatch` so a leaked NSK cannot be replayed      against a sibling Node.   3. Caps the request body at 32 KiB; oversize bodies receive      413 `integrity_violations_body_too_large` without ever      touching the JSON decoder.   4. Decodes the body with `DisallowUnknownFields`; a malformed      envelope or an unknown field surfaces as 400      `malformed_integrity_violations_request`.   5. Canonicalises every entry through the      `tenancy.NewIntegrityViolation` value-object constructor      which enforces every per-violation invariant: `kind` in      the closed set `{binary_checksum, hook_checksum,      ssh_host_key}`, `detected_by` in the closed set      `{startup_scan, inotify, pre_dispatch}`, `artifact_id`      non-empty after trimming, `observed_checksum`/      `expected_checksum` exactly 32 bytes for the checksum      kinds, `observed_fingerprint`/`expected_fingerprint`      matching `SHA256:<base64>` for the `ssh_host_key` kind,      and the per-kind column-mismatch guard that rejects a      checksum kind carrying fingerprint fields and vice versa.   6. Hands the canonical batch to the Node aggregate's      `RecordIntegrityViolations` method which enforces the      batch-level invariants: at least one entry      (`integrity_violations_empty`) and at most 128 entries      (`integrity_violations_too_many`).   7. Persists every violation row and appends a single      `integrity_alert` outbox event inside one transaction so      the operator signal and the audit evidence land together      or neither lands.  The 200 response carries `accepted_at` (server commit timestamp) and `violation_count` (echo of the persisted batch size) so the agent can record the receipt and reconcile with its local replay-queue. The response carries no payload echo and no per-row identifiers; the operator UI consumes the persisted rows from the dedicated audit and integrity surfaces.  DEFERRED-WIRING POSTURE: until the production composition root supplies the IntegrityViolationsRecorder, NSKResolver, and NodeRepo ports the handler depends on, every request to this endpoint returns 501 with `code: integrity_violations_not_provisioned` so log scrapers can alert on the deferred-wiring state.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Node identifier (UUIDv7) — the reporting Node.
@@ -251,7 +251,7 @@ type MeshAPI interface {
 	/*
 		PutNodeEndpoint Record a NAT-observed Peer endpoint observation.
 
-		Accepts a per-Node NAT endpoint observation from plexd and stamps it onto the Peer aggregate that backs the addressed Node. The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      refusing missing or revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `node_id_mismatch` so a leaked NSK cannot be replayed      against a sibling Node.   3. Caps the request body at 4 KiB; oversize bodies receive      413 `endpoint_body_too_large` without ever touching the      JSON decoder.   4. Validates the body — `reported_at` MUST be within 60s of      server now (otherwise 400 `endpoint_clock_skew`),      `endpoint` MUST parse as a `host:port` tuple in the      RFC 6056 1..65535 port range and a non-loopback IPv4/IPv6      address (otherwise 400 `endpoint_unparseable`), and the      envelope MUST decode without unknown fields (otherwise      400 `malformed_endpoint_request`).   5. Persists the observation through the per-Domain Peer      aggregate writer, which emits a `peer_endpoint_changed`      outbox event when the (endpoint, port) tuple differs from      the prior observation or transitions out of the stale      window; identical refreshes simply refresh the freshness      timestamp without emitting a wake-up.  The 200 response carries `accepted_at` (server commit timestamp) and `stale_after` (`accepted_at` plus the per-Domain endpoint TTL); plexd uses `stale_after` to schedule the next observation before the sweeper would tombstone the endpoint.  DEFERRED-WIRING POSTURE: until the production composition root supplies the EndpointRecorder, NSKResolver, NodeRepo, and PeerLookup ports the handler depends on, every request to this endpoint returns 501 with `code: endpoint_not_provisioned` so log scrapers can alert on the deferred-wiring state.
+		Accepts a per-Node NAT endpoint observation from plexd and stamps it onto the Peer aggregate that backs the addressed Node. The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      refusing missing or revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `node_id_mismatch` so a leaked NSK cannot be replayed      against a sibling Node.   3. Caps the request body at 4 KiB; oversize bodies receive      413 `endpoint_body_too_large` without ever touching the      JSON decoder.   4. Validates the body — `reported_at` MUST be within 60s of      server now (otherwise 400 `endpoint_clock_skew`),      `endpoint` MUST parse as a `host:port` tuple in the      1..65535 port range and a non-loopback IPv4/IPv6      address (otherwise 400 `endpoint_unparseable`), and the      envelope MUST decode without unknown fields (otherwise      400 `malformed_endpoint_request`).   5. Persists the observation through the per-Domain Peer      aggregate writer, which emits a `peer_endpoint_changed`      outbox event when the (endpoint, port) tuple differs from      the prior observation or transitions out of the stale      window; identical refreshes simply refresh the freshness      timestamp without emitting a wake-up.  The 200 response carries `accepted_at` (server commit timestamp) and `stale_after` (`accepted_at` plus the per-Domain endpoint TTL); plexd uses `stale_after` to schedule the next observation before the sweeper would tombstone the endpoint.  DEFERRED-WIRING POSTURE: until the production composition root supplies the EndpointRecorder, NSKResolver, NodeRepo, and PeerLookup ports the handler depends on, every request to this endpoint returns 501 with `code: endpoint_not_provisioned` so log scrapers can alert on the deferred-wiring state.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Node identifier (UUIDv7) — the endpoint scope.
@@ -284,17 +284,10 @@ type MeshAPI interface {
 type MeshAPIService service
 
 type ApiDeleteNodeStateReportRequest struct {
-	ctx           context.Context
-	ApiService    MeshAPI
-	id            string
-	key           string
-	authorization *string
-}
-
-// &#x60;Bearer &lt;NSK plaintext&gt;&#x60; — the per-Node Node Secret Key. Only a Node proving possession of its NSK may delete a report; a missing, malformed, or revoked credential surfaces as 401.
-func (r ApiDeleteNodeStateReportRequest) Authorization(authorization string) ApiDeleteNodeStateReportRequest {
-	r.authorization = &authorization
-	return r
+	ctx        context.Context
+	ApiService MeshAPI
+	id         string
+	key        string
 }
 
 func (r ApiDeleteNodeStateReportRequest) Execute() (*http.Response, error) {
@@ -340,9 +333,6 @@ func (a *MeshAPIService) DeleteNodeStateReportExecute(r ApiDeleteNodeStateReport
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-	if r.authorization == nil {
-		return nil, reportError("authorization is required and must be specified")
-	}
 
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
@@ -361,7 +351,6 @@ func (a *MeshAPIService) DeleteNodeStateReportExecute(r ApiDeleteNodeStateReport
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return nil, err
@@ -444,211 +433,6 @@ func (a *MeshAPIService) DeleteNodeStateReportExecute(r ApiDeleteNodeStateReport
 	return localVarHTTPResponse, nil
 }
 
-type ApiFetchNodeSecretRequest struct {
-	ctx           context.Context
-	ApiService    MeshAPI
-	id            string
-	name          string
-	authorization *string
-	version       *int32
-}
-
-// &#x60;Bearer &lt;NSK plaintext&gt;&#x60; — the per-Node Node Secret Key issued at registration time. Only a Node proving possession of its NSK may fetch a secret; a missing, malformed, or revoked credential surfaces as 401.
-func (r ApiFetchNodeSecretRequest) Authorization(authorization string) ApiFetchNodeSecretRequest {
-	r.authorization = &authorization
-	return r
-}
-
-// Optional OpenBao KV v2 version to fetch. When omitted the current version is served. The version actually served is always reported in the &#x60;X-Plexsphere-Secret-Version&#x60; response header.
-func (r ApiFetchNodeSecretRequest) Version(version int32) ApiFetchNodeSecretRequest {
-	r.version = &version
-	return r
-}
-
-func (r ApiFetchNodeSecretRequest) Execute() (*os.File, *http.Response, error) {
-	return r.ApiService.FetchNodeSecretExecute(r)
-}
-
-/*
-FetchNodeSecret Fetch a Secret Store entry rewrapped under the calling Node's NSK.
-
-Returns the named Secret Store entry for the addressed Node as an AES-256-GCM ciphertext envelope rewrapped under the calling Node's Node Secret Key (NSK). The Secret Store is the platform's only meet-and-rewrap point between the OpenBao backend and the per-Node NSK: the handler reads the OpenBao plaintext, recovers the NSK, and rewraps the payload in-process so that ONLY NSK-wrapped ciphertext ever crosses the wire. The transient OpenBao plaintext and the recovered NSK are zeroed on every exit path; no plaintext is ever persisted, logged, cached, or placed on the event bus.  The 200 body is the raw envelope `<12-byte nonce> || <ciphertext + 16-byte GCM tag>`, served as `application/octet-stream`. The caller recovers the seeded plaintext byte-for-byte with `AES-256-GCM-Open` under its NSK. The response carries the served version in `X-Plexsphere-Secret-Version`, the NSK key id used for the wrap in `X-Plexsphere-Secret-KID` (so plexd can pick the right NSK during a rotation overlap), and `Cache-Control: no-store` so no intermediary ever retains the ciphertext.  The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      refusing missing or revoked credentials with 401. Only a      Node proving possession of its NSK can reach the rewrap      pipeline.   2. Resolves the addressed secret metadata, applies the      per-Node and per-Domain rate limits, and runs the      `node-agent` ReBAC visibility check on the addressed Node.      An authenticated caller without the relation receives 403      `PermissionDenied`; the denial is recorded with      `insufficient_relation`.   3. Reads the entry from the OpenBao backend — the current      version when `version` is omitted, or the requested version      when present — reconciling the served version against the      metadata; the OpenBao-returned version wins for the header.   4. Rewraps the payload under the recovered NSK with a fresh      12-byte nonce and emits exactly one granted audit row. A      backend read that fails AFTER a granted authorization still      records the granted audit row — operational outcomes are      carried on the fetch-duration metric, never on the audit      chain.  The response body is capped at 1 MiB of ciphertext.  DEFERRED-WIRING POSTURE: when the Secret Store backend is not configured (empty backend DSN) the production composition root leaves this surface disabled and every request returns 501 with `code: secrets_not_provisioned` so log scrapers can alert on the deferred-wiring state.
-
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Node identifier (UUIDv7) — the secret-fetch scope.
-	@param name Secret name within the owning Project. Lower-case, starts with a letter, and is limited to letters, digits, hyphen, and underscore (1 to 63 characters).
-	@return ApiFetchNodeSecretRequest
-*/
-func (a *MeshAPIService) FetchNodeSecret(ctx context.Context, id string, name string) ApiFetchNodeSecretRequest {
-	return ApiFetchNodeSecretRequest{
-		ApiService: a,
-		ctx:        ctx,
-		id:         id,
-		name:       name,
-	}
-}
-
-// Execute executes the request
-//
-//	@return *os.File
-func (a *MeshAPIService) FetchNodeSecretExecute(r ApiFetchNodeSecretRequest) (*os.File, *http.Response, error) {
-	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *os.File
-	)
-
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "MeshAPIService.FetchNodeSecret")
-	if err != nil {
-		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
-	}
-
-	localVarPath := localBasePath + "/v1/nodes/{id}/secrets/{name}"
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"name"+"}", url.PathEscape(parameterValueToString(r.name, "name")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := url.Values{}
-	localVarFormParams := url.Values{}
-	if r.authorization == nil {
-		return localVarReturnValue, nil, reportError("authorization is required and must be specified")
-	}
-
-	if r.version != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "version", r.version, "form", "")
-	}
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/octet-stream", "application/problem+json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
-	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(req)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 401 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 403 {
-			var v PermissionDenied
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 404 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 429 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 503 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 501 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 500 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
 type ApiGetDomainMeshTopologyRequest struct {
 	ctx        context.Context
 	ApiService MeshAPI
@@ -665,7 +449,7 @@ GetDomainMeshTopology Return the mesh topology for a Domain.
 Returns the read-side projection of the mesh fabric that backs the dashboard mesh-map view and the `plexctl mesh topology` CLI: every live Peer Node anchored to the Domain together with the directed edges between them. The handler:    1. Authenticates the caller and rejects requests without a      resolved Principal with 401.   2. Checks the `domain-view` ReBAC relation on the addressed      Domain BEFORE any existence check so the endpoint cannot      be used as a Domain-id oracle.   3. Resolves the per-Domain peer graph from the SSE peer-      delta projection — `nodes` carries each anchored Node's      mesh-IP and reachability, `edges` carries each pairwise      relationship with its `mode` (`direct` or `relayed`), the      handshake age, and the bridge Node currently serving as      the relay fallback when one is assigned.  The payload mirrors the SSE peer-graph events one-for-one so a renderer that consumes the live stream and a renderer that polls this pull converge on byte-identical state.  DEFERRED-WIRING POSTURE: until the production composition root supplies the mesh-topology projection and the ReBAC RelationChecker the handler depends on, every request to this endpoint returns 501 with `code: mesh_topology_not_provisioned` so log scrapers can alert on the deferred-wiring state.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param domainId Domain identifier (UUIDv7) — the topology scope.
+	@param domainId Owning Domain identifier (UUIDv7). Bound on the Domain-scoped operator surfaces — capacity, mesh topology, managed-push, observability queries, alert rules, and incidents.
 	@return ApiGetDomainMeshTopologyRequest
 */
 func (a *MeshAPIService) GetDomainMeshTopology(ctx context.Context, domainId string) ApiGetDomainMeshTopologyRequest {
@@ -692,8 +476,8 @@ func (a *MeshAPIService) GetDomainMeshTopologyExecute(r ApiGetDomainMeshTopology
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{domainId}/mesh/topology"
-	localVarPath = strings.Replace(localVarPath, "{"+"domainId"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
+	localVarPath := localBasePath + "/v1/domains/{domain_id}/mesh/topology"
+	localVarPath = strings.Replace(localVarPath, "{"+"domain_id"+"}", url.PathEscape(parameterValueToString(r.domainId, "domainId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -827,7 +611,7 @@ func (r ApiGetNodeEventsRequest) Execute() (string, *http.Response, error) {
 /*
 GetNodeEvents Stream signed envelope events for a Node over SSE.
 
-Opens a Server-Sent Events stream of canonical signed `Envelope` records scoped to the addressed Node. Each `data:` frame is the JSON wire body produced by `internal/signing/envelope.CanonicalBytes`. The server runs ed25519 verification against the per-Domain signing public key before emitting the frame; consumers SHOULD verify the trailing `signature:` field again as a defence-in-depth measure.  The `id:` field on every event frame is the JetStream stream sequence number for that envelope. Clients resume by re- connecting with `Last-Event-ID: <numeric>` set to the last sequence they durably processed; the server replays from the next sequence (`> last`). When the header is absent or empty the stream tails from now — historical events are NOT backfilled.  The server emits a 25-second SSE comment-frame keep-alive (`:keep-alive\\n\\n`) so idle proxies do not collapse the connection. The `X-Plexsphere-API-Version` response header carries the contract version the stream conforms to; `Cache-Control: no-cache` opts the response out of any intermediary caching layer.  DEFERRED-WIRING POSTURE: the production composition root does not yet supply the SignatureVerifier, RelationChecker, or NodeRepo ports the handler depends on. Until those ports are wired, every request to this endpoint returns 501 with `code: signed_event_bus_not_provisioned`. See docs/architecture/mesh-event-bus-roadmap.md for the deferred work tracking.
+Opens a Server-Sent Events stream of canonical signed `Envelope` records scoped to the addressed Node. Each `data:` frame is the JSON wire body produced by `internal/signing/envelope.CanonicalBytes`. The server runs ed25519 verification against the per-Domain signing public key before emitting the frame; consumers SHOULD verify the trailing `signature:` field again as a defence-in-depth measure.  The `id:` field on every event frame is the JetStream stream sequence number for that envelope. Clients resume by re- connecting with `Last-Event-ID: <numeric>` set to the last sequence they durably processed; the server replays from the next sequence (`> last`). When the header is absent or empty the stream tails from now — historical events are NOT backfilled.  The server emits a 25-second SSE comment-frame keep-alive (`:keep-alive\\n\\n`) so idle proxies do not collapse the connection. The `X-Plexsphere-API-Version` response header carries the contract version the stream conforms to; `Cache-Control: no-cache` opts the response out of any intermediary caching layer.  DESCOPED FOR THE FIRST PRODUCTION RELEASE: the signed SSE event bus does not ship in the first production release — reconciliation-pull (GET /v1/nodes/{id}/state) is the working delivery channel for mesh state. The production composition root wires none of the load-bearing EventStream, NonceStore, SignatureVerifier, RelationChecker, or NodeRepo ports, so every request to this endpoint returns 501 with `code: signed_event_bus_not_provisioned`, fail-closed by construction. See docs/architecture/mesh-event-bus-roadmap.md for the descope decision and the full un-descope checklist.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Node identifier (UUIDv7) — the SSE stream scope.
@@ -962,6 +746,17 @@ func (a *MeshAPIService) GetNodeEventsExecute(r ApiGetNodeEventsRequest) (string
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 501 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
 			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
@@ -1157,7 +952,7 @@ func (r ApiGetNodeReachabilityRequest) Execute() (*Reachability, *http.Response,
 /*
 GetNodeReachability Read the reachability projection for a Node.
 
-Returns the latest `Reachability` projection for the addressed Node — the per-Node state-machine the heartbeat handler advances on every accepted heartbeat. The projection is the authoritative health view the operator UI and reconciliation surface consume; it transitions `healthy` → `stale` after 90s without a heartbeat and `stale` → `unreachable` after 300s, with `changed_at` tracking the most recent transition.  The endpoint reuses the `node-agent` ReBAC relation already guarding `GET /v1/nodes/{id}/state` and `GET /v1/nodes/{id}/events`, so any caller authorised to issue a reconciliation pull is also authorised to read the reachability projection. Unauthenticated callers receive 401; authenticated callers without the relation receive 403; an unknown Node id surfaces as 404 only after the authorisation gate passes so the endpoint cannot be used as a Node-id oracle .  DEFERRED-WIRING POSTURE: until the production composition root supplies the ReachabilityRepo, RelationChecker, and NodeRepo ports the handler depends on, every request to this endpoint returns 501 with `code: reachability_not_provisioned` so log scrapers can alert on the deferred-wiring state. See docs/architecture/mesh-event-bus-roadmap.md for the deferred work tracking.
+Returns the latest `Reachability` projection for the addressed Node — the per-Node state-machine the heartbeat handler advances on every accepted heartbeat. The projection is the authoritative health view the operator UI and reconciliation surface consume; it transitions `healthy` → `stale` after 90s without a heartbeat and `stale` → `unreachable` after 300s, with `changed_at` tracking the most recent transition.  The endpoint reuses the `node-agent` ReBAC relation already guarding `GET /v1/nodes/{id}/state` and `GET /v1/nodes/{id}/events`, so any caller authorised to issue a reconciliation pull is also authorised to read the reachability projection. Unauthenticated callers receive 401; authenticated callers without the relation receive 403; an unknown Node id surfaces as 404 only after the authorisation gate passes so the endpoint cannot be used as a Node-id oracle.  DEFERRED-WIRING POSTURE: until the production composition root supplies the ReachabilityRepo, RelationChecker, and NodeRepo ports the handler depends on, every request to this endpoint returns 501 with `code: reachability_not_provisioned` so log scrapers can alert on the deferred-wiring state. See docs/architecture/mesh-event-bus-roadmap.md for the deferred work tracking.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Node identifier (UUIDv7) — the reachability scope.
@@ -1275,6 +1070,211 @@ func (a *MeshAPIService) GetNodeReachabilityExecute(r ApiGetNodeReachabilityRequ
 			}
 			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
 			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiGetNodeSecretRequest struct {
+	ctx        context.Context
+	ApiService MeshAPI
+	id         string
+	name       string
+	version    *int32
+}
+
+// Optional OpenBao KV v2 version to fetch. When omitted the current version is served. The version actually served is always reported in the &#x60;X-Plexsphere-Secret-Version&#x60; response header.
+func (r ApiGetNodeSecretRequest) Version(version int32) ApiGetNodeSecretRequest {
+	r.version = &version
+	return r
+}
+
+func (r ApiGetNodeSecretRequest) Execute() (*os.File, *http.Response, error) {
+	return r.ApiService.GetNodeSecretExecute(r)
+}
+
+/*
+GetNodeSecret Fetch a Secret Store entry rewrapped under the calling Node's NSK.
+
+Returns the named Secret Store entry for the addressed Node as an AES-256-GCM ciphertext envelope rewrapped under the calling Node's Node Secret Key (NSK). The Secret Store is the platform's only meet-and-rewrap point between the OpenBao backend and the per-Node NSK: the handler reads the OpenBao plaintext, recovers the NSK, and rewraps the payload in-process so that ONLY NSK-wrapped ciphertext ever crosses the wire. The transient OpenBao plaintext and the recovered NSK are zeroed on every exit path; no plaintext is ever persisted, logged, cached, or placed on the event bus.  The 200 body is the raw envelope `<12-byte nonce> || <ciphertext + 16-byte GCM tag>`, served as `application/octet-stream`. The caller recovers the seeded plaintext byte-for-byte with `AES-256-GCM-Open` under its NSK. The response carries the served version in `X-Plexsphere-Secret-Version`, the NSK key id used for the wrap in `X-Plexsphere-Secret-KID` (so plexd can pick the right NSK during a rotation overlap), and `Cache-Control: no-store` so no intermediary ever retains the ciphertext.  The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      refusing missing or revoked credentials with 401. Only a      Node proving possession of its NSK can reach the rewrap      pipeline.   2. Applies the per-Node and per-Domain rate limits, resolves      the addressed secret metadata, and runs the ReBAC hard      gate — the caller must hold the `read` relation on the      resolved `secret:<id>`.      An authenticated caller without the relation receives 403      `PermissionDenied`; the denial is recorded with      `insufficient_relation`.   3. Reads the entry from the OpenBao backend — the current      version when `version` is omitted, or the requested version      when present — reconciling the served version against the      metadata; the OpenBao-returned version wins for the header.   4. Rewraps the payload under the recovered NSK with a fresh      12-byte nonce and emits exactly one granted audit row. A      backend read that fails AFTER a granted authorization still      records the granted audit row — operational outcomes are      carried on the fetch-duration metric, never on the audit      chain.  The response body is capped at 1 MiB of ciphertext.  DEFERRED-WIRING POSTURE: when the Secret Store backend is not configured (empty backend DSN) the production composition root leaves this surface disabled and every request returns 501 with `code: secrets_not_provisioned` so log scrapers can alert on the deferred-wiring state.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id Node identifier (UUIDv7) — the secret-fetch scope.
+	@param name Secret name within the owning Project. Lower-case, starts with a letter, and is limited to letters, digits, hyphen, and underscore (1 to 63 characters).
+	@return ApiGetNodeSecretRequest
+*/
+func (a *MeshAPIService) GetNodeSecret(ctx context.Context, id string, name string) ApiGetNodeSecretRequest {
+	return ApiGetNodeSecretRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+		name:       name,
+	}
+}
+
+// Execute executes the request
+//
+//	@return *os.File
+func (a *MeshAPIService) GetNodeSecretExecute(r ApiGetNodeSecretRequest) (*os.File, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *os.File
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "MeshAPIService.GetNodeSecret")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/nodes/{id}/secrets/{name}"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"name"+"}", url.PathEscape(parameterValueToString(r.name, "name")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.version != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "version", r.version, "form", "")
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/octet-stream", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 429 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 503 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 501 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -1304,7 +1304,7 @@ func (r ApiGetNodeStateRequest) Execute() (*NodeStateSnapshot, *http.Response, e
 /*
 GetNodeState Reconciliation pull for a Node — return the canonical NodeStateSnapshot.
 
-Returns the canonical `NodeStateSnapshot` for the addressed Node. The snapshot is the authoritative cold-start view that plexd consumes when it first comes up, when its SSE connection has been disconnected for longer than the replay window, or when an out-of-band request arrives to re-derive the desired state. The four wire blocks — `peers`, `policy`, `bridge`, and `state`/`reports` — are always present so plexd's reconcile loop can diff by field presence rather than absence; later stories populate the currently-empty blocks without changing the wire shape .  The peer projection is a single SQL round-trip ordered by `node_id ASC` so two consecutive pulls against the same ledger snapshot are byte-equal — plexd's reconcile loop reduces redundant rewrites by hashing the response.  The endpoint reuses the `node-agent` ReBAC relation already guarding `GET /v1/nodes/{id}/events`, so any caller authorised to subscribe to a Node's SSE event stream is also authorised to issue a reconciliation pull. Unauthenticated callers receive 401; authenticated callers without the relation receive 403; an unknown Node id surfaces as 404 only after the authorisation gate passes so the endpoint cannot be used as a Node-id oracle.  DEFERRED-WIRING POSTURE: until the production composition root supplies the `SnapshotProvider`, `RelationChecker`, and `NodeRepo` ports the handler depends on, every request to this endpoint returns 501 with `code: signed_event_bus_not_provisioned` so log scrapers can alert on the deferred-wiring state. See docs/architecture/mesh-event-bus-roadmap.md for the deferred work tracking.
+Returns the canonical `NodeStateSnapshot` for the addressed Node. The snapshot is the authoritative cold-start view that plexd consumes when it first comes up, when its SSE connection has been disconnected for longer than the replay window, or when an out-of-band request arrives to re-derive the desired state. The wire blocks — `peers`, `policy`, `bridge`, `state`, and `reports` — are always present so plexd's reconcile loop can diff by field presence rather than absence; later stories populate the currently-empty blocks without changing the wire shape.  The peer projection is a single SQL round-trip ordered by `node_id ASC` so two consecutive pulls against the same ledger snapshot are byte-equal — plexd's reconcile loop reduces redundant rewrites by hashing the response.  The endpoint reuses the `node-agent` ReBAC relation already guarding `GET /v1/nodes/{id}/events`, so any caller authorised to subscribe to a Node's SSE event stream is also authorised to issue a reconciliation pull. Unauthenticated callers receive 401; authenticated callers without the relation receive 403; an unknown Node id surfaces as 404 only after the authorisation gate passes so the endpoint cannot be used as a Node-id oracle.  DEFERRED-WIRING POSTURE: until the production composition root supplies the `SnapshotProvider`, `RelationChecker`, and `NodeRepo` ports the handler depends on, every request to this endpoint returns 501 with `code: signed_event_bus_not_provisioned` so log scrapers can alert on the deferred-wiring state. See docs/architecture/mesh-event-bus-roadmap.md for the deferred work tracking.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Node identifier (UUIDv7) — the snapshot scope.
@@ -1425,6 +1425,17 @@ func (a *MeshAPIService) GetNodeStateExecute(r ApiGetNodeStateRequest) (*NodeSta
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 501 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
 			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
@@ -1662,15 +1673,8 @@ type ApiPostNodeAuditRequest struct {
 	ctx               context.Context
 	ApiService        MeshAPI
 	id                string
-	authorization     *string
 	auditEvent        *[]AuditEvent
 	xPlexsphereSentAt *time.Time
-}
-
-// &#x60;Bearer &lt;NSK plaintext&gt;&#x60; — the per-Node Node Secret Key issued at registration time. The NSK is bound to the Node addressed by the path &#x60;id&#x60;; a credential belonging to a different Node surfaces as 403 &#x60;node_id_mismatch&#x60;.
-func (r ApiPostNodeAuditRequest) Authorization(authorization string) ApiPostNodeAuditRequest {
-	r.authorization = &authorization
-	return r
 }
 
 func (r ApiPostNodeAuditRequest) AuditEvent(auditEvent []AuditEvent) ApiPostNodeAuditRequest {
@@ -1727,9 +1731,6 @@ func (a *MeshAPIService) PostNodeAuditExecute(r ApiPostNodeAuditRequest) (*Inges
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-	if r.authorization == nil {
-		return localVarReturnValue, nil, reportError("authorization is required and must be specified")
-	}
 	if r.auditEvent == nil {
 		return localVarReturnValue, nil, reportError("auditEvent is required and must be specified")
 	}
@@ -1751,7 +1752,6 @@ func (a *MeshAPIService) PostNodeAuditExecute(r ApiPostNodeAuditRequest) (*Inges
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
 	if r.xPlexsphereSentAt != nil {
 		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Plexsphere-Sent-At", r.xPlexsphereSentAt, "simple", "")
 	}
@@ -1865,6 +1865,17 @@ func (a *MeshAPIService) PostNodeAuditExecute(r ApiPostNodeAuditRequest) (*Inges
 			}
 			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
 			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -1885,14 +1896,7 @@ type ApiPostNodeHeartbeatRequest struct {
 	ctx              context.Context
 	ApiService       MeshAPI
 	id               string
-	authorization    *string
 	heartbeatRequest *HeartbeatRequest
-}
-
-// &#x60;Bearer &lt;NSK plaintext&gt;&#x60; — the per-Node Node Secret Key issued at registration time. The NSK is bound to the Node addressed by the path &#x60;id&#x60;; a credential belonging to a different Node surfaces as 403 &#x60;node_id_mismatch&#x60; .
-func (r ApiPostNodeHeartbeatRequest) Authorization(authorization string) ApiPostNodeHeartbeatRequest {
-	r.authorization = &authorization
-	return r
 }
 
 func (r ApiPostNodeHeartbeatRequest) HeartbeatRequest(heartbeatRequest HeartbeatRequest) ApiPostNodeHeartbeatRequest {
@@ -1907,7 +1911,7 @@ func (r ApiPostNodeHeartbeatRequest) Execute() (*HeartbeatResponse, *http.Respon
 /*
 PostNodeHeartbeat Record a Node liveness heartbeat and return reconcile/rotate hints.
 
-Accepts a per-Node liveness heartbeat from plexd and updates the reachability projection that drives the mesh-wide health view . The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      rejecting revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `node_id_mismatch` so a leaked NSK cannot be replayed      against a sibling Node.   3. Validates the request body — `client_now` MUST be within      60s of server now (otherwise 400 `clock_skew`),      `binary_checksum` MUST be present and decode to a 32-byte      SHA-256 digest (otherwise 400 `binary_checksum_empty`)      .   4. Persists the heartbeat fact and updates the per-Node      reachability state-machine (`healthy` → `stale` after 90s,      `stale` → `unreachable` after 300s) so the projection at      `GET /v1/nodes/{id}/reachability` reflects the new fact      on the next read.  The 200 response carries `accepted_at` (server timestamp at commit) and two reconciliation flags. `reconcile` defaults to `false` and later stories flip it when the controller wants plexd to issue a fresh reconciliation pull. `rotate_keys` is load-bearing: it is set to `true` whenever a `peer_key_rotation` row is pending for the heartbeating Node, telling the caller to generate a fresh Curve25519 keypair and complete the rotation via `POST /v1/keys/rotate`.  DEFERRED-WIRING POSTURE: until the production composition root supplies the NSK validator, ReachabilityRepo, and clock-skew evaluator the handler depends on, every request to this endpoint returns 501 with `code: heartbeat_not_provisioned` so log scrapers can alert on the deferred-wiring state. See docs/architecture/mesh-event-bus-roadmap.md for the deferred work tracking.
+Accepts a per-Node liveness heartbeat from plexd and updates the reachability projection that drives the mesh-wide health view. The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      rejecting revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `node_id_mismatch` so a leaked NSK cannot be replayed      against a sibling Node.   3. Validates the request body — `client_now` MUST be within      60s of server now (otherwise 400 `clock_skew`),      `binary_checksum` MUST be present and decode to a 32-byte      SHA-256 digest (otherwise 400 `binary_checksum_empty`).   4. Persists the heartbeat fact and updates the per-Node      reachability state-machine (`healthy` → `stale` after 90s,      `stale` → `unreachable` after 300s) so the projection at      `GET /v1/nodes/{id}/reachability` reflects the new fact      on the next read.  The 200 response carries `accepted_at` (server timestamp at commit) and two reconciliation flags. `reconcile` defaults to `false` and later stories flip it when the controller wants plexd to issue a fresh reconciliation pull. `rotate_keys` is load-bearing: it is set to `true` whenever a `peer_key_rotation` row is pending for the heartbeating Node, telling the caller to generate a fresh Curve25519 keypair and complete the rotation via `POST /v1/keys/rotate`.  DEFERRED-WIRING POSTURE: until the production composition root supplies the NSK validator, ReachabilityRepo, and clock-skew evaluator the handler depends on, every request to this endpoint returns 501 with `code: heartbeat_not_provisioned` so log scrapers can alert on the deferred-wiring state. See docs/architecture/mesh-event-bus-roadmap.md for the deferred work tracking.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Node identifier (UUIDv7) — the heartbeat scope.
@@ -1943,9 +1947,6 @@ func (a *MeshAPIService) PostNodeHeartbeatExecute(r ApiPostNodeHeartbeatRequest)
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-	if r.authorization == nil {
-		return localVarReturnValue, nil, reportError("authorization is required and must be specified")
-	}
 	if r.heartbeatRequest == nil {
 		return localVarReturnValue, nil, reportError("heartbeatRequest is required and must be specified")
 	}
@@ -1967,7 +1968,6 @@ func (a *MeshAPIService) PostNodeHeartbeatExecute(r ApiPostNodeHeartbeatRequest)
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
 	// body params
 	localVarPostBody = r.heartbeatRequest
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
@@ -2034,6 +2034,17 @@ func (a *MeshAPIService) PostNodeHeartbeatExecute(r ApiPostNodeHeartbeatRequest)
 			}
 			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
 			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -2054,14 +2065,7 @@ type ApiPostNodeIntegrityViolationsRequest struct {
 	ctx                        context.Context
 	ApiService                 MeshAPI
 	id                         string
-	authorization              *string
 	integrityViolationsRequest *IntegrityViolationsRequest
-}
-
-// &#x60;Bearer &lt;NSK plaintext&gt;&#x60; — the per-Node Node Secret Key issued at registration time. The NSK is bound to the Node addressed by the path &#x60;id&#x60;; a credential belonging to a different Node surfaces as 403 &#x60;node_id_mismatch&#x60;.
-func (r ApiPostNodeIntegrityViolationsRequest) Authorization(authorization string) ApiPostNodeIntegrityViolationsRequest {
-	r.authorization = &authorization
-	return r
 }
 
 func (r ApiPostNodeIntegrityViolationsRequest) IntegrityViolationsRequest(integrityViolationsRequest IntegrityViolationsRequest) ApiPostNodeIntegrityViolationsRequest {
@@ -2076,7 +2080,7 @@ func (r ApiPostNodeIntegrityViolationsRequest) Execute() (*IntegrityViolationsRe
 /*
 PostNodeIntegrityViolations Ingest a batch of integrity-violation reports for a Node.
 
-Accepts a batch of `IntegrityViolation` reports from plexd describing tamper-evidence divergences the agent detected on the local Node: a mismatched binary checksum, a tampered Lua hook checksum, or a rotated SSH host-key fingerprint. The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      refusing missing or revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `node_id_mismatch` so a leaked NSK cannot be replayed      against a sibling Node.   3. Caps the request body at 32 KiB; oversize bodies receive      413 `integrity_violations_body_too_large` without ever      touching the JSON decoder.   4. Decodes the body with `DisallowUnknownFields`; a malformed      envelope or an unknown field surfaces as 400      `malformed_integrity_violations_request`.   5. Canonicalises every entry through the      `tenancy.NewIntegrityViolation` value-object constructor      which enforces every per-violation invariant: `kind` in      the closed set `{binary_checksum, hook_checksum,      ssh_host_key}`, `detected_by` in the closed set      `{startup_scan, inotify, pre_dispatch}`, `artifact_id`      non-empty after trimming, `observed_checksum`/      `expected_checksum` exactly 32 bytes for the checksum      kinds, `observed_fingerprint`/`expected_fingerprint`      matching `SHA256:<base64>` for the `ssh_host_key` kind,      and the per-kind column-mismatch guard that rejects a      checksum kind carrying fingerprint fields and vice versa.   6. Hands the canonical batch to the Node aggregate's      `RecordIntegrityViolations` method which enforces the      batch-level invariants: at least one entry      (`integrity_violations_empty`) and at most 128 entries      (`integrity_violations_too_many`).   7. Persists every violation row and appends a single      `integrity_alert` outbox event inside one transaction so      the operator signal and the audit evidence land together      or neither lands.  The 202 response carries `accepted_at` (server commit timestamp) and `violation_count` (echo of the persisted batch size) so the agent can record the receipt and reconcile with its local replay-queue. The response carries no payload echo and no per-row identifiers; the operator UI consumes the persisted rows from the dedicated audit and integrity surfaces.  DEFERRED-WIRING POSTURE: until the production composition root supplies the IntegrityViolationsRecorder, NSKResolver, and NodeRepo ports the handler depends on, every request to this endpoint returns 501 with `code: integrity_violations_not_provisioned` so log scrapers can alert on the deferred-wiring state.
+Accepts a batch of `IntegrityViolation` reports from plexd describing tamper-evidence divergences the agent detected on the local Node: a mismatched binary checksum, a tampered Lua hook checksum, or a rotated SSH host-key fingerprint. The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      refusing missing or revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `node_id_mismatch` so a leaked NSK cannot be replayed      against a sibling Node.   3. Caps the request body at 32 KiB; oversize bodies receive      413 `integrity_violations_body_too_large` without ever      touching the JSON decoder.   4. Decodes the body with `DisallowUnknownFields`; a malformed      envelope or an unknown field surfaces as 400      `malformed_integrity_violations_request`.   5. Canonicalises every entry through the      `tenancy.NewIntegrityViolation` value-object constructor      which enforces every per-violation invariant: `kind` in      the closed set `{binary_checksum, hook_checksum,      ssh_host_key}`, `detected_by` in the closed set      `{startup_scan, inotify, pre_dispatch}`, `artifact_id`      non-empty after trimming, `observed_checksum`/      `expected_checksum` exactly 32 bytes for the checksum      kinds, `observed_fingerprint`/`expected_fingerprint`      matching `SHA256:<base64>` for the `ssh_host_key` kind,      and the per-kind column-mismatch guard that rejects a      checksum kind carrying fingerprint fields and vice versa.   6. Hands the canonical batch to the Node aggregate's      `RecordIntegrityViolations` method which enforces the      batch-level invariants: at least one entry      (`integrity_violations_empty`) and at most 128 entries      (`integrity_violations_too_many`).   7. Persists every violation row and appends a single      `integrity_alert` outbox event inside one transaction so      the operator signal and the audit evidence land together      or neither lands.  The 200 response carries `accepted_at` (server commit timestamp) and `violation_count` (echo of the persisted batch size) so the agent can record the receipt and reconcile with its local replay-queue. The response carries no payload echo and no per-row identifiers; the operator UI consumes the persisted rows from the dedicated audit and integrity surfaces.  DEFERRED-WIRING POSTURE: until the production composition root supplies the IntegrityViolationsRecorder, NSKResolver, and NodeRepo ports the handler depends on, every request to this endpoint returns 501 with `code: integrity_violations_not_provisioned` so log scrapers can alert on the deferred-wiring state.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Node identifier (UUIDv7) — the reporting Node.
@@ -2112,9 +2116,6 @@ func (a *MeshAPIService) PostNodeIntegrityViolationsExecute(r ApiPostNodeIntegri
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-	if r.authorization == nil {
-		return localVarReturnValue, nil, reportError("authorization is required and must be specified")
-	}
 	if r.integrityViolationsRequest == nil {
 		return localVarReturnValue, nil, reportError("integrityViolationsRequest is required and must be specified")
 	}
@@ -2136,7 +2137,6 @@ func (a *MeshAPIService) PostNodeIntegrityViolationsExecute(r ApiPostNodeIntegri
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
 	// body params
 	localVarPostBody = r.integrityViolationsRequest
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
@@ -2414,15 +2414,8 @@ type ApiPostNodeLogsRequest struct {
 	ctx               context.Context
 	ApiService        MeshAPI
 	id                string
-	authorization     *string
 	logLine           *[]LogLine
 	xPlexsphereSentAt *time.Time
-}
-
-// &#x60;Bearer &lt;NSK plaintext&gt;&#x60; — the per-Node Node Secret Key issued at registration time. The NSK is bound to the Node addressed by the path &#x60;id&#x60;; a credential belonging to a different Node surfaces as 403 &#x60;node_id_mismatch&#x60;.
-func (r ApiPostNodeLogsRequest) Authorization(authorization string) ApiPostNodeLogsRequest {
-	r.authorization = &authorization
-	return r
 }
 
 func (r ApiPostNodeLogsRequest) LogLine(logLine []LogLine) ApiPostNodeLogsRequest {
@@ -2479,9 +2472,6 @@ func (a *MeshAPIService) PostNodeLogsExecute(r ApiPostNodeLogsRequest) (*IngestR
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-	if r.authorization == nil {
-		return localVarReturnValue, nil, reportError("authorization is required and must be specified")
-	}
 	if r.logLine == nil {
 		return localVarReturnValue, nil, reportError("logLine is required and must be specified")
 	}
@@ -2503,7 +2493,6 @@ func (a *MeshAPIService) PostNodeLogsExecute(r ApiPostNodeLogsRequest) (*IngestR
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
 	if r.xPlexsphereSentAt != nil {
 		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Plexsphere-Sent-At", r.xPlexsphereSentAt, "simple", "")
 	}
@@ -2617,6 +2606,17 @@ func (a *MeshAPIService) PostNodeLogsExecute(r ApiPostNodeLogsRequest) (*IngestR
 			}
 			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
 			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -2637,15 +2637,8 @@ type ApiPostNodeMetricsRequest struct {
 	ctx               context.Context
 	ApiService        MeshAPI
 	id                string
-	authorization     *string
 	metricSample      *[]MetricSample
 	xPlexsphereSentAt *time.Time
-}
-
-// &#x60;Bearer &lt;NSK plaintext&gt;&#x60; — the per-Node Node Secret Key issued at registration time. The NSK is bound to the Node addressed by the path &#x60;id&#x60;; a credential belonging to a different Node surfaces as 403 &#x60;node_id_mismatch&#x60;.
-func (r ApiPostNodeMetricsRequest) Authorization(authorization string) ApiPostNodeMetricsRequest {
-	r.authorization = &authorization
-	return r
 }
 
 func (r ApiPostNodeMetricsRequest) MetricSample(metricSample []MetricSample) ApiPostNodeMetricsRequest {
@@ -2702,9 +2695,6 @@ func (a *MeshAPIService) PostNodeMetricsExecute(r ApiPostNodeMetricsRequest) (*I
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-	if r.authorization == nil {
-		return localVarReturnValue, nil, reportError("authorization is required and must be specified")
-	}
 	if r.metricSample == nil {
 		return localVarReturnValue, nil, reportError("metricSample is required and must be specified")
 	}
@@ -2726,7 +2716,6 @@ func (a *MeshAPIService) PostNodeMetricsExecute(r ApiPostNodeMetricsRequest) (*I
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
 	if r.xPlexsphereSentAt != nil {
 		parameterAddToHeaderOrQuery(localVarHeaderParams, "X-Plexsphere-Sent-At", r.xPlexsphereSentAt, "simple", "")
 	}
@@ -2840,6 +2829,17 @@ func (a *MeshAPIService) PostNodeMetricsExecute(r ApiPostNodeMetricsRequest) (*I
 			}
 			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
 			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -2860,14 +2860,7 @@ type ApiPutNodeCapabilitiesRequest struct {
 	ctx                       context.Context
 	ApiService                MeshAPI
 	id                        string
-	authorization             *string
 	capabilityManifestRequest *CapabilityManifestRequest
-}
-
-// &#x60;Bearer &lt;NSK plaintext&gt;&#x60; — the per-Node Node Secret Key issued at registration time. The NSK is bound to the Node addressed by the path &#x60;id&#x60;; a credential belonging to a different Node surfaces as 403 &#x60;node_id_mismatch&#x60;.
-func (r ApiPutNodeCapabilitiesRequest) Authorization(authorization string) ApiPutNodeCapabilitiesRequest {
-	r.authorization = &authorization
-	return r
 }
 
 func (r ApiPutNodeCapabilitiesRequest) CapabilityManifestRequest(capabilityManifestRequest CapabilityManifestRequest) ApiPutNodeCapabilitiesRequest {
@@ -2918,9 +2911,6 @@ func (a *MeshAPIService) PutNodeCapabilitiesExecute(r ApiPutNodeCapabilitiesRequ
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-	if r.authorization == nil {
-		return localVarReturnValue, nil, reportError("authorization is required and must be specified")
-	}
 	if r.capabilityManifestRequest == nil {
 		return localVarReturnValue, nil, reportError("capabilityManifestRequest is required and must be specified")
 	}
@@ -2942,7 +2932,6 @@ func (a *MeshAPIService) PutNodeCapabilitiesExecute(r ApiPutNodeCapabilitiesRequ
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
 	// body params
 	localVarPostBody = r.capabilityManifestRequest
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
@@ -3042,6 +3031,17 @@ func (a *MeshAPIService) PutNodeCapabilitiesExecute(r ApiPutNodeCapabilitiesRequ
 			}
 			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
 			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -3062,14 +3062,7 @@ type ApiPutNodeEndpointRequest struct {
 	ctx             context.Context
 	ApiService      MeshAPI
 	id              string
-	authorization   *string
 	endpointRequest *EndpointRequest
-}
-
-// &#x60;Bearer &lt;NSK plaintext&gt;&#x60; — the per-Node Node Secret Key issued at registration time. The NSK is bound to the Node addressed by the path &#x60;id&#x60;; a credential belonging to a different Node surfaces as 403 &#x60;node_id_mismatch&#x60;.
-func (r ApiPutNodeEndpointRequest) Authorization(authorization string) ApiPutNodeEndpointRequest {
-	r.authorization = &authorization
-	return r
 }
 
 func (r ApiPutNodeEndpointRequest) EndpointRequest(endpointRequest EndpointRequest) ApiPutNodeEndpointRequest {
@@ -3084,7 +3077,7 @@ func (r ApiPutNodeEndpointRequest) Execute() (*EndpointResponse, *http.Response,
 /*
 PutNodeEndpoint Record a NAT-observed Peer endpoint observation.
 
-Accepts a per-Node NAT endpoint observation from plexd and stamps it onto the Peer aggregate that backs the addressed Node. The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      refusing missing or revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `node_id_mismatch` so a leaked NSK cannot be replayed      against a sibling Node.   3. Caps the request body at 4 KiB; oversize bodies receive      413 `endpoint_body_too_large` without ever touching the      JSON decoder.   4. Validates the body — `reported_at` MUST be within 60s of      server now (otherwise 400 `endpoint_clock_skew`),      `endpoint` MUST parse as a `host:port` tuple in the      RFC 6056 1..65535 port range and a non-loopback IPv4/IPv6      address (otherwise 400 `endpoint_unparseable`), and the      envelope MUST decode without unknown fields (otherwise      400 `malformed_endpoint_request`).   5. Persists the observation through the per-Domain Peer      aggregate writer, which emits a `peer_endpoint_changed`      outbox event when the (endpoint, port) tuple differs from      the prior observation or transitions out of the stale      window; identical refreshes simply refresh the freshness      timestamp without emitting a wake-up.  The 200 response carries `accepted_at` (server commit timestamp) and `stale_after` (`accepted_at` plus the per-Domain endpoint TTL); plexd uses `stale_after` to schedule the next observation before the sweeper would tombstone the endpoint.  DEFERRED-WIRING POSTURE: until the production composition root supplies the EndpointRecorder, NSKResolver, NodeRepo, and PeerLookup ports the handler depends on, every request to this endpoint returns 501 with `code: endpoint_not_provisioned` so log scrapers can alert on the deferred-wiring state.
+Accepts a per-Node NAT endpoint observation from plexd and stamps it onto the Peer aggregate that backs the addressed Node. The handler:    1. Authenticates the caller against the Node Secret Key (NSK)      plaintext supplied in the `Authorization: Bearer` header,      refusing missing or revoked credentials with 401.   2. Asserts that the NSK belongs to the Node addressed by the      path `id`, refusing cross-Node use with 403      `node_id_mismatch` so a leaked NSK cannot be replayed      against a sibling Node.   3. Caps the request body at 4 KiB; oversize bodies receive      413 `endpoint_body_too_large` without ever touching the      JSON decoder.   4. Validates the body — `reported_at` MUST be within 60s of      server now (otherwise 400 `endpoint_clock_skew`),      `endpoint` MUST parse as a `host:port` tuple in the      1..65535 port range and a non-loopback IPv4/IPv6      address (otherwise 400 `endpoint_unparseable`), and the      envelope MUST decode without unknown fields (otherwise      400 `malformed_endpoint_request`).   5. Persists the observation through the per-Domain Peer      aggregate writer, which emits a `peer_endpoint_changed`      outbox event when the (endpoint, port) tuple differs from      the prior observation or transitions out of the stale      window; identical refreshes simply refresh the freshness      timestamp without emitting a wake-up.  The 200 response carries `accepted_at` (server commit timestamp) and `stale_after` (`accepted_at` plus the per-Domain endpoint TTL); plexd uses `stale_after` to schedule the next observation before the sweeper would tombstone the endpoint.  DEFERRED-WIRING POSTURE: until the production composition root supplies the EndpointRecorder, NSKResolver, NodeRepo, and PeerLookup ports the handler depends on, every request to this endpoint returns 501 with `code: endpoint_not_provisioned` so log scrapers can alert on the deferred-wiring state.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Node identifier (UUIDv7) — the endpoint scope.
@@ -3120,9 +3113,6 @@ func (a *MeshAPIService) PutNodeEndpointExecute(r ApiPutNodeEndpointRequest) (*E
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-	if r.authorization == nil {
-		return localVarReturnValue, nil, reportError("authorization is required and must be specified")
-	}
 	if r.endpointRequest == nil {
 		return localVarReturnValue, nil, reportError("endpointRequest is required and must be specified")
 	}
@@ -3144,7 +3134,6 @@ func (a *MeshAPIService) PutNodeEndpointExecute(r ApiPutNodeEndpointRequest) (*E
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
 	// body params
 	localVarPostBody = r.endpointRequest
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
@@ -3244,6 +3233,17 @@ func (a *MeshAPIService) PutNodeEndpointExecute(r ApiPutNodeEndpointRequest) (*E
 			}
 			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
 			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -3265,14 +3265,7 @@ type ApiPutNodeStateReportRequest struct {
 	ApiService             MeshAPI
 	id                     string
 	key                    string
-	authorization          *string
 	nodeStateReportRequest *NodeStateReportRequest
-}
-
-// &#x60;Bearer &lt;NSK plaintext&gt;&#x60; — the per-Node Node Secret Key issued at registration time. Only a Node proving possession of its NSK may write a report; a missing, malformed, or revoked credential surfaces as 401.
-func (r ApiPutNodeStateReportRequest) Authorization(authorization string) ApiPutNodeStateReportRequest {
-	r.authorization = &authorization
-	return r
 }
 
 func (r ApiPutNodeStateReportRequest) NodeStateReportRequest(nodeStateReportRequest NodeStateReportRequest) ApiPutNodeStateReportRequest {
@@ -3326,9 +3319,6 @@ func (a *MeshAPIService) PutNodeStateReportExecute(r ApiPutNodeStateReportReques
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-	if r.authorization == nil {
-		return localVarReturnValue, nil, reportError("authorization is required and must be specified")
-	}
 	if r.nodeStateReportRequest == nil {
 		return localVarReturnValue, nil, reportError("nodeStateReportRequest is required and must be specified")
 	}
@@ -3350,7 +3340,6 @@ func (a *MeshAPIService) PutNodeStateReportExecute(r ApiPutNodeStateReportReques
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	parameterAddToHeaderOrQuery(localVarHeaderParams, "Authorization", r.authorization, "simple", "")
 	// body params
 	localVarPostBody = r.nodeStateReportRequest
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
@@ -3409,6 +3398,17 @@ func (a *MeshAPIService) PutNodeStateReportExecute(r ApiPutNodeStateReportReques
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
 			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {

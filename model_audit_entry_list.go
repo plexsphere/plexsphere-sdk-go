@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -18,11 +18,11 @@ import (
 // checks if the AuditEntryList type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &AuditEntryList{}
 
-// AuditEntryList Cursor-paginated page returned by `ListAuditEntries`. The `next_cursor` field is the value to pass back as the `cursor` query parameter on the next call; it is `null` (or absent) when the page is short — that is the end-of-stream signal callers stop on.
+// AuditEntryList Cursor-paginated page returned by `ListAuditEntries`. The `next_cursor` field is the value to pass back as the `cursor` query parameter on the next call; it is absent when the page is short — that is the end-of-stream signal callers stop on.
 type AuditEntryList struct {
 	// Audit rows in ascending `seq` order.
-	Entries []AuditEntry `json:"entries"`
-	// Opaque, HMAC-signed cursor scoped to the addressed Domain. Replaying a cursor minted for a different Domain surfaces as 400 with `code: cursor_invalid`.
+	Items []AuditEntry `json:"items"`
+	// Opaque, HMAC-signed cursor scoped to the addressed chain. Replaying a cursor minted for a different chain surfaces as 400 with `code: invalid_cursor`.
 	NextCursor           *string `json:"next_cursor,omitempty"`
 	AdditionalProperties map[string]interface{}
 }
@@ -33,9 +33,9 @@ type _AuditEntryList AuditEntryList
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewAuditEntryList(entries []AuditEntry) *AuditEntryList {
+func NewAuditEntryList(items []AuditEntry) *AuditEntryList {
 	this := AuditEntryList{}
-	this.Entries = entries
+	this.Items = items
 	return &this
 }
 
@@ -47,28 +47,28 @@ func NewAuditEntryListWithDefaults() *AuditEntryList {
 	return &this
 }
 
-// GetEntries returns the Entries field value
-func (o *AuditEntryList) GetEntries() []AuditEntry {
+// GetItems returns the Items field value
+func (o *AuditEntryList) GetItems() []AuditEntry {
 	if o == nil {
 		var ret []AuditEntry
 		return ret
 	}
 
-	return o.Entries
+	return o.Items
 }
 
-// GetEntriesOk returns a tuple with the Entries field value
+// GetItemsOk returns a tuple with the Items field value
 // and a boolean to check if the value has been set.
-func (o *AuditEntryList) GetEntriesOk() ([]AuditEntry, bool) {
+func (o *AuditEntryList) GetItemsOk() ([]AuditEntry, bool) {
 	if o == nil {
 		return nil, false
 	}
-	return o.Entries, true
+	return o.Items, true
 }
 
-// SetEntries sets field value
-func (o *AuditEntryList) SetEntries(v []AuditEntry) {
-	o.Entries = v
+// SetItems sets field value
+func (o *AuditEntryList) SetItems(v []AuditEntry) {
+	o.Items = v
 }
 
 // GetNextCursor returns the NextCursor field value if set, zero value otherwise.
@@ -113,7 +113,7 @@ func (o AuditEntryList) MarshalJSON() ([]byte, error) {
 
 func (o AuditEntryList) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	toSerialize["entries"] = o.Entries
+	toSerialize["items"] = o.Items
 	if !IsNil(o.NextCursor) {
 		toSerialize["next_cursor"] = o.NextCursor
 	}
@@ -130,7 +130,7 @@ func (o *AuditEntryList) UnmarshalJSON(data []byte) (err error) {
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
-		"entries",
+		"items",
 	}
 
 	allProperties := make(map[string]interface{})
@@ -160,7 +160,7 @@ func (o *AuditEntryList) UnmarshalJSON(data []byte) (err error) {
 	additionalProperties := make(map[string]interface{})
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
-		delete(additionalProperties, "entries")
+		delete(additionalProperties, "items")
 		delete(additionalProperties, "next_cursor")
 		o.AdditionalProperties = additionalProperties
 	}

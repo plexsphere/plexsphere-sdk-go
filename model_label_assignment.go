@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -19,10 +19,10 @@ import (
 // checks if the LabelAssignment type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &LabelAssignment{}
 
-// LabelAssignment Response shape echoing a persisted Label Assignment aggregate .
+// LabelAssignment Response shape echoing a persisted Label Assignment aggregate.
 type LabelAssignment struct {
-	// Parent Label Definition identifier (UUIDv7).
-	DefinitionId string `json:"definition_id"`
+	// Parent Label Definition identifier (UUIDv7). Absent for an orphaned Assignment whose parent Definition was deleted under the `on_delete=orphan` policy — the denormalised `qualified_key` still records what the label is.
+	DefinitionId *string `json:"definition_id,omitempty"`
 	// Fully-qualified Label key (denormalised).
 	QualifiedKey string `json:"qualified_key"`
 	// Lowercase object-kind discriminator.
@@ -43,9 +43,8 @@ type _LabelAssignment LabelAssignment
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewLabelAssignment(definitionId string, qualifiedKey string, objectKind string, objectId string, value interface{}, assignedBy string, assignedAt time.Time) *LabelAssignment {
+func NewLabelAssignment(qualifiedKey string, objectKind string, objectId string, value interface{}, assignedBy string, assignedAt time.Time) *LabelAssignment {
 	this := LabelAssignment{}
-	this.DefinitionId = definitionId
 	this.QualifiedKey = qualifiedKey
 	this.ObjectKind = objectKind
 	this.ObjectId = objectId
@@ -63,28 +62,36 @@ func NewLabelAssignmentWithDefaults() *LabelAssignment {
 	return &this
 }
 
-// GetDefinitionId returns the DefinitionId field value
+// GetDefinitionId returns the DefinitionId field value if set, zero value otherwise.
 func (o *LabelAssignment) GetDefinitionId() string {
-	if o == nil {
+	if o == nil || IsNil(o.DefinitionId) {
 		var ret string
 		return ret
 	}
-
-	return o.DefinitionId
+	return *o.DefinitionId
 }
 
-// GetDefinitionIdOk returns a tuple with the DefinitionId field value
+// GetDefinitionIdOk returns a tuple with the DefinitionId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
 func (o *LabelAssignment) GetDefinitionIdOk() (*string, bool) {
-	if o == nil {
+	if o == nil || IsNil(o.DefinitionId) {
 		return nil, false
 	}
-	return &o.DefinitionId, true
+	return o.DefinitionId, true
 }
 
-// SetDefinitionId sets field value
+// HasDefinitionId returns a boolean if a field has been set.
+func (o *LabelAssignment) HasDefinitionId() bool {
+	if o != nil && !IsNil(o.DefinitionId) {
+		return true
+	}
+
+	return false
+}
+
+// SetDefinitionId gets a reference to the given string and assigns it to the DefinitionId field.
 func (o *LabelAssignment) SetDefinitionId(v string) {
-	o.DefinitionId = v
+	o.DefinitionId = &v
 }
 
 // GetQualifiedKey returns the QualifiedKey field value
@@ -243,7 +250,9 @@ func (o LabelAssignment) MarshalJSON() ([]byte, error) {
 
 func (o LabelAssignment) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	toSerialize["definition_id"] = o.DefinitionId
+	if !IsNil(o.DefinitionId) {
+		toSerialize["definition_id"] = o.DefinitionId
+	}
 	toSerialize["qualified_key"] = o.QualifiedKey
 	toSerialize["object_kind"] = o.ObjectKind
 	toSerialize["object_id"] = o.ObjectId
@@ -265,7 +274,6 @@ func (o *LabelAssignment) UnmarshalJSON(data []byte) (err error) {
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
-		"definition_id",
 		"qualified_key",
 		"object_kind",
 		"object_id",

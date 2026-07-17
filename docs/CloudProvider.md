@@ -3,9 +3,9 @@
 ## Enum
 
 
-* `AWS` (value: `"aws"`)
+* `CloudProviderAws` (value: `"aws"`)
 
-* `AZURE` (value: `"azure"`)
+* `CloudProviderAzure` (value: `"azure"`)
 
 * `UNKNOWN_DEFAULT_OPEN_API` (value: `"unknown_default_open_api"`)
 

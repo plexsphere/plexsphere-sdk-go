@@ -9,9 +9,9 @@ Name | Type | Description | Notes
 **OciReference** | [**OciReference**](OciReference.md) |  | 
 **Verification** | [**VerificationPolicy**](VerificationPolicy.md) |  | 
 **Tracking** | [**TrackingPolicy**](TrackingPolicy.md) |  | 
-**CredentialRef** | Pointer to **string** | &#x60;namespace/name&#x60; reference to the registry-credential Secret, or &#x60;null&#x60; when the source needs none.  | [optional] 
-**DomainId** | Pointer to **string** | Owning Domain, or &#x60;null&#x60; for a catalog-global source.  | [optional] 
-**LastResolvedDigest** | Pointer to **string** | The bundle digest the source last resolved to, or &#x60;null&#x60; before the first resolution.  | [optional] 
+**CredentialRef** | Pointer to **string** | &#x60;namespace/name&#x60; reference to the registry-credential Secret; absent when the source needs none.  | [optional] 
+**DomainId** | Pointer to **string** | Owning Domain; absent for a catalog-global source.  | [optional] 
+**LastResolvedDigest** | Pointer to **string** | The bundle digest the source last resolved to; absent before the first resolution.  | [optional] 
 **Status** | [**CatalogSourceResponseStatus**](CatalogSourceResponseStatus.md) |  | 
 **CreatedAt** | **time.Time** | Catalog source creation timestamp (UTC). | 
 **UpdatedAt** | **time.Time** | Last-modified timestamp (UTC). | 

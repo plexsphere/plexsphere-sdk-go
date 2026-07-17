@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -19,7 +19,7 @@ import (
 // checks if the LabelDefinition type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &LabelDefinition{}
 
-// LabelDefinition Response shape echoing a persisted Label Definition aggregate .
+// LabelDefinition Response shape echoing a persisted Label Definition aggregate.
 type LabelDefinition struct {
 	// Label Definition identifier (UUIDv7).
 	Id    string               `json:"id"`
@@ -31,12 +31,12 @@ type LabelDefinition struct {
 	// Fully namespaced key (for example `platform/env`, `acme:checkout/owner`). Unique across the platform.
 	QualifiedKey string           `json:"qualified_key"`
 	ValueSchema  LabelValueSchema `json:"value_schema"`
-	// Lowercase object-kind whitelist (resource, node, project, domain, workload, network, …). Assignments whose `object.kind` is not in this set are rejected with `scope-mismatch`.
+	// Lowercase object-kind whitelist (resource, node, project, domain, workload, network, …). Assignments whose `object.kind` is not in this set are rejected with `scope_mismatch`.
 	ApplicableKinds []string                `json:"applicable_kinds"`
 	OnDelete        LabelDefinitionOnDelete `json:"on_delete"`
 	// Declared per-object cardinality cap for Assignments of this Definition. `1` means at most one Assignment per object; `0` means unlimited (bounded only by the global 64-per-object ceiling).
 	Cardinality int32 `json:"cardinality"`
-	// When `true`, the value schema is frozen and Assignments of this Definition may not have their value replaced .
+	// When `true`, the value schema is frozen and Assignments of this Definition may not have their value replaced.
 	Immutable bool `json:"immutable"`
 	// When `true`, matching cloud tags are synchronised onto cloud resources by the Provisioning Broker.
 	CloudTagPropagation bool `json:"cloud_tag_propagation"`

@@ -3,8 +3,6 @@
 ## Enum
 
 
-* `GRANTED` (value: `"granted"`)
-
 * `OUT_OF_SCOPE` (value: `"out_of_scope"`)
 
 * `INSUFFICIENT_RELATION` (value: `"insufficient_relation"`)

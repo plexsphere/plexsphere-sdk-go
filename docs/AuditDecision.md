@@ -5,7 +5,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Result** | [**AuditReason**](AuditReason.md) |  | 
-**CaveatContext** | **map[string][]string** | Map from caveat NAME to the array of caveat-parameter NAMES referenced by the check. Values are never present on the wire — is structural: the only string content here is identifiers. &#x60;internal/audit.Entry&#x60; and &#x60;internal/audit.AppendInput&#x60; enforce the same discipline structurally on the Go side.  | 
+**CaveatContext** | **map[string][]string** | Map from caveat NAME to the array of caveat-parameter NAMES referenced by the check. Values are never present on the wire — the constraint is structural: the only string content here is identifiers. &#x60;internal/audit.Entry&#x60; and &#x60;internal/audit.AppendInput&#x60; enforce the same discipline structurally on the Go side.  | 
 
 ## Methods
 

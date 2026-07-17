@@ -5,8 +5,9 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **PrincipalType** | [**WhoamiPrincipalType**](WhoamiPrincipalType.md) |  | 
+**PrincipalScope** | Pointer to [**WhoamiPrincipalScope**](WhoamiPrincipalScope.md) |  | [optional] 
 **Subject** | **string** | Principal identifier (UUIDv7 serialised as a string). | 
-**DomainId** | Pointer to **string** | Domain the principal belongs to. | [optional] 
+**DomainId** | Pointer to **string** | Domain the principal belongs to. Omitted for a platform-scoped principal, which belongs to no Domain.  | [optional] 
 **Email** | Pointer to **string** | Primary email of the principal as projected by the upstream IdP at sign-in. Omitted when the IdP did not supply an &#x60;email&#x60; claim or the principal is a ServiceIdentity. A browser client renders it as the human-readable identity label.  | [optional] 
 **Acr** | Pointer to **string** | Authentication Context Class Reference, if available. | [optional] 
 **Amr** | Pointer to **[]string** | Authentication Methods References (e.g. \&quot;pwd\&quot;, \&quot;mfa\&quot;). | [optional] 
@@ -49,6 +50,31 @@ and a boolean to check if the value has been set.
 
 SetPrincipalType sets PrincipalType field to given value.
 
+
+### GetPrincipalScope
+
+`func (o *Whoami) GetPrincipalScope() WhoamiPrincipalScope`
+
+GetPrincipalScope returns the PrincipalScope field if non-nil, zero value otherwise.
+
+### GetPrincipalScopeOk
+
+`func (o *Whoami) GetPrincipalScopeOk() (*WhoamiPrincipalScope, bool)`
+
+GetPrincipalScopeOk returns a tuple with the PrincipalScope field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetPrincipalScope
+
+`func (o *Whoami) SetPrincipalScope(v WhoamiPrincipalScope)`
+
+SetPrincipalScope sets PrincipalScope field to given value.
+
+### HasPrincipalScope
+
+`func (o *Whoami) HasPrincipalScope() bool`
+
+HasPrincipalScope returns a boolean if a field has been set.
 
 ### GetSubject
 

@@ -4,10 +4,10 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**Relay** | Pointer to [**NodeStateBridgeRelay**](NodeStateBridgeRelay.md) | Relay configuration the Node must program. &#x60;null&#x60; when no relay is configured on the owning bridge Resource.  | [optional] 
-**UserAccess** | Pointer to [**NodeStateBridgeUserAccess**](NodeStateBridgeUserAccess.md) | User-access providers the Node must program. &#x60;null&#x60; when the owning bridge Resource defines none.  | [optional] 
-**Ingress** | Pointer to [**NodeStateBridgeIngress**](NodeStateBridgeIngress.md) | Public-ingress rules the Node must program. &#x60;null&#x60; when the owning bridge Resource defines none.  | [optional] 
-**SiteToSite** | Pointer to [**NodeStateBridgeSiteToSite**](NodeStateBridgeSiteToSite.md) | Site-to-site tunnels the Node must program. &#x60;null&#x60; when the owning bridge Resource defines none.  | [optional] 
+**Relay** | Pointer to [**NodeStateBridgeRelay**](NodeStateBridgeRelay.md) | Relay configuration the Node must program. Absent when no relay is configured on the owning bridge Resource.  | [optional] 
+**UserAccess** | Pointer to [**NodeStateBridgeUserAccess**](NodeStateBridgeUserAccess.md) | User-access providers the Node must program. Absent when the owning bridge Resource defines none.  | [optional] 
+**Ingress** | Pointer to [**NodeStateBridgeIngress**](NodeStateBridgeIngress.md) | Public-ingress rules the Node must program. Absent when the owning bridge Resource defines none.  | [optional] 
+**SiteToSite** | Pointer to [**NodeStateBridgeSiteToSite**](NodeStateBridgeSiteToSite.md) | Site-to-site tunnels the Node must program. Absent when the owning bridge Resource defines none.  | [optional] 
 
 ## Methods
 

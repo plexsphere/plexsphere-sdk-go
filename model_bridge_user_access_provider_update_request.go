@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -23,12 +23,12 @@ type BridgeUserAccessProviderUpdateRequest struct {
 	Kind BridgeUserAccessProviderKind `json:"kind"`
 	// Name of the network interface the provider programs on the Node.
 	InterfaceName string `json:"interface_name"`
-	// UDP port the provider listens on. Outside `1..65535` the write is rejected with `400 relay_port_out_of_range`.
+	// UDP port the provider listens on. Outside `1..65535` the write is rejected with `400 port_out_of_range`.
 	ListenPort int32 `json:"listen_port"`
 	// Maximum number of peers the provider admits.
 	MaxPeers int32 `json:"max_peers"`
 	// Opaque reference to the provider's authentication material in the form `secret:<domain>/<project>/<name>(:<version>)?`. The platform stores the reference, never the material; a malformed reference surfaces as `400 secret_ref_malformed`.
-	AuthSecretRef string `json:"auth_secret_ref"`
+	AuthSecretRef string `json:"auth_secret_ref" validate:"regexp=^secret:[^\\/]+\\/[^\\/]+\\/[^:]+(:[^:]+)?$"`
 	// Free-form JSON routing-policy document, persisted as JSONB.
 	RoutingPolicy        map[string]interface{} `json:"routing_policy"`
 	AdditionalProperties map[string]interface{}

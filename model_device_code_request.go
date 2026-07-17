@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -12,19 +12,18 @@ package plexsphere
 
 import (
 	"encoding/json"
-	"fmt"
 )
 
 // checks if the DeviceCodeRequest type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &DeviceCodeRequest{}
 
-// DeviceCodeRequest Body for POST /v1/auth/device-code — initiates RFC 8628 device authorization against the resolved IdP binding. Only `domain_id` is required; the router resolves the binding from the Domain when `idp_binding_id` is omitted.
+// DeviceCodeRequest Body for POST /v1/auth/device-code — initiates RFC 8628 device authorization against the resolved IdP binding. For a tenant login `domain_id` selects the Domain and the router resolves the binding from it when `idp_binding_id` is omitted. Omitting `domain_id` starts a **platform-operator** device authorization when the named binding (via `idp_binding_id` or `idp_binding_alias`) is a platform-shared binding — mirroring the browser sign-in contract; any non-platform resolution without a `domain_id` is rejected 400.
 type DeviceCodeRequest struct {
-	// Domain the caller is authenticating against.
-	DomainId string `json:"domain_id"`
-	// Explicit IdP binding within the Domain. Optional: when omitted, the binding is resolved by alias, then the Domain's primary binding, then its single active binding. A Domain with two or more active bindings and no primary requires this field (or idp_binding_alias) to disambiguate.
+	// Domain the caller is authenticating against. Optional: omitting it together with a platform-shared binding named via `idp_binding_id` or `idp_binding_alias` starts a Domain-independent platform-operator device authorization. A per-Domain binding named without a `domain_id` is rejected 400 on this surface.
+	DomainId *string `json:"domain_id,omitempty"`
+	// Explicit IdP binding within the Domain. Optional: when omitted, the binding is resolved by alias, then the Domain's primary binding, then its single active binding. A Domain with two or more active bindings and no primary requires this field (or idp_binding_alias) to disambiguate. With no `domain_id`, must name a platform-shared binding to start a platform-operator device authorization.
 	IdpBindingId *string `json:"idp_binding_id,omitempty"`
-	// Human-friendly alias of an IdP binding within the Domain (e.g. `github`). Optional. Resolution precedence is explicit id, then alias, then the Domain's primary binding, then its single active binding. Mutually exclusive with idp_binding_id.
+	// Human-friendly alias of an IdP binding within the Domain (e.g. `github`). Optional. Resolution precedence is explicit id, then alias, then the Domain's primary binding, then its single active binding. Mutually exclusive with idp_binding_id. With no `domain_id`, must name a platform-shared binding's alias (globally unique among active platform bindings) to start a platform-operator device authorization.
 	IdpBindingAlias *string `json:"idp_binding_alias,omitempty"`
 	// Optional OIDC client identifier override.
 	ClientId             *string `json:"client_id,omitempty"`
@@ -37,9 +36,8 @@ type _DeviceCodeRequest DeviceCodeRequest
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewDeviceCodeRequest(domainId string) *DeviceCodeRequest {
+func NewDeviceCodeRequest() *DeviceCodeRequest {
 	this := DeviceCodeRequest{}
-	this.DomainId = domainId
 	return &this
 }
 
@@ -51,28 +49,36 @@ func NewDeviceCodeRequestWithDefaults() *DeviceCodeRequest {
 	return &this
 }
 
-// GetDomainId returns the DomainId field value
+// GetDomainId returns the DomainId field value if set, zero value otherwise.
 func (o *DeviceCodeRequest) GetDomainId() string {
-	if o == nil {
+	if o == nil || IsNil(o.DomainId) {
 		var ret string
 		return ret
 	}
-
-	return o.DomainId
+	return *o.DomainId
 }
 
-// GetDomainIdOk returns a tuple with the DomainId field value
+// GetDomainIdOk returns a tuple with the DomainId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
 func (o *DeviceCodeRequest) GetDomainIdOk() (*string, bool) {
-	if o == nil {
+	if o == nil || IsNil(o.DomainId) {
 		return nil, false
 	}
-	return &o.DomainId, true
+	return o.DomainId, true
 }
 
-// SetDomainId sets field value
+// HasDomainId returns a boolean if a field has been set.
+func (o *DeviceCodeRequest) HasDomainId() bool {
+	if o != nil && !IsNil(o.DomainId) {
+		return true
+	}
+
+	return false
+}
+
+// SetDomainId gets a reference to the given string and assigns it to the DomainId field.
 func (o *DeviceCodeRequest) SetDomainId(v string) {
-	o.DomainId = v
+	o.DomainId = &v
 }
 
 // GetIdpBindingId returns the IdpBindingId field value if set, zero value otherwise.
@@ -181,7 +187,9 @@ func (o DeviceCodeRequest) MarshalJSON() ([]byte, error) {
 
 func (o DeviceCodeRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	toSerialize["domain_id"] = o.DomainId
+	if !IsNil(o.DomainId) {
+		toSerialize["domain_id"] = o.DomainId
+	}
 	if !IsNil(o.IdpBindingId) {
 		toSerialize["idp_binding_id"] = o.IdpBindingId
 	}
@@ -200,27 +208,6 @@ func (o DeviceCodeRequest) ToMap() (map[string]interface{}, error) {
 }
 
 func (o *DeviceCodeRequest) UnmarshalJSON(data []byte) (err error) {
-	// This validates that all required properties are included in the JSON object
-	// by unmarshalling the object into a generic map with string keys and checking
-	// that every required field exists as a key in the generic map.
-	requiredProperties := []string{
-		"domain_id",
-	}
-
-	allProperties := make(map[string]interface{})
-
-	err = json.Unmarshal(data, &allProperties)
-
-	if err != nil {
-		return err
-	}
-
-	for _, requiredProperty := range requiredProperties {
-		if _, exists := allProperties[requiredProperty]; !exists {
-			return fmt.Errorf("no value given for required property %v", requiredProperty)
-		}
-	}
-
 	varDeviceCodeRequest := _DeviceCodeRequest{}
 
 	err = json.Unmarshal(data, &varDeviceCodeRequest)

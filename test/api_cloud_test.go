@@ -22,6 +22,20 @@ func Test_plexsphere_CloudAPIService(t *testing.T) {
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
 
+	t.Run("Test CloudAPIService ApproveCloudAssignment", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var id string
+
+		resp, httpRes, err := apiClient.CloudAPI.ApproveCloudAssignment(context.Background(), id).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
 	t.Run("Test CloudAPIService ApproveCredentialAssignment", func(t *testing.T) {
 
 		t.Skip("skip test") // remove to run test
@@ -29,6 +43,20 @@ func Test_plexsphere_CloudAPIService(t *testing.T) {
 		var id string
 
 		resp, httpRes, err := apiClient.CloudAPI.ApproveCredentialAssignment(context.Background(), id).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
+	t.Run("Test CloudAPIService AttachCloudCredentialCloud", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var id string
+
+		resp, httpRes, err := apiClient.CloudAPI.AttachCloudCredentialCloud(context.Background(), id).Execute()
 
 		require.Nil(t, err)
 		require.NotNil(t, resp)
@@ -55,6 +83,20 @@ func Test_plexsphere_CloudAPIService(t *testing.T) {
 		var id string
 
 		httpRes, err := apiClient.CloudAPI.DeleteCloud(context.Background(), id).Execute()
+
+		require.Nil(t, err)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
+	t.Run("Test CloudAPIService DetachCloudCredentialCloud", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var id string
+		var cloudId string
+
+		httpRes, err := apiClient.CloudAPI.DetachCloudCredentialCloud(context.Background(), id, cloudId).Execute()
 
 		require.Nil(t, err)
 		assert.Equal(t, 200, httpRes.StatusCode)
@@ -89,6 +131,20 @@ func Test_plexsphere_CloudAPIService(t *testing.T) {
 
 	})
 
+	t.Run("Test CloudAPIService GrantCloudAssignment", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var id string
+
+		resp, httpRes, err := apiClient.CloudAPI.GrantCloudAssignment(context.Background(), id).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
 	t.Run("Test CloudAPIService IssueCloudCredential", func(t *testing.T) {
 
 		t.Skip("skip test") // remove to run test
@@ -96,6 +152,34 @@ func Test_plexsphere_CloudAPIService(t *testing.T) {
 		var id string
 
 		resp, httpRes, err := apiClient.CloudAPI.IssueCloudCredential(context.Background(), id).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
+	t.Run("Test CloudAPIService ListCloudAssignments", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var id string
+
+		resp, httpRes, err := apiClient.CloudAPI.ListCloudAssignments(context.Background(), id).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
+	t.Run("Test CloudAPIService ListCloudCredentialClouds", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var id string
+
+		resp, httpRes, err := apiClient.CloudAPI.ListCloudCredentialClouds(context.Background(), id).Execute()
 
 		require.Nil(t, err)
 		require.NotNil(t, resp)
@@ -157,6 +241,20 @@ func Test_plexsphere_CloudAPIService(t *testing.T) {
 
 	})
 
+	t.Run("Test CloudAPIService RejectCloudAssignment", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var id string
+
+		resp, httpRes, err := apiClient.CloudAPI.RejectCloudAssignment(context.Background(), id).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
 	t.Run("Test CloudAPIService RejectCredentialAssignment", func(t *testing.T) {
 
 		t.Skip("skip test") // remove to run test
@@ -171,6 +269,20 @@ func Test_plexsphere_CloudAPIService(t *testing.T) {
 
 	})
 
+	t.Run("Test CloudAPIService RequestCloudAssignment", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var id string
+
+		resp, httpRes, err := apiClient.CloudAPI.RequestCloudAssignment(context.Background(), id).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
 	t.Run("Test CloudAPIService RequestCredentialAssignment", func(t *testing.T) {
 
 		t.Skip("skip test") // remove to run test
@@ -178,6 +290,20 @@ func Test_plexsphere_CloudAPIService(t *testing.T) {
 		var id string
 
 		resp, httpRes, err := apiClient.CloudAPI.RequestCredentialAssignment(context.Background(), id).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
+	t.Run("Test CloudAPIService RevokeCloudAssignment", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var id string
+
+		resp, httpRes, err := apiClient.CloudAPI.RevokeCloudAssignment(context.Background(), id).Execute()
 
 		require.Nil(t, err)
 		require.NotNil(t, resp)

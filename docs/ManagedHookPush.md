@@ -11,7 +11,7 @@ Name | Type | Description | Notes
 **Status** | [**ManagedHookPushStatus**](ManagedHookPushStatus.md) |  | 
 **HadPriorState** | **bool** | Whether the apply replaced an existing object. When &#x60;true&#x60; a rollback restores the prior object; when &#x60;false&#x60; a rollback deletes the applied object.  | 
 **PushedAt** | **time.Time** | Timestamp the object was applied. | 
-**RolledBackAt** | Pointer to **time.Time** | Timestamp the push was rolled back, or &#x60;null&#x60; when the push has not been rolled back.  | [optional] 
+**RolledBackAt** | Pointer to **time.Time** | Timestamp the push was rolled back; absent when the push has not been rolled back.  | [optional] 
 
 ## Methods
 

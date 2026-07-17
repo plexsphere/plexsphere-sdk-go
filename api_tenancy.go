@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -24,7 +24,7 @@ type TenancyAPI interface {
 	/*
 		CreateDomain Create a tenancy Domain.
 
-		Creates a new top-level tenancy Domain. The aggregate enforces every issuance invariant — non-empty Name, kebab-case Slug, canonical RFC 4632 mesh_cidr, and a complete ReachabilityPolicy (a fully-zero policy is replaced with the platform default; a partial policy is rejected). Cross-Domain mesh_cidr non-overlap is policed by the SQL GIST exclusion on `plexsphere.domains.mesh_cidr` and surfaces as `409 mesh_cidr_overlap`; a duplicate slug surfaces as `409 domain_slug_conflict`.  On success the handler emits a `domain.create` audit row and appends a `DomainCreated` outbox event in the same transaction .
+		Creates a new top-level tenancy Domain. The aggregate enforces every issuance invariant — non-empty Name, kebab-case Slug, canonical RFC 4632 mesh_cidr, and a complete ReachabilityPolicy (a fully-zero policy is replaced with the platform default; a partial policy is rejected). Cross-Domain mesh_cidr non-overlap is policed by the SQL GIST exclusion on `plexsphere.domains.mesh_cidr` and surfaces as `409 mesh_cidr_overlap`; a duplicate slug surfaces as `409 domain_slug_conflict`.  On success the handler emits a `domain.create` audit row and appends a `DomainCreated` outbox event in the same transaction.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiCreateDomainRequest
@@ -53,7 +53,7 @@ type TenancyAPI interface {
 	/*
 		CreateProject Create a tenancy Project.
 
-		Creates a new Project under the parent Domain identified by `domain_id`. The aggregate enforces every issuance invariant — non-zero parent Domain id, non-empty Name, kebab-case Slug, optional canonical RFC 4632 sub-range reservation. Cross-Project sub-range non-overlap inside the parent Domain is policed by the SQL GIST exclusion on `plexsphere.project_mesh_ip_reservations` and surfaces as `409 sub_range_overlap`; a duplicate (domain_id, slug) surfaces as `409 project_slug_conflict`.  On success the handler emits a `project.create` audit row and appends a `ProjectCreated` outbox event in the same transaction .
+		Creates a new Project under the parent Domain identified by `domain_id`. The aggregate enforces every issuance invariant — non-zero parent Domain id, non-empty Name, kebab-case Slug, optional canonical RFC 4632 sub-range reservation. Cross-Project sub-range non-overlap inside the parent Domain is policed by the SQL GIST exclusion on `plexsphere.project_mesh_ip_reservations` and surfaces as `409 sub_range_overlap`; a duplicate (domain_id, slug) surfaces as `409 project_slug_conflict`.  On success the handler emits a `project.create` audit row and appends a `ProjectCreated` outbox event in the same transaction.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiCreateProjectRequest
@@ -63,6 +63,21 @@ type TenancyAPI interface {
 	// CreateProjectExecute executes the request
 	//  @return ProjectResponse
 	CreateProjectExecute(r ApiCreateProjectRequest) (*ProjectResponse, *http.Response, error)
+
+	/*
+		CreateServiceIdentity Create a service identity on a Domain.
+
+		Provisions a new machine principal — an identity of kind `service-identity` — on the addressed Domain. The handler runs the `manage` ReBAC check on `domain:<id>` BEFORE the persistence write, so an unauthorised caller never produces a `ServiceIdentityProvisioned` outbox row. On success the service identity and its registration event are written in one transaction; the authz projection turns that event into the `serviceaccount:<id>#parent@domain:<id>` ReBAC edge that makes the new row visible on `GET /v1/domains/{id}/identities`.  Human users are NOT created through this endpoint — they arrive by accepting an Invitation staged via `POST /v1/domains/{id}/invitations`; acceptance itself completes during the OIDC sign-in callback, not through a dedicated API operation. This collection provisions service identities only.  The `201` body is the same `IdentitySummary` projection the listing surface returns, with `kind: service-identity` and the per-Domain `external_subject_pseudonym` populated, so the client renders the new row without a follow-up read. The plaintext `subject` is never echoed back.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param id Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface.
+		@return ApiCreateServiceIdentityRequest
+	*/
+	CreateServiceIdentity(ctx context.Context, id string) ApiCreateServiceIdentityRequest
+
+	// CreateServiceIdentityExecute executes the request
+	//  @return IdentitySummary
+	CreateServiceIdentityExecute(r ApiCreateServiceIdentityRequest) (*IdentitySummary, *http.Response, error)
 
 	/*
 		DeleteDomain Delete a Domain.
@@ -84,7 +99,7 @@ type TenancyAPI interface {
 		Deletes the Project identified by `{id}`. The empty-aggregate guard runs inside the same transaction as the row delete; at least one persisted Resource, Node, or relation tuple forces `409 project_not_empty` with the `ProjectChildCounts` payload in the Problem detail so the operator knows which sub-aggregate to drain first. A concurrent INSERT racing the guard is caught by defense-in-depth — the foreign-key violation surfaces as the same `409` so the caller never observes a half-deleted Project.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface and on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list.
+		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
 		@return ApiDeleteProjectRequest
 	*/
 	DeleteProject(ctx context.Context, id string) ApiDeleteProjectRequest
@@ -110,11 +125,11 @@ type TenancyAPI interface {
 	/*
 		GetIdentity Fetch a single Domain principal by identifier.
 
-		Returns the principal identified by `{principalId}` inside the Domain identified by `{id}`. The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read; an unauthorised caller therefore receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing principal — OR a principal that exists in a different Domain — surfaces as `404 identity_not_found` so the endpoint cannot be used as a cross-Domain enumeration oracle.  The plaintext `external_subject` and `email` fields are populated ONLY when the caller carries the `auditor` relation on the addressed Domain (`domain:<id>#auditor`). A `read`-only caller receives the same shape with the plaintext fields elided so a client cannot escalate by reading the wire bytes.  Every served byte is paired with an `identity.read` audit row .
+		Returns the principal identified by `{principal_id}` inside the Domain identified by `{id}`. The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read; an unauthorised caller therefore receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing principal — OR a principal that exists in a different Domain — surfaces as `404 identity_not_found` so the endpoint cannot be used as a cross-Domain enumeration oracle.  The plaintext `external_subject` and `email` fields are populated ONLY when the caller carries the `auditor` relation on the addressed Domain (`domain:<id>#auditor`). A `read`-only caller receives the same shape with the plaintext fields elided so a client cannot escalate by reading the wire bytes.  Every served byte is paired with an `identity.read` audit row.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface.
-		@param principalId Principal identifier (UUIDv7). Bound on `/v1/domains/{id}/identities/{principalId}` for the per-Domain identity-read surface.
+		@param principalId Principal identifier (UUIDv7). Bound on `/v1/domains/{id}/identities/{principal_id}` for the per-Domain identity-read surface.
 		@return ApiGetIdentityRequest
 	*/
 	GetIdentity(ctx context.Context, id string, principalId string) ApiGetIdentityRequest
@@ -126,11 +141,11 @@ type TenancyAPI interface {
 	/*
 		GetInvitation Fetch a single Invitation by identifier.
 
-		Returns the Invitation identified by `{invitationId}` inside the Domain identified by `{id}`. The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read; an unauthorised caller receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing aggregate — OR an aggregate that exists in a different Domain — surfaces as `404 invitation_not_found` so the endpoint cannot be used as a cross-Domain enumeration oracle.  Every served byte is paired with an `invitation.read` audit row.
+		Returns the Invitation identified by `{invitation_id}` inside the Domain identified by `{id}`. The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read; an unauthorised caller receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing aggregate — OR an aggregate that exists in a different Domain — surfaces as `404 invitation_not_found` so the endpoint cannot be used as a cross-Domain enumeration oracle.  Every served byte is paired with an `invitation.read` audit row.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface.
-		@param invitationId Invitation identifier (UUIDv7). Bound on `/v1/domains/{id}/invitations/{invitationId}` for the per- Domain invitation read / revoke surface.
+		@param invitationId Invitation identifier (UUIDv7). Bound on `/v1/domains/{id}/invitations/{invitation_id}` for the per- Domain invitation read / revoke surface.
 		@return ApiGetInvitationRequest
 	*/
 	GetInvitation(ctx context.Context, id string, invitationId string) ApiGetInvitationRequest
@@ -145,7 +160,7 @@ type TenancyAPI interface {
 		Returns the Project identified by `{id}`. The handler runs the `read` ReBAC check BEFORE the persistence read; an unauthorised caller therefore receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing aggregate surfaces as `404 project_not_found`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface and on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list.
+		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
 		@return ApiGetProjectRequest
 	*/
 	GetProject(ctx context.Context, id string) ApiGetProjectRequest
@@ -171,7 +186,7 @@ type TenancyAPI interface {
 	/*
 		ListIdentities List principals (users + service identities) on a Domain.
 
-		Returns a cursor-paginated page of principals attached to the addressed Domain. The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read; an unauthorised caller therefore receives `403` without the existence side-channel a \"load-then-check\" flow would leak. The optional `kind` query parameter narrows the page to a single principal kind (`user` or `service-identity`); omit to page across both kinds in the same Domain.  The summary projection NEVER carries plaintext `external_subject` or `email`. Auditor-only fields are reachable only via `GET /v1/domains/{id}/identities/{principalId}` .  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.  On every served page the handler emits one `identity.list` audit row.
+		Returns a cursor-paginated page of principals attached to the addressed Domain. The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read; an unauthorised caller therefore receives `403` without the existence side-channel a \"load-then-check\" flow would leak. The optional `kind` query parameter narrows the page to a single principal kind (`user` or `service-identity`); omit to page across both kinds in the same Domain.  The summary projection NEVER carries plaintext `external_subject` or `email`. Auditor-only fields are reachable only via `GET /v1/domains/{id}/identities/{principal_id}`.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.  On every served page the handler emits one `identity.list` audit row.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface.
@@ -186,7 +201,7 @@ type TenancyAPI interface {
 	/*
 		ListInvitations List Invitations on a Domain.
 
-		Returns a cursor-paginated page of Invitations attached to the Domain identified by `{id}`, optionally filtered by status . The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read so an unauthorised caller receives `403` without the existence side-channel a \"load-then-check\" flow would leak. The optional `status` query parameter narrows the page to a single lifecycle state; the special value `all` surfaces every status in one window — omit to default to `all`.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.  The handler emits one `invitation.list` audit row per served page.
+		Returns a cursor-paginated page of Invitations attached to the Domain identified by `{id}`, optionally filtered by status. The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read so an unauthorised caller receives `403` without the existence side-channel a \"load-then-check\" flow would leak. The optional `status` query parameter narrows the page to a single lifecycle state; the special value `all` surfaces every status in one window — omit to default to `all`.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.  The handler emits one `invitation.list` audit row per served page.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface.
@@ -233,7 +248,7 @@ type TenancyAPI interface {
 		Patches the Project identified by `{id}`. The body MUST set at least one of `name`, `description`, `sub_range_cidr`, or `release_sub_range` — an empty body surfaces as `400 empty_patch`.  DECISION: `slug` is intentionally NOT a patchable field — it is the URL handle exported into cached dashboard links and outbox projections. The handler rejects any body that carries a `slug` key (even with the same value) at decode time with `400 slug_immutable`.  Retargeting `sub_range_cidr` triggers an in-tx sibling-overlap guard inside the parent Domain. A patch that would overlap a sibling Project's reservation surfaces as `422 sub_range_invalidates_allocation` carrying the offending `project_id` and `sub_range` in the Problem detail.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface and on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list.
+		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
 		@return ApiPatchProjectRequest
 	*/
 	PatchProject(ctx context.Context, id string) ApiPatchProjectRequest
@@ -245,11 +260,11 @@ type TenancyAPI interface {
 	/*
 		RevokeInvitation Revoke a pending Invitation.
 
-		Revokes the Invitation identified by `{invitationId}` inside the Domain identified by `{id}`. The handler authorises the call against the parent Domain's `manage` ReBAC relation BEFORE invoking the service so an unauthorised caller never produces an `InvitationRevoked` outbox row.  Idempotent on terminal states — the aggregate's monotonic status walk surfaces as:    * `409 invitation_already_accepted` if the row is already     accepted;   * `409 invitation_already_expired` if the row is already     expired (or the expiry sweeper has already flipped it).  A second revoke on a row that is already revoked is treated as a no-op (`204`). A successful revoke emits an `invitation.revoke` audit row and appends an `InvitationRevoked` outbox event in the same transaction .
+		Revokes the Invitation identified by `{invitation_id}` inside the Domain identified by `{id}`. The handler authorises the call against the parent Domain's `manage` ReBAC relation BEFORE invoking the service so an unauthorised caller never produces an `InvitationRevoked` outbox row.  Idempotent on terminal states — the aggregate's monotonic status walk surfaces as:    * `409 invitation_already_accepted` if the row is already     accepted;   * `409 invitation_already_expired` if the row is already     expired (or the expiry sweeper has already flipped it).  A second revoke on a row that is already revoked is treated as a no-op (`204`). A successful revoke emits an `invitation.revoke` audit row and appends an `InvitationRevoked` outbox event in the same transaction.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface.
-		@param invitationId Invitation identifier (UUIDv7). Bound on `/v1/domains/{id}/invitations/{invitationId}` for the per- Domain invitation read / revoke surface.
+		@param invitationId Invitation identifier (UUIDv7). Bound on `/v1/domains/{id}/invitations/{invitation_id}` for the per- Domain invitation read / revoke surface.
 		@return ApiRevokeInvitationRequest
 	*/
 	RevokeInvitation(ctx context.Context, id string, invitationId string) ApiRevokeInvitationRequest
@@ -279,7 +294,7 @@ func (r ApiCreateDomainRequest) Execute() (*DomainResponse, *http.Response, erro
 /*
 CreateDomain Create a tenancy Domain.
 
-Creates a new top-level tenancy Domain. The aggregate enforces every issuance invariant — non-empty Name, kebab-case Slug, canonical RFC 4632 mesh_cidr, and a complete ReachabilityPolicy (a fully-zero policy is replaced with the platform default; a partial policy is rejected). Cross-Domain mesh_cidr non-overlap is policed by the SQL GIST exclusion on `plexsphere.domains.mesh_cidr` and surfaces as `409 mesh_cidr_overlap`; a duplicate slug surfaces as `409 domain_slug_conflict`.  On success the handler emits a `domain.create` audit row and appends a `DomainCreated` outbox event in the same transaction .
+Creates a new top-level tenancy Domain. The aggregate enforces every issuance invariant — non-empty Name, kebab-case Slug, canonical RFC 4632 mesh_cidr, and a complete ReachabilityPolicy (a fully-zero policy is replaced with the platform default; a partial policy is rejected). Cross-Domain mesh_cidr non-overlap is policed by the SQL GIST exclusion on `plexsphere.domains.mesh_cidr` and surfaces as `409 mesh_cidr_overlap`; a duplicate slug surfaces as `409 domain_slug_conflict`.  On success the handler emits a `domain.create` audit row and appends a `DomainCreated` outbox event in the same transaction.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiCreateDomainRequest
@@ -657,7 +672,7 @@ func (r ApiCreateProjectRequest) Execute() (*ProjectResponse, *http.Response, er
 /*
 CreateProject Create a tenancy Project.
 
-Creates a new Project under the parent Domain identified by `domain_id`. The aggregate enforces every issuance invariant — non-zero parent Domain id, non-empty Name, kebab-case Slug, optional canonical RFC 4632 sub-range reservation. Cross-Project sub-range non-overlap inside the parent Domain is policed by the SQL GIST exclusion on `plexsphere.project_mesh_ip_reservations` and surfaces as `409 sub_range_overlap`; a duplicate (domain_id, slug) surfaces as `409 project_slug_conflict`.  On success the handler emits a `project.create` audit row and appends a `ProjectCreated` outbox event in the same transaction .
+Creates a new Project under the parent Domain identified by `domain_id`. The aggregate enforces every issuance invariant — non-zero parent Domain id, non-empty Name, kebab-case Slug, optional canonical RFC 4632 sub-range reservation. Cross-Project sub-range non-overlap inside the parent Domain is policed by the SQL GIST exclusion on `plexsphere.project_mesh_ip_reservations` and surfaces as `409 sub_range_overlap`; a duplicate (domain_id, slug) surfaces as `409 project_slug_conflict`.  On success the handler emits a `project.create` audit row and appends a `ProjectCreated` outbox event in the same transaction.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiCreateProjectRequest
@@ -815,6 +830,197 @@ func (a *TenancyAPIService) CreateProjectExecute(r ApiCreateProjectRequest) (*Pr
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiCreateServiceIdentityRequest struct {
+	ctx                          context.Context
+	ApiService                   TenancyAPI
+	id                           string
+	serviceIdentityCreateRequest *ServiceIdentityCreateRequest
+}
+
+func (r ApiCreateServiceIdentityRequest) ServiceIdentityCreateRequest(serviceIdentityCreateRequest ServiceIdentityCreateRequest) ApiCreateServiceIdentityRequest {
+	r.serviceIdentityCreateRequest = &serviceIdentityCreateRequest
+	return r
+}
+
+func (r ApiCreateServiceIdentityRequest) Execute() (*IdentitySummary, *http.Response, error) {
+	return r.ApiService.CreateServiceIdentityExecute(r)
+}
+
+/*
+CreateServiceIdentity Create a service identity on a Domain.
+
+Provisions a new machine principal — an identity of kind `service-identity` — on the addressed Domain. The handler runs the `manage` ReBAC check on `domain:<id>` BEFORE the persistence write, so an unauthorised caller never produces a `ServiceIdentityProvisioned` outbox row. On success the service identity and its registration event are written in one transaction; the authz projection turns that event into the `serviceaccount:<id>#parent@domain:<id>` ReBAC edge that makes the new row visible on `GET /v1/domains/{id}/identities`.  Human users are NOT created through this endpoint — they arrive by accepting an Invitation staged via `POST /v1/domains/{id}/invitations`; acceptance itself completes during the OIDC sign-in callback, not through a dedicated API operation. This collection provisions service identities only.  The `201` body is the same `IdentitySummary` projection the listing surface returns, with `kind: service-identity` and the per-Domain `external_subject_pseudonym` populated, so the client renders the new row without a follow-up read. The plaintext `subject` is never echoed back.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface.
+	@return ApiCreateServiceIdentityRequest
+*/
+func (a *TenancyAPIService) CreateServiceIdentity(ctx context.Context, id string) ApiCreateServiceIdentityRequest {
+	return ApiCreateServiceIdentityRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return IdentitySummary
+func (a *TenancyAPIService) CreateServiceIdentityExecute(r ApiCreateServiceIdentityRequest) (*IdentitySummary, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *IdentitySummary
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "TenancyAPIService.CreateServiceIdentity")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/domains/{id}/service-identities"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.serviceIdentityCreateRequest == nil {
+		return localVarReturnValue, nil, reportError("serviceIdentityCreateRequest is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.serviceIdentityCreateRequest
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 413 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 503 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiDeleteDomainRequest struct {
 	ctx        context.Context
 	ApiService TenancyAPI
@@ -901,6 +1107,17 @@ func (a *TenancyAPIService) DeleteDomainExecute(r ApiDeleteDomainRequest) (*http
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
 		if localVarHTTPResponse.StatusCode == 401 {
 			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -977,7 +1194,7 @@ DeleteProject Delete a Project.
 Deletes the Project identified by `{id}`. The empty-aggregate guard runs inside the same transaction as the row delete; at least one persisted Resource, Node, or relation tuple forces `409 project_not_empty` with the `ProjectChildCounts` payload in the Problem detail so the operator knows which sub-aggregate to drain first. A concurrent INSERT racing the guard is caught by defense-in-depth — the foreign-key violation surfaces as the same `409` so the caller never observes a half-deleted Project.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface and on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list.
+	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
 	@return ApiDeleteProjectRequest
 */
 func (a *TenancyAPIService) DeleteProject(ctx context.Context, id string) ApiDeleteProjectRequest {
@@ -1207,6 +1424,17 @@ func (a *TenancyAPIService) GetDomainExecute(r ApiGetDomainRequest) (*DomainResp
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
 		if localVarHTTPResponse.StatusCode == 401 {
 			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -1279,11 +1507,11 @@ func (r ApiGetIdentityRequest) Execute() (*IdentityDetail, *http.Response, error
 /*
 GetIdentity Fetch a single Domain principal by identifier.
 
-Returns the principal identified by `{principalId}` inside the Domain identified by `{id}`. The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read; an unauthorised caller therefore receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing principal — OR a principal that exists in a different Domain — surfaces as `404 identity_not_found` so the endpoint cannot be used as a cross-Domain enumeration oracle.  The plaintext `external_subject` and `email` fields are populated ONLY when the caller carries the `auditor` relation on the addressed Domain (`domain:<id>#auditor`). A `read`-only caller receives the same shape with the plaintext fields elided so a client cannot escalate by reading the wire bytes.  Every served byte is paired with an `identity.read` audit row .
+Returns the principal identified by `{principal_id}` inside the Domain identified by `{id}`. The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read; an unauthorised caller therefore receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing principal — OR a principal that exists in a different Domain — surfaces as `404 identity_not_found` so the endpoint cannot be used as a cross-Domain enumeration oracle.  The plaintext `external_subject` and `email` fields are populated ONLY when the caller carries the `auditor` relation on the addressed Domain (`domain:<id>#auditor`). A `read`-only caller receives the same shape with the plaintext fields elided so a client cannot escalate by reading the wire bytes.  Every served byte is paired with an `identity.read` audit row.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface.
-	@param principalId Principal identifier (UUIDv7). Bound on `/v1/domains/{id}/identities/{principalId}` for the per-Domain identity-read surface.
+	@param principalId Principal identifier (UUIDv7). Bound on `/v1/domains/{id}/identities/{principal_id}` for the per-Domain identity-read surface.
 	@return ApiGetIdentityRequest
 */
 func (a *TenancyAPIService) GetIdentity(ctx context.Context, id string, principalId string) ApiGetIdentityRequest {
@@ -1311,9 +1539,9 @@ func (a *TenancyAPIService) GetIdentityExecute(r ApiGetIdentityRequest) (*Identi
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{id}/identities/{principalId}"
+	localVarPath := localBasePath + "/v1/domains/{id}/identities/{principal_id}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"principalId"+"}", url.PathEscape(parameterValueToString(r.principalId, "principalId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"principal_id"+"}", url.PathEscape(parameterValueToString(r.principalId, "principalId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -1441,11 +1669,11 @@ func (r ApiGetInvitationRequest) Execute() (*InvitationResponse, *http.Response,
 /*
 GetInvitation Fetch a single Invitation by identifier.
 
-Returns the Invitation identified by `{invitationId}` inside the Domain identified by `{id}`. The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read; an unauthorised caller receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing aggregate — OR an aggregate that exists in a different Domain — surfaces as `404 invitation_not_found` so the endpoint cannot be used as a cross-Domain enumeration oracle.  Every served byte is paired with an `invitation.read` audit row.
+Returns the Invitation identified by `{invitation_id}` inside the Domain identified by `{id}`. The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read; an unauthorised caller receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing aggregate — OR an aggregate that exists in a different Domain — surfaces as `404 invitation_not_found` so the endpoint cannot be used as a cross-Domain enumeration oracle.  Every served byte is paired with an `invitation.read` audit row.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface.
-	@param invitationId Invitation identifier (UUIDv7). Bound on `/v1/domains/{id}/invitations/{invitationId}` for the per- Domain invitation read / revoke surface.
+	@param invitationId Invitation identifier (UUIDv7). Bound on `/v1/domains/{id}/invitations/{invitation_id}` for the per- Domain invitation read / revoke surface.
 	@return ApiGetInvitationRequest
 */
 func (a *TenancyAPIService) GetInvitation(ctx context.Context, id string, invitationId string) ApiGetInvitationRequest {
@@ -1473,9 +1701,9 @@ func (a *TenancyAPIService) GetInvitationExecute(r ApiGetInvitationRequest) (*In
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{id}/invitations/{invitationId}"
+	localVarPath := localBasePath + "/v1/domains/{id}/invitations/{invitation_id}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"invitationId"+"}", url.PathEscape(parameterValueToString(r.invitationId, "invitationId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"invitation_id"+"}", url.PathEscape(parameterValueToString(r.invitationId, "invitationId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -1605,7 +1833,7 @@ GetProject Fetch a Project by identifier.
 Returns the Project identified by `{id}`. The handler runs the `read` ReBAC check BEFORE the persistence read; an unauthorised caller therefore receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing aggregate surfaces as `404 project_not_found`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface and on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list.
+	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
 	@return ApiGetProjectRequest
 */
 func (a *TenancyAPIService) GetProject(ctx context.Context, id string) ApiGetProjectRequest {
@@ -1760,7 +1988,7 @@ func (r ApiListDomainsRequest) Cursor(cursor string) ApiListDomainsRequest {
 	return r
 }
 
-// Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the service.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListDomainsRequest) Limit(limit int32) ApiListDomainsRequest {
 	r.limit = &limit
 	return r
@@ -1879,7 +2107,7 @@ func (a *TenancyAPIService) ListDomainsExecute(r ApiListDomainsRequest) (*Domain
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 403 {
-			var v PermissionDenied
+			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -1923,13 +2151,13 @@ type ApiListIdentitiesRequest struct {
 	kind       *IdentityKind
 }
 
-// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400 invalid_cursor&#x60; .
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
 func (r ApiListIdentitiesRequest) Cursor(cursor string) ApiListIdentitiesRequest {
 	r.cursor = &cursor
 	return r
 }
 
-// Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the service.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListIdentitiesRequest) Limit(limit int32) ApiListIdentitiesRequest {
 	r.limit = &limit
 	return r
@@ -1948,7 +2176,7 @@ func (r ApiListIdentitiesRequest) Execute() (*IdentityList, *http.Response, erro
 /*
 ListIdentities List principals (users + service identities) on a Domain.
 
-Returns a cursor-paginated page of principals attached to the addressed Domain. The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read; an unauthorised caller therefore receives `403` without the existence side-channel a \"load-then-check\" flow would leak. The optional `kind` query parameter narrows the page to a single principal kind (`user` or `service-identity`); omit to page across both kinds in the same Domain.  The summary projection NEVER carries plaintext `external_subject` or `email`. Auditor-only fields are reachable only via `GET /v1/domains/{id}/identities/{principalId}` .  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.  On every served page the handler emits one `identity.list` audit row.
+Returns a cursor-paginated page of principals attached to the addressed Domain. The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read; an unauthorised caller therefore receives `403` without the existence side-channel a \"load-then-check\" flow would leak. The optional `kind` query parameter narrows the page to a single principal kind (`user` or `service-identity`); omit to page across both kinds in the same Domain.  The summary projection NEVER carries plaintext `external_subject` or `email`. Auditor-only fields are reachable only via `GET /v1/domains/{id}/identities/{principal_id}`.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.  On every served page the handler emits one `identity.list` audit row.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface.
@@ -2060,7 +2288,7 @@ func (a *TenancyAPIService) ListIdentitiesExecute(r ApiListIdentitiesRequest) (*
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 403 {
-			var v PermissionDenied
+			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -2115,19 +2343,19 @@ type ApiListInvitationsRequest struct {
 	status     *ListInvitationsStatusParameter
 }
 
-// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400 invalid_cursor&#x60; .
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
 func (r ApiListInvitationsRequest) Cursor(cursor string) ApiListInvitationsRequest {
 	r.cursor = &cursor
 	return r
 }
 
-// Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the service.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListInvitationsRequest) Limit(limit int32) ApiListInvitationsRequest {
 	r.limit = &limit
 	return r
 }
 
-// Optional status filter. Values outside the closed set surface as &#x60;400 invalid_status&#x60;. Defaults to &#x60;all&#x60; .
+// Optional status filter. Values outside the closed set surface as &#x60;400 invalid_status&#x60;. Defaults to &#x60;all&#x60;.
 func (r ApiListInvitationsRequest) Status(status ListInvitationsStatusParameter) ApiListInvitationsRequest {
 	r.status = &status
 	return r
@@ -2140,7 +2368,7 @@ func (r ApiListInvitationsRequest) Execute() (*InvitationList, *http.Response, e
 /*
 ListInvitations List Invitations on a Domain.
 
-Returns a cursor-paginated page of Invitations attached to the Domain identified by `{id}`, optionally filtered by status . The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read so an unauthorised caller receives `403` without the existence side-channel a \"load-then-check\" flow would leak. The optional `status` query parameter narrows the page to a single lifecycle state; the special value `all` surfaces every status in one window — omit to default to `all`.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.  The handler emits one `invitation.list` audit row per served page.
+Returns a cursor-paginated page of Invitations attached to the Domain identified by `{id}`, optionally filtered by status. The handler runs the `read` ReBAC check on `domain:<id>` BEFORE the persistence read so an unauthorised caller receives `403` without the existence side-channel a \"load-then-check\" flow would leak. The optional `status` query parameter narrows the page to a single lifecycle state; the special value `all` surfaces every status in one window — omit to default to `all`.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.  The handler emits one `invitation.list` audit row per served page.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface.
@@ -2252,7 +2480,7 @@ func (a *TenancyAPIService) ListInvitationsExecute(r ApiListInvitationsRequest) 
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 403 {
-			var v PermissionDenied
+			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -2312,7 +2540,7 @@ func (r ApiListProjectsRequest) Cursor(cursor string) ApiListProjectsRequest {
 	return r
 }
 
-// Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the service.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListProjectsRequest) Limit(limit int32) ApiListProjectsRequest {
 	r.limit = &limit
 	return r
@@ -2440,7 +2668,7 @@ func (a *TenancyAPIService) ListProjectsExecute(r ApiListProjectsRequest) (*Proj
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 403 {
-			var v PermissionDenied
+			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -2699,7 +2927,7 @@ PatchProject Patch mutable fields on a Project.
 Patches the Project identified by `{id}`. The body MUST set at least one of `name`, `description`, `sub_range_cidr`, or `release_sub_range` — an empty body surfaces as `400 empty_patch`.  DECISION: `slug` is intentionally NOT a patchable field — it is the URL handle exported into cached dashboard links and outbox projections. The handler rejects any body that carries a `slug` key (even with the same value) at decode time with `400 slug_immutable`.  Retargeting `sub_range_cidr` triggers an in-tx sibling-overlap guard inside the parent Domain. A patch that would overlap a sibling Project's reservation surfaces as `422 sub_range_invalidates_allocation` carrying the offending `project_id` and `sub_range` in the Problem detail.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface and on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list.
+	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
 	@return ApiPatchProjectRequest
 */
 func (a *TenancyAPIService) PatchProject(ctx context.Context, id string) ApiPatchProjectRequest {
@@ -2893,11 +3121,11 @@ func (r ApiRevokeInvitationRequest) Execute() (*http.Response, error) {
 /*
 RevokeInvitation Revoke a pending Invitation.
 
-Revokes the Invitation identified by `{invitationId}` inside the Domain identified by `{id}`. The handler authorises the call against the parent Domain's `manage` ReBAC relation BEFORE invoking the service so an unauthorised caller never produces an `InvitationRevoked` outbox row.  Idempotent on terminal states — the aggregate's monotonic status walk surfaces as:    * `409 invitation_already_accepted` if the row is already     accepted;   * `409 invitation_already_expired` if the row is already     expired (or the expiry sweeper has already flipped it).  A second revoke on a row that is already revoked is treated as a no-op (`204`). A successful revoke emits an `invitation.revoke` audit row and appends an `InvitationRevoked` outbox event in the same transaction .
+Revokes the Invitation identified by `{invitation_id}` inside the Domain identified by `{id}`. The handler authorises the call against the parent Domain's `manage` ReBAC relation BEFORE invoking the service so an unauthorised caller never produces an `InvitationRevoked` outbox row.  Idempotent on terminal states — the aggregate's monotonic status walk surfaces as:    * `409 invitation_already_accepted` if the row is already     accepted;   * `409 invitation_already_expired` if the row is already     expired (or the expiry sweeper has already flipped it).  A second revoke on a row that is already revoked is treated as a no-op (`204`). A successful revoke emits an `invitation.revoke` audit row and appends an `InvitationRevoked` outbox event in the same transaction.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Domain identifier (UUIDv7). Bound on `/v1/domains/{id}` for the tenancy CRUD surface.
-	@param invitationId Invitation identifier (UUIDv7). Bound on `/v1/domains/{id}/invitations/{invitationId}` for the per- Domain invitation read / revoke surface.
+	@param invitationId Invitation identifier (UUIDv7). Bound on `/v1/domains/{id}/invitations/{invitation_id}` for the per- Domain invitation read / revoke surface.
 	@return ApiRevokeInvitationRequest
 */
 func (a *TenancyAPIService) RevokeInvitation(ctx context.Context, id string, invitationId string) ApiRevokeInvitationRequest {
@@ -2922,9 +3150,9 @@ func (a *TenancyAPIService) RevokeInvitationExecute(r ApiRevokeInvitationRequest
 		return nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/v1/domains/{id}/invitations/{invitationId}"
+	localVarPath := localBasePath + "/v1/domains/{id}/invitations/{invitation_id}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"invitationId"+"}", url.PathEscape(parameterValueToString(r.invitationId, "invitationId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"invitation_id"+"}", url.PathEscape(parameterValueToString(r.invitationId, "invitationId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

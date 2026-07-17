@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -23,7 +23,7 @@ type PlexdHook struct {
 	// PlexdHook resource name (e.g. `nightly-backup`). Non-empty after trimming whitespace; a violation surfaces as 422 `plexd_hook_invalid`.
 	Name string `json:"name"`
 	// OCI image digest of the hook image in canonical `sha256:<64 lowercase hex>` form. Format-only validation — plexsphere performs no registry lookup. Anything that does not match surfaces as 422 `plexd_hook_invalid`.
-	ImageDigest string `json:"image_digest"`
+	ImageDigest string `json:"image_digest" validate:"regexp=^sha256:[0-9a-f]{64}$"`
 	// Optional free-form string-to-string parameter map copied verbatim from the discovered PlexdHook spec.
 	Parameters map[string]string `json:"parameters,omitempty"`
 	// Optional execution timeout in whole seconds. Non-negative; a negative value surfaces as 422 `plexd_hook_invalid`. The domain owns this as a duration — the `_seconds` suffix is the wire encoding only.

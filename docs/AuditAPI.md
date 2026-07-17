@@ -4,13 +4,13 @@ All URIs are relative to *http://localhost*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**EraseIdentityFromAudit**](AuditAPI.md#EraseIdentityFromAudit) | **Post** /v1/domains/{domainId}/audit/erase-identity | Erase an identity&#39;s PII mapping from the per-Domain audit log.
+[**EraseIdentityFromAudit**](AuditAPI.md#EraseIdentityFromAudit) | **Post** /v1/domains/{domain_id}/audit/erase-identity | Erase an identity&#39;s PII mapping from the per-Domain audit log.
 [**EraseIdentityFromPlatformAudit**](AuditAPI.md#EraseIdentityFromPlatformAudit) | **Post** /v1/platform/audit/erase-identity | Erase an identity&#39;s PII mapping from the platform audit log.
-[**GetAuditEntry**](AuditAPI.md#GetAuditEntry) | **Get** /v1/domains/{domainId}/audit/entries/{seq} | Read a single audit entry with its hash-chain proof.
+[**GetAuditEntry**](AuditAPI.md#GetAuditEntry) | **Get** /v1/domains/{domain_id}/audit/entries/{seq} | Read a single audit entry with its hash-chain proof.
 [**GetPlatformAuditEntry**](AuditAPI.md#GetPlatformAuditEntry) | **Get** /v1/platform/audit/entries/{seq} | Read a single platform audit entry with its hash-chain proof.
-[**ListAuditEntries**](AuditAPI.md#ListAuditEntries) | **Get** /v1/domains/{domainId}/audit/entries | List entries on the per-Domain audit chain.
+[**ListAuditEntries**](AuditAPI.md#ListAuditEntries) | **Get** /v1/domains/{domain_id}/audit/entries | List entries on the per-Domain audit chain.
 [**ListPlatformAuditEntries**](AuditAPI.md#ListPlatformAuditEntries) | **Get** /v1/platform/audit/entries | List entries on the platform-residency audit chain.
-[**VerifyAuditChain**](AuditAPI.md#VerifyAuditChain) | **Post** /v1/domains/{domainId}/audit/verify | Verify the per-Domain hash chain or a segment of it.
+[**VerifyAuditChain**](AuditAPI.md#VerifyAuditChain) | **Post** /v1/domains/{domain_id}/audit/verify | Verify the per-Domain hash chain or a segment of it.
 [**VerifyPlatformAuditChain**](AuditAPI.md#VerifyPlatformAuditChain) | **Post** /v1/platform/audit/verify | Verify the platform-residency hash chain or a segment of it.
 
 
@@ -36,7 +36,7 @@ import (
 )
 
 func main() {
-	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path. 
+	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain; rows with platform residency live on the separate chain served under `/v1/platform/audit`. 
 	auditEraseIdentityRequest := *openapiclient.NewAuditEraseIdentityRequest("IdentityId_example") // AuditEraseIdentityRequest | 
 
 	configuration := openapiclient.NewConfiguration()
@@ -57,7 +57,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**domainId** | **string** | Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain&#39;s chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.  | 
+**domainId** | **string** | Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain&#39;s chain; rows with platform residency live on the separate chain served under &#x60;/v1/platform/audit&#x60;.  | 
 
 ### Other Parameters
 
@@ -75,7 +75,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -141,7 +141,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -174,7 +174,7 @@ import (
 )
 
 func main() {
-	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path. 
+	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain; rows with platform residency live on the separate chain served under `/v1/platform/audit`. 
 	seq := int64(789) // int64 | Per-Domain monotonic sequence number assigned at append time. Sequences start at 1 (the genesis row) and never reset. 
 
 	configuration := openapiclient.NewConfiguration()
@@ -195,7 +195,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**domainId** | **string** | Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain&#39;s chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.  | 
+**domainId** | **string** | Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain&#39;s chain; rows with platform residency live on the separate chain served under &#x60;/v1/platform/audit&#x60;.  | 
 **seq** | **int64** | Per-Domain monotonic sequence number assigned at append time. Sequences start at 1 (the genesis row) and never reset.  | 
 
 ### Other Parameters
@@ -214,7 +214,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -284,7 +284,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -318,10 +318,10 @@ import (
 )
 
 func main() {
-	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path. 
-	cursor := "cursor_example" // string | Opaque pagination cursor — value of `next_cursor` from the previous page, or unset to start at the head of the chain .  (optional)
-	limit := int32(56) // int32 | Maximum number of entries to return on this page. Clamped server-side at 200 to protect the read replica from a single auditor issuing an unbounded LIMIT.  (optional) (default to 50)
-	subject := "subject_example" // string | Filter by subject pseudonym (64 lowercase hex characters). The query service never accepts plaintext subject ids; pseudonymisation is the caller's responsibility and happens at the sink boundary.  (optional)
+	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain; rows with platform residency live on the separate chain served under `/v1/platform/audit`. 
+	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
+	subject := "subject_example" // string | Filter by subject pseudonym (64 lowercase hex characters). The query service never accepts plaintext subject ids; rows are pseudonymised at the sink boundary, so callers filter by the pseudonym as returned on previously read entries.  (optional)
 	relation := "relation_example" // string | SpiceDB relation label to filter on. (optional)
 	objectType := "objectType_example" // string | SpiceDB object type to filter on (e.g. `domain`, `node`). (optional)
 	objectId := "objectId_example" // string | Opaque object identifier within `object_type`. (optional)
@@ -348,7 +348,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**domainId** | **string** | Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain&#39;s chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.  | 
+**domainId** | **string** | Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain&#39;s chain; rows with platform residency live on the separate chain served under &#x60;/v1/platform/audit&#x60;.  | 
 
 ### Other Parameters
 
@@ -358,9 +358,9 @@ Other parameters are passed through a pointer to a apiListAuditEntriesRequest st
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 
- **cursor** | **string** | Opaque pagination cursor — value of &#x60;next_cursor&#x60; from the previous page, or unset to start at the head of the chain .  | 
- **limit** | **int32** | Maximum number of entries to return on this page. Clamped server-side at 200 to protect the read replica from a single auditor issuing an unbounded LIMIT.  | [default to 50]
- **subject** | **string** | Filter by subject pseudonym (64 lowercase hex characters). The query service never accepts plaintext subject ids; pseudonymisation is the caller&#39;s responsibility and happens at the sink boundary.  | 
+ **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
+ **subject** | **string** | Filter by subject pseudonym (64 lowercase hex characters). The query service never accepts plaintext subject ids; rows are pseudonymised at the sink boundary, so callers filter by the pseudonym as returned on previously read entries.  | 
  **relation** | **string** | SpiceDB relation label to filter on. | 
  **objectType** | **string** | SpiceDB object type to filter on (e.g. &#x60;domain&#x60;, &#x60;node&#x60;). | 
  **objectId** | **string** | Opaque object identifier within &#x60;object_type&#x60;. | 
@@ -375,7 +375,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -409,9 +409,9 @@ import (
 )
 
 func main() {
-	cursor := "cursor_example" // string | Opaque pagination cursor — value of `next_cursor` from the previous page, or unset to start at the head of the chain .  (optional)
-	limit := int32(56) // int32 | Maximum number of entries to return on this page. Clamped server-side at 200 to protect the read replica from a single auditor issuing an unbounded LIMIT.  (optional) (default to 50)
-	subject := "subject_example" // string | Filter by subject pseudonym (64 lowercase hex characters). The query service never accepts plaintext subject ids; pseudonymisation is the caller's responsibility and happens at the sink boundary.  (optional)
+	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
+	subject := "subject_example" // string | Filter by subject pseudonym (64 lowercase hex characters). The query service never accepts plaintext subject ids; rows are pseudonymised at the sink boundary, so callers filter by the pseudonym as returned on previously read entries.  (optional)
 	relation := "relation_example" // string | SpiceDB relation label to filter on. (optional)
 	objectType := "objectType_example" // string | SpiceDB object type to filter on (e.g. `cloud`, `platform`). (optional)
 	objectId := "objectId_example" // string | Opaque object identifier within `object_type`. (optional)
@@ -443,9 +443,9 @@ Other parameters are passed through a pointer to a apiListPlatformAuditEntriesRe
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **cursor** | **string** | Opaque pagination cursor — value of &#x60;next_cursor&#x60; from the previous page, or unset to start at the head of the chain .  | 
- **limit** | **int32** | Maximum number of entries to return on this page. Clamped server-side at 200 to protect the read replica from a single auditor issuing an unbounded LIMIT.  | [default to 50]
- **subject** | **string** | Filter by subject pseudonym (64 lowercase hex characters). The query service never accepts plaintext subject ids; pseudonymisation is the caller&#39;s responsibility and happens at the sink boundary.  | 
+ **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
+ **subject** | **string** | Filter by subject pseudonym (64 lowercase hex characters). The query service never accepts plaintext subject ids; rows are pseudonymised at the sink boundary, so callers filter by the pseudonym as returned on previously read entries.  | 
  **relation** | **string** | SpiceDB relation label to filter on. | 
  **objectType** | **string** | SpiceDB object type to filter on (e.g. &#x60;cloud&#x60;, &#x60;platform&#x60;). | 
  **objectId** | **string** | Opaque object identifier within &#x60;object_type&#x60;. | 
@@ -460,7 +460,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -493,7 +493,7 @@ import (
 )
 
 func main() {
-	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path. 
+	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain's chain; rows with platform residency live on the separate chain served under `/v1/platform/audit`. 
 	auditChainVerifyRequest := *openapiclient.NewAuditChainVerifyRequest() // AuditChainVerifyRequest |  (optional)
 
 	configuration := openapiclient.NewConfiguration()
@@ -514,7 +514,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**domainId** | **string** | Owning Domain. The Platform Audit Log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain&#39;s chain, never on a shared system chain . Every audit endpoint requires the Domain identifier in the path.  | 
+**domainId** | **string** | Owning Domain of the addressed audit chain. The Domain audit log is per-Domain by residency contract — cross-Domain decisions land in EACH affected Domain&#39;s chain; rows with platform residency live on the separate chain served under &#x60;/v1/platform/audit&#x60;.  | 
 
 ### Other Parameters
 
@@ -532,7 +532,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -598,7 +598,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 

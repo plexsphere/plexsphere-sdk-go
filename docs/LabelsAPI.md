@@ -12,6 +12,7 @@ Method | HTTP request | Description
 [**ListObjectLabels**](LabelsAPI.md#ListObjectLabels) | **Get** /v1/objects/{kind}/{id}/labels | List Label Assignments attached to an object.
 [**PreviewLabelSelector**](LabelsAPI.md#PreviewLabelSelector) | **Post** /v1/labels/selectors/preview | Parse a label selector and return its AST or errors inline.
 [**PutObjectLabel**](LabelsAPI.md#PutObjectLabel) | **Put** /v1/objects/{kind}/{id}/labels | Upsert a Label Assignment on an object.
+[**SearchObjectsByLabel**](LabelsAPI.md#SearchObjectsByLabel) | **Post** /v1/objects/search | Search objects by Label selector, filtered to the caller&#39;s access.
 [**UpdateLabelDefinition**](LabelsAPI.md#UpdateLabelDefinition) | **Patch** /v1/label-definitions/{id} | Update mutable fields on a Label Definition.
 
 
@@ -70,7 +71,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -138,7 +139,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -211,7 +212,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -281,7 +282,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -295,7 +296,7 @@ No authorization required
 
 ## ListLabelDefinitions
 
-> LabelDefinitionListResponse ListLabelDefinitions(ctx).Scope(scope).Cursor(cursor).Limit(limit).Execute()
+> LabelDefinitionList ListLabelDefinitions(ctx).Scope(scope).Cursor(cursor).Limit(limit).Execute()
 
 List Label Definitions in a scope.
 
@@ -314,9 +315,9 @@ import (
 )
 
 func main() {
-	scope := "scope_example" // string | Scope selector. Accepts the literal `platform`, or `domain:<uuid>`, or `project:<uuid>`. DECISION: scope is a single string rather than a pair of query params because the three forms are mutually exclusive and the SpiceDB scope-object derivation treats them as a single coordinate . 
-	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`.  (optional)
-	limit := int32(56) // int32 | Maximum number of items to return in a single page .  (optional) (default to 50)
+	scope := "scope_example" // string | Scope selector. Accepts the literal `platform`, or `domain:<uuid>`, or `project:<uuid>`. DECISION: scope is a single string rather than a pair of query params because the three forms are mutually exclusive and the SpiceDB scope-object derivation treats them as a single coordinate. 
+	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -325,7 +326,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error when calling `LabelsAPI.ListLabelDefinitions``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
 	}
-	// response from `ListLabelDefinitions`: LabelDefinitionListResponse
+	// response from `ListLabelDefinitions`: LabelDefinitionList
 	fmt.Fprintf(os.Stdout, "Response from `LabelsAPI.ListLabelDefinitions`: %v\n", resp)
 }
 ```
@@ -341,17 +342,17 @@ Other parameters are passed through a pointer to a apiListLabelDefinitionsReques
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **scope** | **string** | Scope selector. Accepts the literal &#x60;platform&#x60;, or &#x60;domain:&lt;uuid&gt;&#x60;, or &#x60;project:&lt;uuid&gt;&#x60;. DECISION: scope is a single string rather than a pair of query params because the three forms are mutually exclusive and the SpiceDB scope-object derivation treats them as a single coordinate .  | 
- **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;.  | 
- **limit** | **int32** | Maximum number of items to return in a single page .  | [default to 50]
+ **scope** | **string** | Scope selector. Accepts the literal &#x60;platform&#x60;, or &#x60;domain:&lt;uuid&gt;&#x60;, or &#x60;project:&lt;uuid&gt;&#x60;. DECISION: scope is a single string rather than a pair of query params because the three forms are mutually exclusive and the SpiceDB scope-object derivation treats them as a single coordinate.  | 
+ **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
 
 ### Return type
 
-[**LabelDefinitionListResponse**](LabelDefinitionListResponse.md)
+[**LabelDefinitionList**](LabelDefinitionList.md)
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -424,7 +425,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -490,7 +491,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -565,7 +566,73 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+
+### HTTP request headers
+
+- **Content-Type**: application/json
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## SearchObjectsByLabel
+
+> ObjectSearchResponse SearchObjectsByLabel(ctx).ObjectSearchRequest(objectSearchRequest).Execute()
+
+Search objects by Label selector, filtered to the caller's access.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	objectSearchRequest := *openapiclient.NewObjectSearchRequest("Selector_example", "Relation_example", openapiclient.ObjectSearchRequest_scope("platform")) // ObjectSearchRequest | 
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.LabelsAPI.SearchObjectsByLabel(context.Background()).ObjectSearchRequest(objectSearchRequest).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `LabelsAPI.SearchObjectsByLabel``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `SearchObjectsByLabel`: ObjectSearchResponse
+	fmt.Fprintf(os.Stdout, "Response from `LabelsAPI.SearchObjectsByLabel`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiSearchObjectsByLabelRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **objectSearchRequest** | [**ObjectSearchRequest**](ObjectSearchRequest.md) |  | 
+
+### Return type
+
+[**ObjectSearchResponse**](ObjectSearchResponse.md)
+
+### Authorization
+
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -637,7 +704,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 

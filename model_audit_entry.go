@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -19,11 +19,11 @@ import (
 // checks if the AuditEntry type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &AuditEntry{}
 
-// AuditEntry Single audit chain row exposed on the read surface. Mirrors the `internal/audit.Entry` aggregate plus the per-row provenance (`entry_hash`, `prev_hash`) the verifier consumes. `archive_etag` and `archived_at` are populated once the object-store mirror worker has uploaded the row to the per-Domain bucket; both are `null` on rows still in flight from the append path.
+// AuditEntry Single audit chain row exposed on the read surface — served by both the per-Domain chain (`/v1/domains/{domain_id}/audit`) and the platform-residency chain (`/v1/platform/audit`). Mirrors the `internal/audit.Entry` aggregate plus the per-row provenance (`entry_hash`, `prev_hash`) the verifier consumes. `archive_etag` and `archived_at` are populated once the object-store mirror worker has uploaded the row to the owning chain's bucket; both are absent on rows still in flight from the append path.
 type AuditEntry struct {
-	// Per-Domain monotonic sequence number assigned at append time.
+	// Per-chain monotonic sequence number assigned at append time.
 	Seq int64 `json:"seq"`
-	// Owning Domain.
+	// Scope anchor of the owning chain — the owning Domain id on Domain-chain rows, the platform chain's anchor id on platform-residency rows.
 	DomainId string `json:"domain_id"`
 	// Server-side timestamp the decision was reached (RFC 3339, UTC).
 	OccurredAt time.Time    `json:"occurred_at"`
@@ -40,9 +40,9 @@ type AuditEntry struct {
 	EntryHash string `json:"entry_hash" validate:"regexp=^[0-9a-f]{64}$"`
 	// `entry_hash` of the preceding row, or 64 zero hex characters on the genesis row (`seq=1`).
 	PrevHash string `json:"prev_hash" validate:"regexp=^[0-9a-f]{64}$"`
-	// Object-store ETag of the per-Domain mirror copy, or `null` until the drain worker has uploaded the row.
+	// Object-store ETag of the per-Domain mirror copy; absent until the drain worker has uploaded the row.
 	ArchiveEtag *string `json:"archive_etag,omitempty"`
-	// Server-side timestamp the mirror upload completed, or `null` while the row is still in flight.
+	// Server-side timestamp the mirror upload completed; absent while the row is still in flight.
 	ArchivedAt           *time.Time `json:"archived_at,omitempty"`
 	AdditionalProperties map[string]interface{}
 }

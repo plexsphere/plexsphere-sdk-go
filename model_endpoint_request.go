@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -21,7 +21,7 @@ var _ MappedNullable = &EndpointRequest{}
 
 // EndpointRequest Body for PUT /v1/nodes/{id}/endpoint. Carries a single NAT- observed transport endpoint the plexd agent saw the local Node arrive on, plus the agent's classification of the NAT traversal posture and the wall-clock at which the observation was made.
 type EndpointRequest struct {
-	// Canonical `host:port` wire form of the observed transport endpoint. The host is an IPv4 dotted quad or an IPv6 address bracketed per RFC 5952 (`[2001:db8::1]:51820`); the port is in the RFC 6056 ephemeral range 1..65535. Loopback, link-local, and unspecified addresses are refused with 400 `endpoint_unparseable`.
+	// Canonical `host:port` wire form of the observed transport endpoint. The host is an IPv4 dotted quad or an IPv6 address bracketed per RFC 5952 (`[2001:db8::1]:51820`); the port is in the 1..65535 range. Loopback, link-local, and unspecified addresses are refused with 400 `endpoint_unparseable`.
 	Endpoint string                 `json:"endpoint"`
 	NatType  EndpointRequestNatType `json:"nat_type"`
 	// Agent wall-clock at the moment the observation was made. The handler rejects the request with 400 `endpoint_clock_skew` if the value drifts more than 60 seconds from server now.

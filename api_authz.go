@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -38,7 +38,7 @@ type AuthzAPI interface {
 	/*
 		DeleteRelationTuple Delete a relation tuple.
 
-		Deletes the relation tuple identified by `{id}`. The operation is idempotent — a `{id}` that was already deleted surfaces as `404 relation_tuple_not_found` rather than `204`, so a caller racing two deletes can distinguish \"I deleted it\" from \"someone else got there first\" without leaking existence side-channels (the read path runs the same authz check before the lookup).
+		Deletes the relation tuple identified by `{id}`. A repeated delete of the same `{id}` deliberately surfaces as `404 relation_tuple_not_found` rather than `204`, so a caller racing two deletes can distinguish \"I deleted it\" from \"someone else got there first\" without leaking existence side-channels (the read path runs the same authz check before the lookup).
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Relation tuple identifier (UUIDv7). Bound on `/v1/authz/relation-tuples/{id}` for the per-tuple PATCH / DELETE surface.
@@ -81,7 +81,7 @@ type AuthzAPI interface {
 	/*
 		PostAuthzCheck Run a ReBAC permission check.
 
-		Evaluates the ReBAC tuple graph and (optional) caveat program for the addressed (`subject`, `relation`, `resource`) triple and returns the decision as data on `200`.  DECISION: a denial surfaces as `200 { decision: denied, reason }`, NEVER as `403`. The HTTP layer reserves `403` for transport denials (the caller is not even authorised to USE the check endpoint). Mixing the two would force callers to disambiguate infrastructure failures from policy outcomes by parsing the Problem body, defeating the point of treating denials as a first-class result.  The `correlation_id` echoed on every response pairs the result with the matching audit entry emitted by `internal/audit`.
+		Evaluates the ReBAC tuple graph and (optional) caveat program for the addressed (`subject`, `relation`, `resource`) triple and returns the decision as data on `200`.  DECISION: a denial surfaces as `200 { decision: denied, reason }`, NEVER as `403` — and no 403 is declared on this operation at all: an unauthenticated caller is refused with 401 by the authn middleware, and every authenticated caller may run checks. Mixing policy denials into transport status codes would force callers to disambiguate infrastructure failures from policy outcomes by parsing the Problem body, defeating the point of treating denials as a first-class result.  The `correlation_id` echoed on every response pairs the result with the matching audit entry emitted by `internal/audit`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@return ApiPostAuthzCheckRequest
@@ -324,7 +324,7 @@ func (r ApiDeleteRelationTupleRequest) Execute() (*http.Response, error) {
 /*
 DeleteRelationTuple Delete a relation tuple.
 
-Deletes the relation tuple identified by `{id}`. The operation is idempotent — a `{id}` that was already deleted surfaces as `404 relation_tuple_not_found` rather than `204`, so a caller racing two deletes can distinguish \"I deleted it\" from \"someone else got there first\" without leaking existence side-channels (the read path runs the same authz check before the lookup).
+Deletes the relation tuple identified by `{id}`. A repeated delete of the same `{id}` deliberately surfaces as `404 relation_tuple_not_found` rather than `204`, so a caller racing two deletes can distinguish \"I deleted it\" from \"someone else got there first\" without leaking existence side-channels (the read path runs the same authz check before the lookup).
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Relation tuple identifier (UUIDv7). Bound on `/v1/authz/relation-tuples/{id}` for the per-tuple PATCH / DELETE surface.
@@ -477,7 +477,7 @@ func (r ApiListRelationTuplesRequest) Cursor(cursor string) ApiListRelationTuple
 	return r
 }
 
-// Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the service.
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
 func (r ApiListRelationTuplesRequest) Limit(limit int32) ApiListRelationTuplesRequest {
 	r.limit = &limit
 	return r
@@ -833,7 +833,7 @@ func (r ApiPostAuthzCheckRequest) Execute() (*RebacCheckResponse, *http.Response
 /*
 PostAuthzCheck Run a ReBAC permission check.
 
-Evaluates the ReBAC tuple graph and (optional) caveat program for the addressed (`subject`, `relation`, `resource`) triple and returns the decision as data on `200`.  DECISION: a denial surfaces as `200 { decision: denied, reason }`, NEVER as `403`. The HTTP layer reserves `403` for transport denials (the caller is not even authorised to USE the check endpoint). Mixing the two would force callers to disambiguate infrastructure failures from policy outcomes by parsing the Problem body, defeating the point of treating denials as a first-class result.  The `correlation_id` echoed on every response pairs the result with the matching audit entry emitted by `internal/audit`.
+Evaluates the ReBAC tuple graph and (optional) caveat program for the addressed (`subject`, `relation`, `resource`) triple and returns the decision as data on `200`.  DECISION: a denial surfaces as `200 { decision: denied, reason }`, NEVER as `403` — and no 403 is declared on this operation at all: an unauthenticated caller is refused with 401 by the authn middleware, and every authenticated caller may run checks. Mixing policy denials into transport status codes would force callers to disambiguate infrastructure failures from policy outcomes by parsing the Problem body, defeating the point of treating denials as a first-class result.  The `correlation_id` echoed on every response pairs the result with the matching audit entry emitted by `internal/audit`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiPostAuthzCheckRequest

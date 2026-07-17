@@ -4,14 +4,14 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**Items** | [**[]Incident**](Incident.md) | The incident headers on this page. | 
+**Items** | [**[]IncidentHeader**](IncidentHeader.md) | The incident headers on this page. | 
 **NextCursor** | Pointer to **string** | Opaque pagination cursor for the next page, or absent when the page is the last.  | [optional] 
 
 ## Methods
 
 ### NewIncidentList
 
-`func NewIncidentList(items []Incident, ) *IncidentList`
+`func NewIncidentList(items []IncidentHeader, ) *IncidentList`
 
 NewIncidentList instantiates a new IncidentList object
 This constructor will assign default values to properties that have it defined,
@@ -28,20 +28,20 @@ but it doesn't guarantee that properties required by API are set
 
 ### GetItems
 
-`func (o *IncidentList) GetItems() []Incident`
+`func (o *IncidentList) GetItems() []IncidentHeader`
 
 GetItems returns the Items field if non-nil, zero value otherwise.
 
 ### GetItemsOk
 
-`func (o *IncidentList) GetItemsOk() (*[]Incident, bool)`
+`func (o *IncidentList) GetItemsOk() (*[]IncidentHeader, bool)`
 
 GetItemsOk returns a tuple with the Items field if it's non-nil, zero value otherwise
 and a boolean to check if the value has been set.
 
 ### SetItems
 
-`func (o *IncidentList) SetItems(v []Incident)`
+`func (o *IncidentList) SetItems(v []IncidentHeader)`
 
 SetItems sets Items field to given value.
 

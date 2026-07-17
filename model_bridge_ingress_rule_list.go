@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -21,7 +21,7 @@ var _ MappedNullable = &BridgeIngressRuleList{}
 // BridgeIngressRuleList Public-ingress rules on a bridge Resource, returned by `ListBridgeIngressRules`. Ordered by slug ascending.
 type BridgeIngressRuleList struct {
 	// Rules ordered by slug ascending.
-	Rules                []BridgeIngressRuleResponse `json:"rules"`
+	Items                []BridgeIngressRuleResponse `json:"items"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -31,9 +31,9 @@ type _BridgeIngressRuleList BridgeIngressRuleList
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewBridgeIngressRuleList(rules []BridgeIngressRuleResponse) *BridgeIngressRuleList {
+func NewBridgeIngressRuleList(items []BridgeIngressRuleResponse) *BridgeIngressRuleList {
 	this := BridgeIngressRuleList{}
-	this.Rules = rules
+	this.Items = items
 	return &this
 }
 
@@ -45,28 +45,28 @@ func NewBridgeIngressRuleListWithDefaults() *BridgeIngressRuleList {
 	return &this
 }
 
-// GetRules returns the Rules field value
-func (o *BridgeIngressRuleList) GetRules() []BridgeIngressRuleResponse {
+// GetItems returns the Items field value
+func (o *BridgeIngressRuleList) GetItems() []BridgeIngressRuleResponse {
 	if o == nil {
 		var ret []BridgeIngressRuleResponse
 		return ret
 	}
 
-	return o.Rules
+	return o.Items
 }
 
-// GetRulesOk returns a tuple with the Rules field value
+// GetItemsOk returns a tuple with the Items field value
 // and a boolean to check if the value has been set.
-func (o *BridgeIngressRuleList) GetRulesOk() ([]BridgeIngressRuleResponse, bool) {
+func (o *BridgeIngressRuleList) GetItemsOk() ([]BridgeIngressRuleResponse, bool) {
 	if o == nil {
 		return nil, false
 	}
-	return o.Rules, true
+	return o.Items, true
 }
 
-// SetRules sets field value
-func (o *BridgeIngressRuleList) SetRules(v []BridgeIngressRuleResponse) {
-	o.Rules = v
+// SetItems sets field value
+func (o *BridgeIngressRuleList) SetItems(v []BridgeIngressRuleResponse) {
+	o.Items = v
 }
 
 func (o BridgeIngressRuleList) MarshalJSON() ([]byte, error) {
@@ -79,7 +79,7 @@ func (o BridgeIngressRuleList) MarshalJSON() ([]byte, error) {
 
 func (o BridgeIngressRuleList) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	toSerialize["rules"] = o.Rules
+	toSerialize["items"] = o.Items
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -93,7 +93,7 @@ func (o *BridgeIngressRuleList) UnmarshalJSON(data []byte) (err error) {
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
-		"rules",
+		"items",
 	}
 
 	allProperties := make(map[string]interface{})
@@ -123,7 +123,7 @@ func (o *BridgeIngressRuleList) UnmarshalJSON(data []byte) (err error) {
 	additionalProperties := make(map[string]interface{})
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
-		delete(additionalProperties, "rules")
+		delete(additionalProperties, "items")
 		o.AdditionalProperties = additionalProperties
 	}
 

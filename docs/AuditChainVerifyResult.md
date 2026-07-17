@@ -5,9 +5,9 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Ok** | **bool** | &#x60;true&#x60; when every row in the inspected segment hashes correctly and chains to its predecessor; &#x60;false&#x60; when the verifier observed a divergence at &#x60;divergent_seq&#x60;.  | 
-**DivergentSeq** | Pointer to **int64** | Seq of the first row whose recomputed hash did not match the stored value, or whose &#x60;prev_hash&#x60; did not match the previous row&#39;s &#x60;entry_hash&#x60;. &#x60;null&#x60; on a clean run.  | [optional] 
-**ExpectedHash** | Pointer to **string** | Hash the verifier computed for &#x60;divergent_seq&#x60;, lowercase hex. &#x60;null&#x60; on a clean run.  | [optional] 
-**ObservedHash** | Pointer to **string** | Hash actually stored at &#x60;divergent_seq&#x60;, lowercase hex. &#x60;null&#x60; on a clean run.  | [optional] 
+**DivergentSeq** | Pointer to **int64** | Seq of the first row whose recomputed hash did not match the stored value, or whose &#x60;prev_hash&#x60; did not match the previous row&#39;s &#x60;entry_hash&#x60;. Absent on a clean run.  | [optional] 
+**ExpectedHash** | Pointer to **string** | Hash the verifier computed for &#x60;divergent_seq&#x60;, lowercase hex. Absent on a clean run.  | [optional] 
+**ObservedHash** | Pointer to **string** | Hash actually stored at &#x60;divergent_seq&#x60;, lowercase hex. Absent on a clean run.  | [optional] 
 **SegmentFrom** | **int64** | Inclusive lower bound the verifier actually walked. | 
 **SegmentTo** | **int64** | Inclusive upper bound the verifier actually walked. | 
 

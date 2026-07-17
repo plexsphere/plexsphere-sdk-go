@@ -4,13 +4,13 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**Providers** | [**[]BridgeUserAccessProviderResponse**](BridgeUserAccessProviderResponse.md) | Providers ordered by slug ascending. | 
+**Items** | [**[]BridgeUserAccessProviderResponse**](BridgeUserAccessProviderResponse.md) | Providers ordered by slug ascending. | 
 
 ## Methods
 
 ### NewBridgeUserAccessProviderList
 
-`func NewBridgeUserAccessProviderList(providers []BridgeUserAccessProviderResponse, ) *BridgeUserAccessProviderList`
+`func NewBridgeUserAccessProviderList(items []BridgeUserAccessProviderResponse, ) *BridgeUserAccessProviderList`
 
 NewBridgeUserAccessProviderList instantiates a new BridgeUserAccessProviderList object
 This constructor will assign default values to properties that have it defined,
@@ -25,24 +25,24 @@ NewBridgeUserAccessProviderListWithDefaults instantiates a new BridgeUserAccessP
 This constructor will only assign default values to properties that have it defined,
 but it doesn't guarantee that properties required by API are set
 
-### GetProviders
+### GetItems
 
-`func (o *BridgeUserAccessProviderList) GetProviders() []BridgeUserAccessProviderResponse`
+`func (o *BridgeUserAccessProviderList) GetItems() []BridgeUserAccessProviderResponse`
 
-GetProviders returns the Providers field if non-nil, zero value otherwise.
+GetItems returns the Items field if non-nil, zero value otherwise.
 
-### GetProvidersOk
+### GetItemsOk
 
-`func (o *BridgeUserAccessProviderList) GetProvidersOk() (*[]BridgeUserAccessProviderResponse, bool)`
+`func (o *BridgeUserAccessProviderList) GetItemsOk() (*[]BridgeUserAccessProviderResponse, bool)`
 
-GetProvidersOk returns a tuple with the Providers field if it's non-nil, zero value otherwise
+GetItemsOk returns a tuple with the Items field if it's non-nil, zero value otherwise
 and a boolean to check if the value has been set.
 
-### SetProviders
+### SetItems
 
-`func (o *BridgeUserAccessProviderList) SetProviders(v []BridgeUserAccessProviderResponse)`
+`func (o *BridgeUserAccessProviderList) SetItems(v []BridgeUserAccessProviderResponse)`
 
-SetProviders sets Providers field to given value.
+SetItems sets Items field to given value.
 
 
 

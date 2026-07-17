@@ -4,18 +4,18 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**ProjectId** | **string** | Project the redeeming substrate is enrolling into. Must match the &#x60;project_id&#x60; segment of the plaintext &#x60;bootstrap_token&#x60;; a mismatch surfaces as 403 with &#x60;reason&#x3D;project_mismatch&#x60;.  | 
-**ResourceId** | **string** | Human-readable Resource handle (e.g. &#x60;edge-router-01&#x60;) the registering Node binds to. The handler resolves this against the Resource aggregate; an unknown handle surfaces as 404 with &#x60;code&#x3D;resource_not_found&#x60;.  | 
-**BootstrapToken** | **string** | Plaintext BootstrapToken in the documented &#x60;psb_&lt;env&gt;_&lt;projectId&gt;_&lt;kind&gt;_&lt;random&gt;&#x60; format (matches &#x60;^psb_[a-z]+_[a-z2-7]+_(node|bridge)_[a-z2-7]{20,}$&#x60;) . The Validator parses the prefix to discover the env + project-id + kind triple before running the candidate scan.  | 
-**Nonce** | **string** | Request-side replay-protection nonce. The persistence layer holds a partial UNIQUE on (project_id, consumed_nonce); a duplicate surfaces as 403 with &#x60;reason&#x3D;nonce_collision&#x60;.  | 
+**ProjectId** | **string** | Project the redeeming substrate is enrolling into. Must match the &#x60;project_id&#x60; segment of the plaintext &#x60;bootstrap_token&#x60;; a mismatch surfaces as 403 with &#x60;code&#x3D;project_mismatch&#x60;.  | 
+**ResourceHandle** | **string** | Human-readable Resource handle (e.g. &#x60;edge-router-01&#x60;) the registering Node binds to. The handler resolves this against the Resource aggregate; an unknown handle surfaces as 404 with &#x60;code&#x3D;resource_not_found&#x60;.  | 
+**BootstrapToken** | **string** | Plaintext BootstrapToken in the documented &#x60;psb_&lt;env&gt;_&lt;projectId&gt;_&lt;kind&gt;_&lt;random&gt;&#x60; format (matches &#x60;^psb_[a-z]+_[a-z2-7]+_(node|bridge)_[a-z2-7]{20,}$&#x60;). The Validator parses the prefix to discover the env + project-id + kind triple before running the candidate scan.  | 
+**Nonce** | **string** | Request-side replay-protection nonce. The persistence layer holds a partial UNIQUE on (project_id, consumed_nonce); a duplicate surfaces as 403 with &#x60;code&#x3D;nonce_collision&#x60;.  | 
 **PublicKey** | **string** | 32-byte X25519 (WireGuard) public key, base64-encoded with standard padding. RFC 7748 §5 fixes the curve to a 32-byte little-endian point encoding so any other byte length surfaces as 400 with &#x60;code&#x3D;public_key_invalid&#x60;; the all-zero degenerate value (a known small-order point) is also rejected with the same code. The fixed length-44 base64 canonical form is the standard &#x60;RawStdEncoding&#x60;-with-padding result for a 32-byte payload.  | 
-**RequestedResourceId** | Pointer to **string** | Optional override the operator can supply when the substrate&#39;s own naming differs from the platform handle (e.g. the Node identifies itself as &#x60;node-12&#x60; while the platform Resource is &#x60;edge-router-01&#x60;). Empty or omitted means \&quot;no override; use &#x60;resource_id&#x60; verbatim\&quot; .  | [optional] 
+**RequestedResourceId** | Pointer to **string** | Optional override the operator can supply when the substrate&#39;s own naming differs from the platform handle (e.g. the Node identifies itself as &#x60;node-12&#x60; while the platform Resource is &#x60;edge-router-01&#x60;). Empty or omitted means \&quot;no override; use &#x60;resource_handle&#x60; verbatim\&quot;.  | [optional] 
 
 ## Methods
 
 ### NewRegisterRequest
 
-`func NewRegisterRequest(projectId string, resourceId string, bootstrapToken string, nonce string, publicKey string, ) *RegisterRequest`
+`func NewRegisterRequest(projectId string, resourceHandle string, bootstrapToken string, nonce string, publicKey string, ) *RegisterRequest`
 
 NewRegisterRequest instantiates a new RegisterRequest object
 This constructor will assign default values to properties that have it defined,
@@ -50,24 +50,24 @@ and a boolean to check if the value has been set.
 SetProjectId sets ProjectId field to given value.
 
 
-### GetResourceId
+### GetResourceHandle
 
-`func (o *RegisterRequest) GetResourceId() string`
+`func (o *RegisterRequest) GetResourceHandle() string`
 
-GetResourceId returns the ResourceId field if non-nil, zero value otherwise.
+GetResourceHandle returns the ResourceHandle field if non-nil, zero value otherwise.
 
-### GetResourceIdOk
+### GetResourceHandleOk
 
-`func (o *RegisterRequest) GetResourceIdOk() (*string, bool)`
+`func (o *RegisterRequest) GetResourceHandleOk() (*string, bool)`
 
-GetResourceIdOk returns a tuple with the ResourceId field if it's non-nil, zero value otherwise
+GetResourceHandleOk returns a tuple with the ResourceHandle field if it's non-nil, zero value otherwise
 and a boolean to check if the value has been set.
 
-### SetResourceId
+### SetResourceHandle
 
-`func (o *RegisterRequest) SetResourceId(v string)`
+`func (o *RegisterRequest) SetResourceHandle(v string)`
 
-SetResourceId sets ResourceId field to given value.
+SetResourceHandle sets ResourceHandle field to given value.
 
 
 ### GetBootstrapToken

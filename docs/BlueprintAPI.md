@@ -32,7 +32,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Blueprint identifier (UUIDv7). Bound on `/v1/blueprints/{id}` for the read-only Blueprint Catalog surface. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Blueprint identifier (UUIDv7). Bound on `/v1/blueprints/{id}` for the Blueprint Catalog read surface and on `/v1/blueprints/{id}/versions` for the version-publishing authorship surface. 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -52,7 +52,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Blueprint identifier (UUIDv7). Bound on &#x60;/v1/blueprints/{id}&#x60; for the read-only Blueprint Catalog surface.  | 
+**id** | **string** | Blueprint identifier (UUIDv7). Bound on &#x60;/v1/blueprints/{id}&#x60; for the Blueprint Catalog read surface and on &#x60;/v1/blueprints/{id}/versions&#x60; for the version-publishing authorship surface.  | 
 
 ### Other Parameters
 
@@ -69,7 +69,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -103,7 +103,7 @@ import (
 
 func main() {
 	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
-	limit := int32(56) // int32 | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the read service.  (optional) (default to 50)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -129,7 +129,7 @@ Other parameters are passed through a pointer to a apiListBlueprintsRequest stru
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
- **limit** | **int32** | Maximum number of items to return in a single page. The handler clamps the value to [1, 200] before forwarding it to the read service.  | [default to 50]
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
 
 ### Return type
 
@@ -137,7 +137,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -170,8 +170,8 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Blueprint identifier (UUIDv7). Bound on `/v1/blueprints/{id}` for the read-only Blueprint Catalog surface. 
-	blueprintVersionCreateRequest := *openapiclient.NewBlueprintVersionCreateRequest("Version_example", map[string]interface{}{"key": interface{}(123)}, map[string]interface{}{"key": interface{}(123)}, map[string]interface{}{"key": interface{}(123)}, []string{"ProviderKinds_example"}, "InjectionStrategy_example") // BlueprintVersionCreateRequest | 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Blueprint identifier (UUIDv7). Bound on `/v1/blueprints/{id}` for the Blueprint Catalog read surface and on `/v1/blueprints/{id}/versions` for the version-publishing authorship surface. 
+	blueprintVersionCreateRequest := *openapiclient.NewBlueprintVersionCreateRequest("Version_example", map[string]interface{}{"key": interface{}(123)}, map[string]interface{}{"key": interface{}(123)}, map[string]interface{}{"key": interface{}(123)}, []openapiclient.BlueprintVersionCreateRequestProviderKindsInner{openapiclient.BlueprintVersionCreateRequest_provider_kinds_inner("aws")}, openapiclient.BlueprintVersionCreateRequest_injection_strategy("cloud-init-user-data")) // BlueprintVersionCreateRequest | 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -191,7 +191,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Blueprint identifier (UUIDv7). Bound on &#x60;/v1/blueprints/{id}&#x60; for the read-only Blueprint Catalog surface.  | 
+**id** | **string** | Blueprint identifier (UUIDv7). Bound on &#x60;/v1/blueprints/{id}&#x60; for the Blueprint Catalog read surface and on &#x60;/v1/blueprints/{id}/versions&#x60; for the version-publishing authorship surface.  | 
 
 ### Other Parameters
 
@@ -209,7 +209,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -275,7 +275,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 

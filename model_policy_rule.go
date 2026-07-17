@@ -1,7 +1,7 @@
 /*
 plexsphere API
 
-HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints , and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file .  CSRF defence-in-depth (issue #181): every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf-token-mismatch`, `csrf-origin-mismatch`, `csrf-origin-not-configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
+HTTP contract for plexsphere's meta endpoints (health, version, self-describing OpenAPI), the identity sign-in / token endpoints, and the admin IdP-binding management surface. The specification is the single source of truth — server stubs, clients, and documentation are generated from this file.  CSRF defence-in-depth: every state-changing cookie-authenticated `/v1/_*` request (`POST`, `PATCH`, `PUT`, `DELETE`) is required to carry both an Origin / Sec-Fetch-Site signal AND echo the `plexsphere_csrf` cookie value in the `X-Plexsphere-CSRF` header. Violations surface as `403 application/problem+json` with `code` ∈ { `csrf_token_mismatch`, `csrf_origin_mismatch`, `csrf_origin_not_configured` }. Bearer-authenticated requests (`Authorization: Bearer …`) are exempt because the bearer scheme is not auto-attached by browsers; the sign-in surface (`/v1/auth/_*`) is exempt because it cannot carry a Principal yet.
 
 API version: v1
 */
@@ -23,9 +23,9 @@ type PolicyRule struct {
 	Action   PolicyAction   `json:"action"`
 	Protocol PolicyProtocol `json:"protocol"`
 	// IPv4 or IPv6 prefix in CIDR notation (e.g. `10.0.0.0/8`, `2001:db8::/32`). Source and destination MUST agree on address family; a mismatch surfaces as `422 cidr_family_mismatch`.
-	SourceCidr string `json:"source_cidr"`
+	SourceCidr string `json:"source_cidr" validate:"regexp=^([0-9]{1,3}\\\\.){3}[0-9]{1,3}\\/[0-9]{1,2}$|^[0-9a-fA-F:]+\\/[0-9]{1,3}$"`
 	// IPv4 or IPv6 prefix in CIDR notation. Address family MUST match `source_cidr`.
-	DestinationCidr      string           `json:"destination_cidr"`
+	DestinationCidr      string           `json:"destination_cidr" validate:"regexp=^([0-9]{1,3}\\\\.){3}[0-9]{1,3}\\/[0-9]{1,2}$|^[0-9a-fA-F:]+\\/[0-9]{1,3}$"`
 	Ports                *PolicyPortRange `json:"ports,omitempty"`
 	AdditionalProperties map[string]interface{}
 }
