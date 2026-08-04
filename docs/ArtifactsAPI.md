@@ -68,7 +68,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+[nskBearer](../README.md#nskBearer), [operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -138,7 +138,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+[nskBearer](../README.md#nskBearer), [operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 

@@ -5,7 +5,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **RotationId** | **string** | Identifier of the &#x60;peer_key_rotation&#x60; row this submission flipped from &#x60;pending&#x60; to &#x60;completed&#x60;. The Node records it so a later audit query can correlate the rotation back to the re-issued PSK row.  | 
-**Kid** | **string** | Key id of the freshly-wrapped pairwise PSK the rotation re-issued. Paired with &#x60;wrap_key_version&#x60; it is the reference plexd uses to resolve the PSK without the control plane re-transmitting secret material.  | 
+**Kid** | **string** | Key id of the freshly-wrapped pairwise PSK the rotation re-issued. Paired with &#x60;wrap_key_version&#x60; it is a server-side row reference — the pair pins the exact wrapped PSK row, not a path the Node resolves locally; the Node re-fetches each edge PSK from &#x60;GET /v1/nodes/{id}/peers/{peer_node_id}/psk&#x60;.  | 
 **WrapKeyVersion** | **int32** | Version of the active wrap key under which the re-issued PSK was wrapped. Paired with &#x60;kid&#x60; it pins the exact wrapping epoch.  | 
 
 ## Methods

@@ -5,24 +5,27 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Id** | **string** | Approval identifier (UUIDv7). | 
+**Kind** | [**ApprovalKind**](ApprovalKind.md) |  | 
 **DomainId** | **string** | Identifier of the owning Domain — the residency pivot the ReBAC gate authorises against.  | 
+**ProjectId** | Pointer to **string** | Identifier of the consuming Project the assignment binds into. Set on &#x60;credential_assignment&#x60; and &#x60;cloud_assignment&#x60; rows; absent on &#x60;approval&#x60; rows.  | [optional] 
 **ProposerSubject** | **string** | ReBAC subject string of the principal that raised the proposal. A caller may never approve a proposal whose &#x60;proposer_subject&#x60; is themselves.  | 
 **ActionKind** | **string** | Kind of action the proposal would perform once approved. Matched against the Domain &#x60;ApprovalPolicy&#x60; rules to decide whether the proposal is gated.  | 
 **TargetResource** | **string** | Resource the proposed action targets. Matched against the optional &#x60;target_resource&#x60; of a policy rule.  | 
 **Payload** | Pointer to **map[string]interface{}** | Raw JSON action payload applied verbatim once the proposal is approved. Opaque to the approval workflow — it carries the parameters of the action the proposer intends to run.  | [optional] 
 **State** | [**ApprovalState**](ApprovalState.md) |  | 
+**Materialised** | Pointer to **bool** | Whether the assignment&#39;s ReBAC binding is currently live. &#x60;true&#x60; only while the assignment is in the &#x60;approved&#x60; state. Set on &#x60;credential_assignment&#x60; and &#x60;cloud_assignment&#x60; rows; absent on &#x60;approval&#x60; rows.  | [optional] 
 **CreatedAt** | **time.Time** | Aggregate creation timestamp (UTC). | 
 **DecidedAt** | Pointer to **time.Time** | Timestamp the proposal reached a terminal state (UTC). Absent while the proposal is still &#x60;proposed&#x60; or &#x60;pending-approval&#x60;.  | [optional] 
 **DecidedBySubject** | Pointer to **string** | ReBAC subject string of the principal that decided the proposal. Absent while undecided and for the unattended &#x60;expired&#x60; path.  | [optional] 
 **DecisionReason** | Pointer to **string** | Free-text rationale recorded with the decision. Absent while undecided and for the unattended &#x60;expired&#x60; path. For a break-glass override the rationale value is PII and is NOT surfaced here verbatim — only its field name is projected onto &#x60;caveat_context&#x60;.  | [optional] 
-**ExpiresAt** | **time.Time** | Deadline past which the background sweeper expires an un-decided proposal (UTC).  | 
+**ExpiresAt** | Pointer to **time.Time** | Deadline past which the background sweeper expires an un-decided proposal (UTC). Set on &#x60;approval&#x60; rows only. Assignment rows carry no deadline and never expire, so the field is absent on &#x60;credential_assignment&#x60; and &#x60;cloud_assignment&#x60; rows.  | [optional] 
 **CaveatContext** | Pointer to **map[string][]string** | Names-only projection of the caveat field NAMES referenced on the decision&#39;s audit row — for a break-glass override this carries the &#x60;reason&#x60; field name. Values never cross this boundary: the map keys are caveat NAMES and the arrays are caveat-parameter NAMES, mirroring the Platform Audit Log invariant. Absent while the proposal carries no decision audit row.  | [optional] 
 
 ## Methods
 
 ### NewApproval
 
-`func NewApproval(id string, domainId string, proposerSubject string, actionKind string, targetResource string, state ApprovalState, createdAt time.Time, expiresAt time.Time, ) *Approval`
+`func NewApproval(id string, kind ApprovalKind, domainId string, proposerSubject string, actionKind string, targetResource string, state ApprovalState, createdAt time.Time, ) *Approval`
 
 NewApproval instantiates a new Approval object
 This constructor will assign default values to properties that have it defined,
@@ -57,6 +60,26 @@ and a boolean to check if the value has been set.
 SetId sets Id field to given value.
 
 
+### GetKind
+
+`func (o *Approval) GetKind() ApprovalKind`
+
+GetKind returns the Kind field if non-nil, zero value otherwise.
+
+### GetKindOk
+
+`func (o *Approval) GetKindOk() (*ApprovalKind, bool)`
+
+GetKindOk returns a tuple with the Kind field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetKind
+
+`func (o *Approval) SetKind(v ApprovalKind)`
+
+SetKind sets Kind field to given value.
+
+
 ### GetDomainId
 
 `func (o *Approval) GetDomainId() string`
@@ -76,6 +99,31 @@ and a boolean to check if the value has been set.
 
 SetDomainId sets DomainId field to given value.
 
+
+### GetProjectId
+
+`func (o *Approval) GetProjectId() string`
+
+GetProjectId returns the ProjectId field if non-nil, zero value otherwise.
+
+### GetProjectIdOk
+
+`func (o *Approval) GetProjectIdOk() (*string, bool)`
+
+GetProjectIdOk returns a tuple with the ProjectId field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetProjectId
+
+`func (o *Approval) SetProjectId(v string)`
+
+SetProjectId sets ProjectId field to given value.
+
+### HasProjectId
+
+`func (o *Approval) HasProjectId() bool`
+
+HasProjectId returns a boolean if a field has been set.
 
 ### GetProposerSubject
 
@@ -181,6 +229,31 @@ and a boolean to check if the value has been set.
 
 SetState sets State field to given value.
 
+
+### GetMaterialised
+
+`func (o *Approval) GetMaterialised() bool`
+
+GetMaterialised returns the Materialised field if non-nil, zero value otherwise.
+
+### GetMaterialisedOk
+
+`func (o *Approval) GetMaterialisedOk() (*bool, bool)`
+
+GetMaterialisedOk returns a tuple with the Materialised field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetMaterialised
+
+`func (o *Approval) SetMaterialised(v bool)`
+
+SetMaterialised sets Materialised field to given value.
+
+### HasMaterialised
+
+`func (o *Approval) HasMaterialised() bool`
+
+HasMaterialised returns a boolean if a field has been set.
 
 ### GetCreatedAt
 
@@ -296,6 +369,11 @@ and a boolean to check if the value has been set.
 
 SetExpiresAt sets ExpiresAt field to given value.
 
+### HasExpiresAt
+
+`func (o *Approval) HasExpiresAt() bool`
+
+HasExpiresAt returns a boolean if a field has been set.
 
 ### GetCaveatContext
 

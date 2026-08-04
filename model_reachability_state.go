@@ -15,7 +15,7 @@ import (
 	"fmt"
 )
 
-// ReachabilityState Current reachability state. `healthy` means the most recent heartbeat is younger than 90s; `stale` means it is between 90s and 300s old; `unreachable` means it is older than 300s or no heartbeat has ever been accepted.
+// ReachabilityState Current reachability state. `never_reported` means no heartbeat has ever been admitted for the Node; it is the state a Node is born in at enrolment. The other three values are derived from the age of the most recent admitted heartbeat: `healthy` means it is younger than 90s, `stale` means it is between 90s and 300s old, and `unreachable` means it is older than 300s. `unreachable` therefore applies only to a Node whose heartbeats stopped.
 type ReachabilityState string
 
 // List of Reachability_state
@@ -23,6 +23,7 @@ const (
 	REACHABILITYSTATE_HEALTHY                  ReachabilityState = "healthy"
 	REACHABILITYSTATE_STALE                    ReachabilityState = "stale"
 	REACHABILITYSTATE_UNREACHABLE              ReachabilityState = "unreachable"
+	REACHABILITYSTATE_NEVER_REPORTED           ReachabilityState = "never_reported"
 	REACHABILITYSTATE_UNKNOWN_DEFAULT_OPEN_API ReachabilityState = "unknown_default_open_api"
 )
 
@@ -31,6 +32,7 @@ var AllowedReachabilityStateEnumValues = []ReachabilityState{
 	"healthy",
 	"stale",
 	"unreachable",
+	"never_reported",
 	"unknown_default_open_api",
 }
 

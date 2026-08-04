@@ -1,15 +1,13 @@
-# MeshTopologyNodeReachability
+# ApprovalKind
 
 ## Enum
 
 
-* `HEALTHY` (value: `"healthy"`)
+* `APPROVAL` (value: `"approval"`)
 
-* `STALE` (value: `"stale"`)
+* `CREDENTIAL_ASSIGNMENT` (value: `"credential_assignment"`)
 
-* `UNREACHABLE` (value: `"unreachable"`)
-
-* `NEVER_REPORTED` (value: `"never_reported"`)
+* `CLOUD_ASSIGNMENT` (value: `"cloud_assignment"`)
 
 * `UNKNOWN_DEFAULT_OPEN_API` (value: `"unknown_default_open_api"`)
 

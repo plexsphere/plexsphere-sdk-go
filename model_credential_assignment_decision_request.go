@@ -19,7 +19,7 @@ import (
 // checks if the CredentialAssignmentDecisionRequest type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &CredentialAssignmentDecisionRequest{}
 
-// CredentialAssignmentDecisionRequest Body for `POST /v1/credential-assignments/{id}/reject` and `POST /v1/credential-assignments/{id}/revoke`. The `reason` is recorded on the lifecycle outbox event so the decision carries an approver- or operator-supplied audit string.
+// CredentialAssignmentDecisionRequest Body for `POST /v1/credential-assignments/{id}/revoke`. The `reason` is recorded on the lifecycle outbox event so the decision carries an operator-supplied audit string. Approving and rejecting an assignment happens on the approvals queue via `POST /v1/approvals/{id}/approve` and `POST /v1/approvals/{id}/reject`.
 type CredentialAssignmentDecisionRequest struct {
 	// Decision rationale. Non-empty — whitespace-only is rejected with `400 invalid_decision_reason`.
 	Reason string `json:"reason"`

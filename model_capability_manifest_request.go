@@ -18,7 +18,7 @@ import (
 // checks if the CapabilityManifestRequest type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &CapabilityManifestRequest{}
 
-// CapabilityManifestRequest Body for PUT /v1/nodes/{id}/capabilities. Carries the per-Node capability manifest snapshot plexd reports on agent boot and whenever the running binary, host-key, or declared hooks change: the agent binary semver, the SHA-256 of the running binary (for tamper-evidence and rollout tracking), the optional SSH host-key fingerprint (for the downstream integrity correlator), and the optional list of hooks the agent advertises. The handler canonicalises the envelope through the `tenancy.NewCapabilityManifest` value-object constructor; every invariant is enforced at the aggregate boundary before the recorder ever touches Postgres.
+// CapabilityManifestRequest Body for PUT /v1/nodes/{id}/capabilities. Carries the per-Node capability manifest snapshot plexd reports on agent boot and whenever the running binary, host-key, declared hooks, or built-in action inventory change: the agent binary semver, the SHA-256 of the running binary (for tamper-evidence and rollout tracking), the optional SSH host-key fingerprint (for the downstream integrity correlator), the optional list of hooks the agent advertises, and the optional inventory of built-in actions the agent implements. The handler canonicalises the envelope through the `tenancy.NewCapabilityManifest` value-object constructor; every invariant is enforced at the aggregate boundary before the recorder ever touches Postgres.
 type CapabilityManifestRequest struct {
 	// Human-readable plexd agent version string (e.g. `plexd-v0.4.2-ge5f3a1c`). Non-empty after trimming whitespace — the handler rejects an empty value with 400 `binary_version_empty`.
 	BinaryVersion string `json:"binary_version"`
@@ -29,7 +29,9 @@ type CapabilityManifestRequest struct {
 	// Optional list of hook declarations the agent advertises. Each entry pairs a hook name with the SHA-256 digest of the hook payload so the integrity correlator can detect a hook-content change without re-fetching the payload. The manifest invariants reject duplicate names (400 `declared_hook_duplicate`), more than 128 entries (400 `declared_hooks_too_many`), and any per-entry violation (400 `declared_hook_invalid`).
 	DeclaredHooks []DeclaredHook `json:"declared_hooks,omitempty"`
 	// Optional list of Kubernetes PlexdHook custom resources the agent discovered in its cluster and advertises read-only. Distinct from `declared_hooks`: each entry carries an OCI image digest, a free-form parameter map, an execution timeout, and a sandbox flag rather than a payload checksum. Discovery is read-only — plexsphere records what plexd observed and never writes PlexdHook objects back. The manifest invariants reject duplicate names (422 `plexd_hook_duplicate`), more than 128 entries (422 `plexd_hooks_too_many`), and any per-entry violation (422 `plexd_hook_invalid`).
-	PlexdHooks           []PlexdHook `json:"plexd_hooks,omitempty"`
+	PlexdHooks []PlexdHook `json:"plexd_hooks,omitempty"`
+	// Optional inventory of the built-in actions the agent implements — the operations `POST /v1/projects/{project_id}/resources/{resource_id}/actions` can dispatch against this Node with `kind: builtin`. Each entry names an action, describes it, and declares the parameters it accepts.  The inventory is advisory and read-only. Dispatch does not consult it: an execution names its action, the Node is the authority on whether it can run it, and an unknown action fails at the Node. What the inventory buys is the ability to answer \"what can this Node do?\" without dispatching anything — so an operator surface can offer a Node's actual actions rather than a fixed list, and so a fleet-wide capability query has data to read.  Absent and empty are distinct in intent but not in effect: an agent that reports no inventory is simply one the platform cannot answer that question for. It is not an agent whose actions are known to be none, and nothing refuses a dispatch on that basis.  The manifest invariants reject duplicate action names (422 `builtin_action_duplicate`), more than 128 entries (422 `builtin_actions_too_many`), and any per-entry violation (422 `builtin_action_invalid`).
+	BuiltinActions       []BuiltinAction `json:"builtin_actions,omitempty"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -198,6 +200,38 @@ func (o *CapabilityManifestRequest) SetPlexdHooks(v []PlexdHook) {
 	o.PlexdHooks = v
 }
 
+// GetBuiltinActions returns the BuiltinActions field value if set, zero value otherwise.
+func (o *CapabilityManifestRequest) GetBuiltinActions() []BuiltinAction {
+	if o == nil || IsNil(o.BuiltinActions) {
+		var ret []BuiltinAction
+		return ret
+	}
+	return o.BuiltinActions
+}
+
+// GetBuiltinActionsOk returns a tuple with the BuiltinActions field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CapabilityManifestRequest) GetBuiltinActionsOk() ([]BuiltinAction, bool) {
+	if o == nil || IsNil(o.BuiltinActions) {
+		return nil, false
+	}
+	return o.BuiltinActions, true
+}
+
+// HasBuiltinActions returns a boolean if a field has been set.
+func (o *CapabilityManifestRequest) HasBuiltinActions() bool {
+	if o != nil && !IsNil(o.BuiltinActions) {
+		return true
+	}
+
+	return false
+}
+
+// SetBuiltinActions gets a reference to the given []BuiltinAction and assigns it to the BuiltinActions field.
+func (o *CapabilityManifestRequest) SetBuiltinActions(v []BuiltinAction) {
+	o.BuiltinActions = v
+}
+
 func (o CapabilityManifestRequest) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -218,6 +252,9 @@ func (o CapabilityManifestRequest) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.PlexdHooks) {
 		toSerialize["plexd_hooks"] = o.PlexdHooks
+	}
+	if !IsNil(o.BuiltinActions) {
+		toSerialize["builtin_actions"] = o.BuiltinActions
 	}
 
 	for key, value := range o.AdditionalProperties {
@@ -268,6 +305,7 @@ func (o *CapabilityManifestRequest) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "ssh_host_key_fingerprint")
 		delete(additionalProperties, "declared_hooks")
 		delete(additionalProperties, "plexd_hooks")
+		delete(additionalProperties, "builtin_actions")
 		o.AdditionalProperties = additionalProperties
 	}
 

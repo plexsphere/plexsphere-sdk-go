@@ -226,7 +226,7 @@ Name | Type | Description  | Notes
 
 ## ListApprovals
 
-> ApprovalList ListApprovals(ctx).Status(status).DomainId(domainId).Cursor(cursor).Limit(limit).Execute()
+> ApprovalList ListApprovals(ctx).Status(status).Kind(kind).DomainId(domainId).CloudId(cloudId).Cursor(cursor).Limit(limit).Execute()
 
 List dual-control Approvals.
 
@@ -245,14 +245,16 @@ import (
 )
 
 func main() {
-	status := openapiclient.ApprovalState("proposed") // ApprovalState | Optional lifecycle filter. When present, only Approvals in the named state are returned.  (optional)
-	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Optional owning-Domain filter. When present, only Approvals belonging to the named Domain are returned.  (optional)
+	status := openapiclient.ApprovalState("proposed") // ApprovalState | Optional lifecycle filter. When present, only rows in the named state are returned. A value outside the vocabulary is rejected with `400 invalid_status`.  (optional)
+	kind := openapiclient.ApprovalKind("approval") // ApprovalKind | Optional source filter. When present, only rows of the named source family are returned. A value outside the vocabulary is rejected with `400 invalid_kind`.  (optional)
+	domainId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Optional owning-Domain filter. When present, only rows belonging to the named Domain are returned.  (optional)
+	cloudId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Optional Cloud filter. When present, only assignment rows that target the named Cloud are returned: a `cloud_assignment` row for that Cloud, or a `credential_assignment` row for any Cloud Credential the Cloud owns. An `approval` row never matches this filter, so combining `cloud_id` with `kind=approval` returns an empty page. A malformed value is rejected with `400 invalid_cloud_id`.  (optional)
 	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
 	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.ApprovalsAPI.ListApprovals(context.Background()).Status(status).DomainId(domainId).Cursor(cursor).Limit(limit).Execute()
+	resp, r, err := apiClient.ApprovalsAPI.ListApprovals(context.Background()).Status(status).Kind(kind).DomainId(domainId).CloudId(cloudId).Cursor(cursor).Limit(limit).Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error when calling `ApprovalsAPI.ListApprovals``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
@@ -273,8 +275,10 @@ Other parameters are passed through a pointer to a apiListApprovalsRequest struc
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **status** | [**ApprovalState**](ApprovalState.md) | Optional lifecycle filter. When present, only Approvals in the named state are returned.  | 
- **domainId** | **string** | Optional owning-Domain filter. When present, only Approvals belonging to the named Domain are returned.  | 
+ **status** | [**ApprovalState**](ApprovalState.md) | Optional lifecycle filter. When present, only rows in the named state are returned. A value outside the vocabulary is rejected with &#x60;400 invalid_status&#x60;.  | 
+ **kind** | [**ApprovalKind**](ApprovalKind.md) | Optional source filter. When present, only rows of the named source family are returned. A value outside the vocabulary is rejected with &#x60;400 invalid_kind&#x60;.  | 
+ **domainId** | **string** | Optional owning-Domain filter. When present, only rows belonging to the named Domain are returned.  | 
+ **cloudId** | **string** | Optional Cloud filter. When present, only assignment rows that target the named Cloud are returned: a &#x60;cloud_assignment&#x60; row for that Cloud, or a &#x60;credential_assignment&#x60; row for any Cloud Credential the Cloud owns. An &#x60;approval&#x60; row never matches this filter, so combining &#x60;cloud_id&#x60; with &#x60;kind&#x3D;approval&#x60; returns an empty page. A malformed value is rejected with &#x60;400 invalid_cloud_id&#x60;.  | 
  **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
  **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
 

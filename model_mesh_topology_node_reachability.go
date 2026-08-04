@@ -23,6 +23,7 @@ const (
 	MESHTOPOLOGYNODEREACHABILITY_HEALTHY                  MeshTopologyNodeReachability = "healthy"
 	MESHTOPOLOGYNODEREACHABILITY_STALE                    MeshTopologyNodeReachability = "stale"
 	MESHTOPOLOGYNODEREACHABILITY_UNREACHABLE              MeshTopologyNodeReachability = "unreachable"
+	MESHTOPOLOGYNODEREACHABILITY_NEVER_REPORTED           MeshTopologyNodeReachability = "never_reported"
 	MESHTOPOLOGYNODEREACHABILITY_UNKNOWN_DEFAULT_OPEN_API MeshTopologyNodeReachability = "unknown_default_open_api"
 )
 
@@ -31,6 +32,7 @@ var AllowedMeshTopologyNodeReachabilityEnumValues = []MeshTopologyNodeReachabili
 	"healthy",
 	"stale",
 	"unreachable",
+	"never_reported",
 	"unknown_default_open_api",
 }
 

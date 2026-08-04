@@ -7,6 +7,7 @@ Name | Type | Description | Notes
 **Phase** | [**SessionActivityTCPPhase**](SessionActivityTCPPhase.md) |  | 
 **TargetHost** | Pointer to **string** | Target host the tunnel connected to. Present on &#x60;session_started&#x60;.  | [optional] 
 **TargetPort** | Pointer to **int32** | Target port the tunnel connected to. Present on &#x60;session_started&#x60;.  | [optional] 
+**ListenerEndpoint** | Pointer to **string** | The &#x60;host:port&#x60; the Node bound for this session on its mesh address. Present only on &#x60;session_started&#x60;.  | [optional] 
 **BytesIn** | Pointer to **int32** | Bytes forwarded from the operator to the target. Present on &#x60;session_ended&#x60;.  | [optional] 
 **BytesOut** | Pointer to **int32** | Bytes forwarded from the target to the operator. Present on &#x60;session_ended&#x60;.  | [optional] 
 **TerminatedBy** | Pointer to [**SessionActivityTCPTerminatedBy**](SessionActivityTCPTerminatedBy.md) |  | [optional] 
@@ -99,6 +100,31 @@ SetTargetPort sets TargetPort field to given value.
 `func (o *SessionActivityTCP) HasTargetPort() bool`
 
 HasTargetPort returns a boolean if a field has been set.
+
+### GetListenerEndpoint
+
+`func (o *SessionActivityTCP) GetListenerEndpoint() string`
+
+GetListenerEndpoint returns the ListenerEndpoint field if non-nil, zero value otherwise.
+
+### GetListenerEndpointOk
+
+`func (o *SessionActivityTCP) GetListenerEndpointOk() (*string, bool)`
+
+GetListenerEndpointOk returns a tuple with the ListenerEndpoint field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetListenerEndpoint
+
+`func (o *SessionActivityTCP) SetListenerEndpoint(v string)`
+
+SetListenerEndpoint sets ListenerEndpoint field to given value.
+
+### HasListenerEndpoint
+
+`func (o *SessionActivityTCP) HasListenerEndpoint() bool`
+
+HasListenerEndpoint returns a boolean if a field has been set.
 
 ### GetBytesIn
 

@@ -19,7 +19,7 @@ import (
 // checks if the CloudAssignmentResponse type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &CloudAssignmentResponse{}
 
-// CloudAssignmentResponse Metadata projection of a Cloud Assignment. The shape is shared by `RequestCloudAssignment`, `ListCloudAssignments`, `GrantCloudAssignment`, `ApproveCloudAssignment`, `RejectCloudAssignment`, and `RevokeCloudAssignment` so clients only need one binding.
+// CloudAssignmentResponse Metadata projection of a Cloud Assignment. The shape is shared by `RequestCloudAssignment`, `ListCloudAssignments`, `GrantCloudAssignment`, and `RevokeCloudAssignment` so clients only need one binding.
 type CloudAssignmentResponse struct {
 	// Cloud Assignment identifier (UUIDv7).
 	Id string `json:"id"`

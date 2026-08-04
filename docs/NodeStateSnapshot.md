@@ -5,6 +5,8 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Peers** | [**[]NodeStatePeer**](NodeStatePeer.md) | Peer set the addressed Node should program into its WireGuard table. One entry per other Node in the addressed Node&#39;s Domain — the addressed Node itself is excluded so plexd does not program a self-peer. Ordered by &#x60;node_id&#x60; ascending so two consecutive pulls against the same ledger snapshot are byte-equal.  | 
+**Executions** | [**[]NodeStateExecution**](NodeStateExecution.md) | Pending action dispatches addressed to this Node — entries whose per-target status is &#x60;pending&#x60;, &#x60;ack&#x60;, or &#x60;started&#x60; and whose deadline is unexpired. An entry leaves the block when its target reaches a terminal status via the execution callback. Ordered by &#x60;requested_at&#x60; then &#x60;execution_id&#x60; ascending so two consecutive pulls against the same ledger snapshot are byte-equal. Empty is &#x60;[]&#x60; (never &#x60;null&#x60;).  | 
+**Sessions** | [**[]NodeStateSession**](NodeStateSession.md) | Live mediated sessions targeting a Resource this Node provisions. An entry leaves the block on revocation or expiry. Ordered by &#x60;issued_at&#x60; then &#x60;session_id&#x60; ascending so two consecutive pulls against the same ledger snapshot are byte-equal. Empty is &#x60;[]&#x60; (never &#x60;null&#x60;).  | 
 **Reachability** | [**Reachability**](Reachability.md) | Latest &#x60;Reachability&#x60; projection for the addressed Node, carried inside the reconciliation-pull payload so plexd sees the same health view that &#x60;GET /v1/nodes/{id}/reachability&#x60; exposes without an additional round-trip.  | 
 **Policy** | [**NodeStatePolicy**](NodeStatePolicy.md) | Policy block — present-but-empty placeholder populates the wire shape. May be &#x60;null&#x60; until then; the field itself is always present so plexd&#39;s reconcile loop can diff by field presence.  | 
 **Bridge** | [**NodeStateBridge**](NodeStateBridge.md) | Bridge orchestrator block — present-but-empty placeholder  populates the wire shape. May be &#x60;null&#x60; until then; the field itself is always present.  | 
@@ -15,7 +17,7 @@ Name | Type | Description | Notes
 
 ### NewNodeStateSnapshot
 
-`func NewNodeStateSnapshot(peers []NodeStatePeer, reachability Reachability, policy NodeStatePolicy, bridge NodeStateBridge, state NodeStateReports, reports NodeStateReports, ) *NodeStateSnapshot`
+`func NewNodeStateSnapshot(peers []NodeStatePeer, executions []NodeStateExecution, sessions []NodeStateSession, reachability Reachability, policy NodeStatePolicy, bridge NodeStateBridge, state NodeStateReports, reports NodeStateReports, ) *NodeStateSnapshot`
 
 NewNodeStateSnapshot instantiates a new NodeStateSnapshot object
 This constructor will assign default values to properties that have it defined,
@@ -48,6 +50,46 @@ and a boolean to check if the value has been set.
 `func (o *NodeStateSnapshot) SetPeers(v []NodeStatePeer)`
 
 SetPeers sets Peers field to given value.
+
+
+### GetExecutions
+
+`func (o *NodeStateSnapshot) GetExecutions() []NodeStateExecution`
+
+GetExecutions returns the Executions field if non-nil, zero value otherwise.
+
+### GetExecutionsOk
+
+`func (o *NodeStateSnapshot) GetExecutionsOk() (*[]NodeStateExecution, bool)`
+
+GetExecutionsOk returns a tuple with the Executions field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetExecutions
+
+`func (o *NodeStateSnapshot) SetExecutions(v []NodeStateExecution)`
+
+SetExecutions sets Executions field to given value.
+
+
+### GetSessions
+
+`func (o *NodeStateSnapshot) GetSessions() []NodeStateSession`
+
+GetSessions returns the Sessions field if non-nil, zero value otherwise.
+
+### GetSessionsOk
+
+`func (o *NodeStateSnapshot) GetSessionsOk() (*[]NodeStateSession, bool)`
+
+GetSessionsOk returns a tuple with the Sessions field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetSessions
+
+`func (o *NodeStateSnapshot) SetSessions(v []NodeStateSession)`
+
+SetSessions sets Sessions field to given value.
 
 
 ### GetReachability

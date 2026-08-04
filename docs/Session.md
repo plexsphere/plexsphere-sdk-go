@@ -18,6 +18,7 @@ Name | Type | Description | Notes
 **RevokedAt** | Pointer to **time.Time** | Revocation timestamp (UTC); absent while the Session is live.  | [optional] 
 **RevokeReason** | Pointer to [**RevokeReason**](RevokeReason.md) | Reason the Session was revoked. Omitted while the Session is live.  | [optional] 
 **Target** | [**SessionTarget**](SessionTarget.md) |  | 
+**ListenerEndpoint** | Pointer to **string** | The &#x60;host:port&#x60; the target Node reported for this Session, and the endpoint the attach gateway dials. Absent until the Node&#39;s first &#x60;session_started&#x60; activity row for a &#x60;tcp&#x60; session settles it.  | [optional] 
 
 ## Methods
 
@@ -332,6 +333,31 @@ and a boolean to check if the value has been set.
 
 SetTarget sets Target field to given value.
 
+
+### GetListenerEndpoint
+
+`func (o *Session) GetListenerEndpoint() string`
+
+GetListenerEndpoint returns the ListenerEndpoint field if non-nil, zero value otherwise.
+
+### GetListenerEndpointOk
+
+`func (o *Session) GetListenerEndpointOk() (*string, bool)`
+
+GetListenerEndpointOk returns a tuple with the ListenerEndpoint field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetListenerEndpoint
+
+`func (o *Session) SetListenerEndpoint(v string)`
+
+SetListenerEndpoint sets ListenerEndpoint field to given value.
+
+### HasListenerEndpoint
+
+`func (o *Session) HasListenerEndpoint() bool`
+
+HasListenerEndpoint returns a boolean if a field has been set.
 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

@@ -4,8 +4,6 @@ All URIs are relative to *http://localhost*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**ApproveCloudAssignment**](CloudAPI.md#ApproveCloudAssignment) | **Post** /v1/cloud-assignments/{id}/approve | Approve a Cloud Assignment request.
-[**ApproveCredentialAssignment**](CloudAPI.md#ApproveCredentialAssignment) | **Post** /v1/credential-assignments/{id}/approve | Approve a Credential Assignment.
 [**AttachCloudCredentialCloud**](CloudAPI.md#AttachCloudCredentialCloud) | **Post** /v1/cloud-credentials/{id}/clouds | Attach a usage Cloud to a Cloud Credential.
 [**CreateCloud**](CloudAPI.md#CreateCloud) | **Post** /v1/clouds | Create a Cloud Inventory entry.
 [**DeleteCloud**](CloudAPI.md#DeleteCloud) | **Delete** /v1/clouds/{id} | Delete a Cloud.
@@ -20,154 +18,12 @@ Method | HTTP request | Description
 [**ListClouds**](CloudAPI.md#ListClouds) | **Get** /v1/clouds | List Cloud Inventory entries.
 [**ListCredentialAssignments**](CloudAPI.md#ListCredentialAssignments) | **Get** /v1/projects/{id}/credential-assignments | List the Credential Assignments owned by a Project.
 [**PatchCloud**](CloudAPI.md#PatchCloud) | **Patch** /v1/clouds/{id} | Patch mutable fields on a Cloud.
-[**RejectCloudAssignment**](CloudAPI.md#RejectCloudAssignment) | **Post** /v1/cloud-assignments/{id}/reject | Reject a Cloud Assignment request.
-[**RejectCredentialAssignment**](CloudAPI.md#RejectCredentialAssignment) | **Post** /v1/credential-assignments/{id}/reject | Reject a Credential Assignment.
 [**RequestCloudAssignment**](CloudAPI.md#RequestCloudAssignment) | **Post** /v1/projects/{id}/cloud-assignments | Request usage of a Cloud for a Project.
 [**RequestCredentialAssignment**](CloudAPI.md#RequestCredentialAssignment) | **Post** /v1/projects/{id}/credential-assignments | Request a Credential Assignment for a Project.
 [**RevokeCloudAssignment**](CloudAPI.md#RevokeCloudAssignment) | **Post** /v1/cloud-assignments/{id}/revoke | Revoke a Cloud Assignment.
 [**RevokeCloudCredential**](CloudAPI.md#RevokeCloudCredential) | **Post** /v1/cloud-credentials/{id}/revoke | Revoke a Cloud Credential.
 [**RevokeCredentialAssignment**](CloudAPI.md#RevokeCredentialAssignment) | **Post** /v1/credential-assignments/{id}/revoke | Revoke a Credential Assignment.
 
-
-
-## ApproveCloudAssignment
-
-> CloudAssignmentResponse ApproveCloudAssignment(ctx, id).Execute()
-
-Approve a Cloud Assignment request.
-
-
-
-### Example
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"os"
-	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
-)
-
-func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Assignment identifier (UUIDv7). Bound on `/v1/cloud-assignments/{id}/approve`, `/v1/cloud-assignments/{id}/reject`, and `/v1/cloud-assignments/{id}/revoke` for the Cloud Assignment decision surface. 
-
-	configuration := openapiclient.NewConfiguration()
-	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.CloudAPI.ApproveCloudAssignment(context.Background(), id).Execute()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error when calling `CloudAPI.ApproveCloudAssignment``: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
-	}
-	// response from `ApproveCloudAssignment`: CloudAssignmentResponse
-	fmt.Fprintf(os.Stdout, "Response from `CloudAPI.ApproveCloudAssignment`: %v\n", resp)
-}
-```
-
-### Path Parameters
-
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
-**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Cloud Assignment identifier (UUIDv7). Bound on &#x60;/v1/cloud-assignments/{id}/approve&#x60;, &#x60;/v1/cloud-assignments/{id}/reject&#x60;, and &#x60;/v1/cloud-assignments/{id}/revoke&#x60; for the Cloud Assignment decision surface.  | 
-
-### Other Parameters
-
-Other parameters are passed through a pointer to a apiApproveCloudAssignmentRequest struct via the builder pattern
-
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
-
-
-### Return type
-
-[**CloudAssignmentResponse**](CloudAssignmentResponse.md)
-
-### Authorization
-
-[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
-
-### HTTP request headers
-
-- **Content-Type**: Not defined
-- **Accept**: application/json, application/problem+json
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
-[[Back to Model list]](../README.md#documentation-for-models)
-[[Back to README]](../README.md)
-
-
-## ApproveCredentialAssignment
-
-> CredentialAssignmentResponse ApproveCredentialAssignment(ctx, id).Execute()
-
-Approve a Credential Assignment.
-
-
-
-### Example
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"os"
-	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
-)
-
-func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Credential Assignment identifier (UUIDv7). Bound on `/v1/credential-assignments/{id}/approve`, `/v1/credential-assignments/{id}/reject`, and `/v1/credential-assignments/{id}/revoke` for the Credential Assignment decision surface. 
-
-	configuration := openapiclient.NewConfiguration()
-	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.CloudAPI.ApproveCredentialAssignment(context.Background(), id).Execute()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error when calling `CloudAPI.ApproveCredentialAssignment``: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
-	}
-	// response from `ApproveCredentialAssignment`: CredentialAssignmentResponse
-	fmt.Fprintf(os.Stdout, "Response from `CloudAPI.ApproveCredentialAssignment`: %v\n", resp)
-}
-```
-
-### Path Parameters
-
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
-**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Credential Assignment identifier (UUIDv7). Bound on &#x60;/v1/credential-assignments/{id}/approve&#x60;, &#x60;/v1/credential-assignments/{id}/reject&#x60;, and &#x60;/v1/credential-assignments/{id}/revoke&#x60; for the Credential Assignment decision surface.  | 
-
-### Other Parameters
-
-Other parameters are passed through a pointer to a apiApproveCredentialAssignmentRequest struct via the builder pattern
-
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
-
-
-### Return type
-
-[**CredentialAssignmentResponse**](CredentialAssignmentResponse.md)
-
-### Authorization
-
-[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
-
-### HTTP request headers
-
-- **Content-Type**: Not defined
-- **Accept**: application/json, application/problem+json
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
-[[Back to Model list]](../README.md#documentation-for-models)
-[[Back to README]](../README.md)
 
 
 ## AttachCloudCredentialCloud
@@ -1167,150 +1023,6 @@ Name | Type | Description  | Notes
 [[Back to README]](../README.md)
 
 
-## RejectCloudAssignment
-
-> CloudAssignmentResponse RejectCloudAssignment(ctx, id).CloudAssignmentDecisionRequest(cloudAssignmentDecisionRequest).Execute()
-
-Reject a Cloud Assignment request.
-
-
-
-### Example
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"os"
-	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
-)
-
-func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Assignment identifier (UUIDv7). Bound on `/v1/cloud-assignments/{id}/approve`, `/v1/cloud-assignments/{id}/reject`, and `/v1/cloud-assignments/{id}/revoke` for the Cloud Assignment decision surface. 
-	cloudAssignmentDecisionRequest := *openapiclient.NewCloudAssignmentDecisionRequest("Reason_example") // CloudAssignmentDecisionRequest | 
-
-	configuration := openapiclient.NewConfiguration()
-	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.CloudAPI.RejectCloudAssignment(context.Background(), id).CloudAssignmentDecisionRequest(cloudAssignmentDecisionRequest).Execute()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error when calling `CloudAPI.RejectCloudAssignment``: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
-	}
-	// response from `RejectCloudAssignment`: CloudAssignmentResponse
-	fmt.Fprintf(os.Stdout, "Response from `CloudAPI.RejectCloudAssignment`: %v\n", resp)
-}
-```
-
-### Path Parameters
-
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
-**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Cloud Assignment identifier (UUIDv7). Bound on &#x60;/v1/cloud-assignments/{id}/approve&#x60;, &#x60;/v1/cloud-assignments/{id}/reject&#x60;, and &#x60;/v1/cloud-assignments/{id}/revoke&#x60; for the Cloud Assignment decision surface.  | 
-
-### Other Parameters
-
-Other parameters are passed through a pointer to a apiRejectCloudAssignmentRequest struct via the builder pattern
-
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
-
- **cloudAssignmentDecisionRequest** | [**CloudAssignmentDecisionRequest**](CloudAssignmentDecisionRequest.md) |  | 
-
-### Return type
-
-[**CloudAssignmentResponse**](CloudAssignmentResponse.md)
-
-### Authorization
-
-[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
-
-### HTTP request headers
-
-- **Content-Type**: application/json
-- **Accept**: application/json, application/problem+json
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
-[[Back to Model list]](../README.md#documentation-for-models)
-[[Back to README]](../README.md)
-
-
-## RejectCredentialAssignment
-
-> CredentialAssignmentResponse RejectCredentialAssignment(ctx, id).CredentialAssignmentDecisionRequest(credentialAssignmentDecisionRequest).Execute()
-
-Reject a Credential Assignment.
-
-
-
-### Example
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"os"
-	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
-)
-
-func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Credential Assignment identifier (UUIDv7). Bound on `/v1/credential-assignments/{id}/approve`, `/v1/credential-assignments/{id}/reject`, and `/v1/credential-assignments/{id}/revoke` for the Credential Assignment decision surface. 
-	credentialAssignmentDecisionRequest := *openapiclient.NewCredentialAssignmentDecisionRequest("Reason_example") // CredentialAssignmentDecisionRequest | 
-
-	configuration := openapiclient.NewConfiguration()
-	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.CloudAPI.RejectCredentialAssignment(context.Background(), id).CredentialAssignmentDecisionRequest(credentialAssignmentDecisionRequest).Execute()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error when calling `CloudAPI.RejectCredentialAssignment``: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
-	}
-	// response from `RejectCredentialAssignment`: CredentialAssignmentResponse
-	fmt.Fprintf(os.Stdout, "Response from `CloudAPI.RejectCredentialAssignment`: %v\n", resp)
-}
-```
-
-### Path Parameters
-
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
-**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Credential Assignment identifier (UUIDv7). Bound on &#x60;/v1/credential-assignments/{id}/approve&#x60;, &#x60;/v1/credential-assignments/{id}/reject&#x60;, and &#x60;/v1/credential-assignments/{id}/revoke&#x60; for the Credential Assignment decision surface.  | 
-
-### Other Parameters
-
-Other parameters are passed through a pointer to a apiRejectCredentialAssignmentRequest struct via the builder pattern
-
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
-
- **credentialAssignmentDecisionRequest** | [**CredentialAssignmentDecisionRequest**](CredentialAssignmentDecisionRequest.md) |  | 
-
-### Return type
-
-[**CredentialAssignmentResponse**](CredentialAssignmentResponse.md)
-
-### Authorization
-
-[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
-
-### HTTP request headers
-
-- **Content-Type**: application/json
-- **Accept**: application/json, application/problem+json
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
-[[Back to Model list]](../README.md#documentation-for-models)
-[[Back to README]](../README.md)
-
-
 ## RequestCloudAssignment
 
 > CloudAssignmentResponse RequestCloudAssignment(ctx, id).CloudAssignmentRequestBody(cloudAssignmentRequestBody).Execute()
@@ -1476,7 +1188,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Assignment identifier (UUIDv7). Bound on `/v1/cloud-assignments/{id}/approve`, `/v1/cloud-assignments/{id}/reject`, and `/v1/cloud-assignments/{id}/revoke` for the Cloud Assignment decision surface. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Assignment identifier (UUIDv7). Bound on `/v1/cloud-assignments/{id}/revoke` for the Cloud Assignment revocation surface. 
 	cloudAssignmentDecisionRequest := *openapiclient.NewCloudAssignmentDecisionRequest("Reason_example") // CloudAssignmentDecisionRequest | 
 
 	configuration := openapiclient.NewConfiguration()
@@ -1497,7 +1209,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Cloud Assignment identifier (UUIDv7). Bound on &#x60;/v1/cloud-assignments/{id}/approve&#x60;, &#x60;/v1/cloud-assignments/{id}/reject&#x60;, and &#x60;/v1/cloud-assignments/{id}/revoke&#x60; for the Cloud Assignment decision surface.  | 
+**id** | **string** | Cloud Assignment identifier (UUIDv7). Bound on &#x60;/v1/cloud-assignments/{id}/revoke&#x60; for the Cloud Assignment revocation surface.  | 
 
 ### Other Parameters
 
@@ -1620,7 +1332,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Credential Assignment identifier (UUIDv7). Bound on `/v1/credential-assignments/{id}/approve`, `/v1/credential-assignments/{id}/reject`, and `/v1/credential-assignments/{id}/revoke` for the Credential Assignment decision surface. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Credential Assignment identifier (UUIDv7). Bound on `/v1/credential-assignments/{id}/revoke` for the Credential Assignment revocation surface. 
 	credentialAssignmentDecisionRequest := *openapiclient.NewCredentialAssignmentDecisionRequest("Reason_example") // CredentialAssignmentDecisionRequest | 
 
 	configuration := openapiclient.NewConfiguration()
@@ -1641,7 +1353,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Credential Assignment identifier (UUIDv7). Bound on &#x60;/v1/credential-assignments/{id}/approve&#x60;, &#x60;/v1/credential-assignments/{id}/reject&#x60;, and &#x60;/v1/credential-assignments/{id}/revoke&#x60; for the Credential Assignment decision surface.  | 
+**id** | **string** | Credential Assignment identifier (UUIDv7). Bound on &#x60;/v1/credential-assignments/{id}/revoke&#x60; for the Credential Assignment revocation surface.  | 
 
 ### Other Parameters
 

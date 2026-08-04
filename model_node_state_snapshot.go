@@ -18,10 +18,14 @@ import (
 // checks if the NodeStateSnapshot type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &NodeStateSnapshot{}
 
-// NodeStateSnapshot Canonical reconciliation-pull envelope for a single Node. The wire blocks — `peers`, `policy`, `bridge`, `state`, and `reports` — are always present so plexd's reconcile loop can diff by field presence rather than absence; later stories (policy fan-out, bridge orchestrator, node-state reports) populate the currently-empty blocks without changing the wire shape. Empty `peers` is `[]` (never `null`); the other blocks may be `null` until their owning story lands.
+// NodeStateSnapshot Canonical reconciliation-pull envelope for a single Node. The wire blocks — `peers`, `policy`, `bridge`, `state`, `reports`, `executions`, and `sessions` — are always present so plexd's reconcile loop can diff by field presence rather than absence; later stories (policy fan-out, bridge orchestrator, node-state reports) populate the currently-empty blocks without changing the wire shape. Empty `peers`, `executions`, and `sessions` are `[]` (never `null`); the other blocks may be `null` until their owning story lands.
 type NodeStateSnapshot struct {
 	// Peer set the addressed Node should program into its WireGuard table. One entry per other Node in the addressed Node's Domain — the addressed Node itself is excluded so plexd does not program a self-peer. Ordered by `node_id` ascending so two consecutive pulls against the same ledger snapshot are byte-equal.
 	Peers []NodeStatePeer `json:"peers"`
+	// Pending action dispatches addressed to this Node — entries whose per-target status is `pending`, `ack`, or `started` and whose deadline is unexpired. An entry leaves the block when its target reaches a terminal status via the execution callback. Ordered by `requested_at` then `execution_id` ascending so two consecutive pulls against the same ledger snapshot are byte-equal. Empty is `[]` (never `null`).
+	Executions []NodeStateExecution `json:"executions"`
+	// Live mediated sessions targeting a Resource this Node provisions. An entry leaves the block on revocation or expiry. Ordered by `issued_at` then `session_id` ascending so two consecutive pulls against the same ledger snapshot are byte-equal. Empty is `[]` (never `null`).
+	Sessions []NodeStateSession `json:"sessions"`
 	// Latest `Reachability` projection for the addressed Node, carried inside the reconciliation-pull payload so plexd sees the same health view that `GET /v1/nodes/{id}/reachability` exposes without an additional round-trip.
 	Reachability Reachability `json:"reachability"`
 	// Policy block — present-but-empty placeholder populates the wire shape. May be `null` until then; the field itself is always present so plexd's reconcile loop can diff by field presence.
@@ -41,9 +45,11 @@ type _NodeStateSnapshot NodeStateSnapshot
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewNodeStateSnapshot(peers []NodeStatePeer, reachability Reachability, policy NodeStatePolicy, bridge NodeStateBridge, state NodeStateReports, reports NodeStateReports) *NodeStateSnapshot {
+func NewNodeStateSnapshot(peers []NodeStatePeer, executions []NodeStateExecution, sessions []NodeStateSession, reachability Reachability, policy NodeStatePolicy, bridge NodeStateBridge, state NodeStateReports, reports NodeStateReports) *NodeStateSnapshot {
 	this := NodeStateSnapshot{}
 	this.Peers = peers
+	this.Executions = executions
+	this.Sessions = sessions
 	this.Reachability = reachability
 	this.Policy = policy
 	this.Bridge = bridge
@@ -82,6 +88,54 @@ func (o *NodeStateSnapshot) GetPeersOk() ([]NodeStatePeer, bool) {
 // SetPeers sets field value
 func (o *NodeStateSnapshot) SetPeers(v []NodeStatePeer) {
 	o.Peers = v
+}
+
+// GetExecutions returns the Executions field value
+func (o *NodeStateSnapshot) GetExecutions() []NodeStateExecution {
+	if o == nil {
+		var ret []NodeStateExecution
+		return ret
+	}
+
+	return o.Executions
+}
+
+// GetExecutionsOk returns a tuple with the Executions field value
+// and a boolean to check if the value has been set.
+func (o *NodeStateSnapshot) GetExecutionsOk() ([]NodeStateExecution, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return o.Executions, true
+}
+
+// SetExecutions sets field value
+func (o *NodeStateSnapshot) SetExecutions(v []NodeStateExecution) {
+	o.Executions = v
+}
+
+// GetSessions returns the Sessions field value
+func (o *NodeStateSnapshot) GetSessions() []NodeStateSession {
+	if o == nil {
+		var ret []NodeStateSession
+		return ret
+	}
+
+	return o.Sessions
+}
+
+// GetSessionsOk returns a tuple with the Sessions field value
+// and a boolean to check if the value has been set.
+func (o *NodeStateSnapshot) GetSessionsOk() ([]NodeStateSession, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return o.Sessions, true
+}
+
+// SetSessions sets field value
+func (o *NodeStateSnapshot) SetSessions(v []NodeStateSession) {
+	o.Sessions = v
 }
 
 // GetReachability returns the Reachability field value
@@ -215,6 +269,8 @@ func (o NodeStateSnapshot) MarshalJSON() ([]byte, error) {
 func (o NodeStateSnapshot) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["peers"] = o.Peers
+	toSerialize["executions"] = o.Executions
+	toSerialize["sessions"] = o.Sessions
 	toSerialize["reachability"] = o.Reachability
 	toSerialize["policy"] = o.Policy
 	toSerialize["bridge"] = o.Bridge
@@ -234,6 +290,8 @@ func (o *NodeStateSnapshot) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"peers",
+		"executions",
+		"sessions",
 		"reachability",
 		"policy",
 		"bridge",
@@ -269,6 +327,8 @@ func (o *NodeStateSnapshot) UnmarshalJSON(data []byte) (err error) {
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "peers")
+		delete(additionalProperties, "executions")
+		delete(additionalProperties, "sessions")
 		delete(additionalProperties, "reachability")
 		delete(additionalProperties, "policy")
 		delete(additionalProperties, "bridge")

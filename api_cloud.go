@@ -22,36 +22,6 @@ import (
 type CloudAPI interface {
 
 	/*
-		ApproveCloudAssignment Approve a Cloud Assignment request.
-
-		Approves the Cloud Assignment identified by `{id}`. The handler reads the row to resolve the owning Cloud, runs the `assign` ReBAC check on that Cloud, then delegates to the Cloud Assignment application service which moves the assignment to the `approved` state, materialises the `cloud#uses` binding so the Cloud is usable in the Project, and appends a `CloudAssignmentMaterialised` outbox event in a single transaction.  Approval is only legal from the `requested` state — any other source state returns `409 illegal_transition`. The caller may not approve an assignment they themselves requested; that self-approval is rejected with `403 self_approval_denied`.
-
-		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Cloud Assignment identifier (UUIDv7). Bound on `/v1/cloud-assignments/{id}/approve`, `/v1/cloud-assignments/{id}/reject`, and `/v1/cloud-assignments/{id}/revoke` for the Cloud Assignment decision surface.
-		@return ApiApproveCloudAssignmentRequest
-	*/
-	ApproveCloudAssignment(ctx context.Context, id string) ApiApproveCloudAssignmentRequest
-
-	// ApproveCloudAssignmentExecute executes the request
-	//  @return CloudAssignmentResponse
-	ApproveCloudAssignmentExecute(r ApiApproveCloudAssignmentRequest) (*CloudAssignmentResponse, *http.Response, error)
-
-	/*
-		ApproveCredentialAssignment Approve a Credential Assignment.
-
-		Approves the Credential Assignment identified by `{id}`. The handler reads the row to resolve the parent Project, runs the `manage` ReBAC check on that Project, then delegates to the Credential Assignment application service which moves the assignment to the `approved` state, materialises the binding, and appends a `CredentialAssignmentApproved` outbox event in a single transaction.  Approval is only legal from the `requested` state — any other source state returns `409 illegal_transition`. The caller may not approve an assignment they themselves requested; that self-approval is rejected with `403 self_approval_denied`.
-
-		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Credential Assignment identifier (UUIDv7). Bound on `/v1/credential-assignments/{id}/approve`, `/v1/credential-assignments/{id}/reject`, and `/v1/credential-assignments/{id}/revoke` for the Credential Assignment decision surface.
-		@return ApiApproveCredentialAssignmentRequest
-	*/
-	ApproveCredentialAssignment(ctx context.Context, id string) ApiApproveCredentialAssignmentRequest
-
-	// ApproveCredentialAssignmentExecute executes the request
-	//  @return CredentialAssignmentResponse
-	ApproveCredentialAssignmentExecute(r ApiApproveCredentialAssignmentRequest) (*CredentialAssignmentResponse, *http.Response, error)
-
-	/*
 		AttachCloudCredentialCloud Attach a usage Cloud to a Cloud Credential.
 
 		Adds a usage edge so the Cloud Credential identified by `{id}` additionally serves the Cloud named in the body. The handler runs a `manage` ReBAC check on the credential's home Cloud BEFORE decoding the body, then — once the body names the target usage Cloud — a second `manage` check on that target Cloud, and only then delegates to the Cloud Credentials Custodian which records the usage edge. The caller must administer both Clouds: the home Cloud whose credential is mutated and the target Cloud that will start serving it.  Attach is idempotent: re-attaching an already-attached Cloud returns `201` without creating a second edge. A revoked credential cannot pick up further usage Clouds and is refused with `409 cloud_credential_revoked`; a body `cloud_id` that names no existing Cloud is refused with `404 cloud_not_found`.
@@ -231,7 +201,7 @@ type CloudAPI interface {
 	/*
 		ListCredentialAssignments List the Credential Assignments owned by a Project.
 
-		Returns a creation-ordered page of Credential Assignment lifecycle metadata for the Project identified by `{id}`. The handler runs a top-level `observe` ReBAC check on the parent Project BEFORE the persistence read, then layers a per-row `observe` filter on top so the response items are the subset of the persistence-level page the caller is authorised to see.  The projection carries the assignment identity, the owning Project, the bound Cloud Credential, the lifecycle state, a derived `materialised` flag, and the lifecycle timestamps.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
+		Returns a creation-ordered page of Credential Assignment lifecycle metadata for the Project identified by `{id}`. The handler runs a top-level `read` ReBAC check on the parent Project BEFORE the persistence read; every assignment in the page belongs to the one path Project, so the project `read` check authorises the whole page and no per-row filter runs.  The projection carries the assignment identity, the owning Project, the bound Cloud Credential, the lifecycle state, a derived `materialised` flag, and the lifecycle timestamps.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
@@ -257,36 +227,6 @@ type CloudAPI interface {
 	// PatchCloudExecute executes the request
 	//  @return CloudResponse
 	PatchCloudExecute(r ApiPatchCloudRequest) (*CloudResponse, *http.Response, error)
-
-	/*
-		RejectCloudAssignment Reject a Cloud Assignment request.
-
-		Rejects the Cloud Assignment identified by `{id}`. The handler reads the row to resolve the owning Cloud, runs the `assign` ReBAC check on that Cloud, then delegates to the Cloud Assignment application service which moves the assignment to the `rejected` state and appends a `CloudAssignmentRejected` outbox event in a single transaction. The `reason` from the body is recorded on the event as an operator-supplied audit string.  Rejection is only legal from the `requested` state — any other source state returns `409 illegal_transition`.
-
-		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Cloud Assignment identifier (UUIDv7). Bound on `/v1/cloud-assignments/{id}/approve`, `/v1/cloud-assignments/{id}/reject`, and `/v1/cloud-assignments/{id}/revoke` for the Cloud Assignment decision surface.
-		@return ApiRejectCloudAssignmentRequest
-	*/
-	RejectCloudAssignment(ctx context.Context, id string) ApiRejectCloudAssignmentRequest
-
-	// RejectCloudAssignmentExecute executes the request
-	//  @return CloudAssignmentResponse
-	RejectCloudAssignmentExecute(r ApiRejectCloudAssignmentRequest) (*CloudAssignmentResponse, *http.Response, error)
-
-	/*
-		RejectCredentialAssignment Reject a Credential Assignment.
-
-		Rejects the Credential Assignment identified by `{id}`. The handler reads the row to resolve the parent Project, runs the `manage` ReBAC check on that Project, then delegates to the Credential Assignment application service which moves the assignment to the `rejected` state and appends a `CredentialAssignmentRejected` outbox event in a single transaction. The `reason` from the body is recorded on the event as an approver-supplied audit string.  Rejection is only legal from the `requested` state — any other source state returns `409 illegal_transition`.
-
-		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Credential Assignment identifier (UUIDv7). Bound on `/v1/credential-assignments/{id}/approve`, `/v1/credential-assignments/{id}/reject`, and `/v1/credential-assignments/{id}/revoke` for the Credential Assignment decision surface.
-		@return ApiRejectCredentialAssignmentRequest
-	*/
-	RejectCredentialAssignment(ctx context.Context, id string) ApiRejectCredentialAssignmentRequest
-
-	// RejectCredentialAssignmentExecute executes the request
-	//  @return CredentialAssignmentResponse
-	RejectCredentialAssignmentExecute(r ApiRejectCredentialAssignmentRequest) (*CredentialAssignmentResponse, *http.Response, error)
 
 	/*
 		RequestCloudAssignment Request usage of a Cloud for a Project.
@@ -321,10 +261,10 @@ type CloudAPI interface {
 	/*
 		RevokeCloudAssignment Revoke a Cloud Assignment.
 
-		Revokes the Cloud Assignment identified by `{id}`. The handler reads the row to resolve the owning Cloud, runs the `assign` ReBAC check on that Cloud, then delegates to the Cloud Assignment application service which moves the assignment to the `revoked` state, narrow-deletes the `cloud#uses` binding so the Cloud is no longer usable in the Project, and appends a `CloudAssignmentRevoked` outbox event in a single transaction. The `reason` from the body is recorded on the event as an operator-supplied audit string.  Revocation is only legal from the `approved` state — any other source state returns `409 illegal_transition`.
+		Revokes the Cloud Assignment identified by `{id}`. The handler reads the row to resolve the owning Cloud and the consuming Project, runs the dual ReBAC gate described below, then delegates to the Cloud Assignment application service which moves the assignment to the `revoked` state, narrow-deletes the `cloud#uses` binding so the Cloud is no longer usable in the Project, and appends a `CloudAssignmentRevoked` outbox event in a single transaction. The `reason` from the body is recorded on the event as an operator-supplied audit string.  The gate has two legs: `assign` on the owning Cloud, the object the assignment spends, and on its denial `deploy` on the consuming Project. Either leg authorises the revocation; the call is denied only when both deny. The second leg lets a Project owner hand back a Cloud they were granted without holding the Cloud-side `assign` relation.  Revocation is only legal from the `approved` state — any other source state returns `409 illegal_transition`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Cloud Assignment identifier (UUIDv7). Bound on `/v1/cloud-assignments/{id}/approve`, `/v1/cloud-assignments/{id}/reject`, and `/v1/cloud-assignments/{id}/revoke` for the Cloud Assignment decision surface.
+		@param id Cloud Assignment identifier (UUIDv7). Bound on `/v1/cloud-assignments/{id}/revoke` for the Cloud Assignment revocation surface.
 		@return ApiRevokeCloudAssignmentRequest
 	*/
 	RevokeCloudAssignment(ctx context.Context, id string) ApiRevokeCloudAssignmentRequest
@@ -351,10 +291,10 @@ type CloudAPI interface {
 	/*
 		RevokeCredentialAssignment Revoke a Credential Assignment.
 
-		Revokes the Credential Assignment identified by `{id}`. The handler reads the row to resolve the parent Project, runs the `manage` ReBAC check on that Project, then delegates to the Credential Assignment application service which moves the assignment to the `revoked` state, tears down the materialised binding, and appends a `CredentialAssignmentRevoked` outbox event in a single transaction. The `reason` from the body is recorded on the event as an operator-supplied audit string.  Revocation is only legal from the `approved` state — any other source state returns `409 illegal_transition`.
+		Revokes the Credential Assignment identified by `{id}`. The handler reads the row to resolve the owning Cloud Credential and the consuming Project, runs the dual ReBAC gate described below, then delegates to the Credential Assignment application service which moves the assignment to the `revoked` state, tears down the materialised binding, and appends a `CredentialAssignmentRevoked` outbox event in a single transaction. The `reason` from the body is recorded on the event as an operator-supplied audit string.  The gate has two legs: `assign` on the owning Cloud Credential, the object the assignment spends, and on its denial `deploy` on the consuming Project. Either leg authorises the revocation; the call is denied only when both deny. The second leg lets a Project owner hand back a Credential they were granted without holding the Credential-side `assign` relation.  Revocation is only legal from the `approved` state — any other source state returns `409 illegal_transition`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Credential Assignment identifier (UUIDv7). Bound on `/v1/credential-assignments/{id}/approve`, `/v1/credential-assignments/{id}/reject`, and `/v1/credential-assignments/{id}/revoke` for the Credential Assignment decision surface.
+		@param id Credential Assignment identifier (UUIDv7). Bound on `/v1/credential-assignments/{id}/revoke` for the Credential Assignment revocation surface.
 		@return ApiRevokeCredentialAssignmentRequest
 	*/
 	RevokeCredentialAssignment(ctx context.Context, id string) ApiRevokeCredentialAssignmentRequest
@@ -366,344 +306,6 @@ type CloudAPI interface {
 
 // CloudAPIService CloudAPI service
 type CloudAPIService service
-
-type ApiApproveCloudAssignmentRequest struct {
-	ctx        context.Context
-	ApiService CloudAPI
-	id         string
-}
-
-func (r ApiApproveCloudAssignmentRequest) Execute() (*CloudAssignmentResponse, *http.Response, error) {
-	return r.ApiService.ApproveCloudAssignmentExecute(r)
-}
-
-/*
-ApproveCloudAssignment Approve a Cloud Assignment request.
-
-Approves the Cloud Assignment identified by `{id}`. The handler reads the row to resolve the owning Cloud, runs the `assign` ReBAC check on that Cloud, then delegates to the Cloud Assignment application service which moves the assignment to the `approved` state, materialises the `cloud#uses` binding so the Cloud is usable in the Project, and appends a `CloudAssignmentMaterialised` outbox event in a single transaction.  Approval is only legal from the `requested` state — any other source state returns `409 illegal_transition`. The caller may not approve an assignment they themselves requested; that self-approval is rejected with `403 self_approval_denied`.
-
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Cloud Assignment identifier (UUIDv7). Bound on `/v1/cloud-assignments/{id}/approve`, `/v1/cloud-assignments/{id}/reject`, and `/v1/cloud-assignments/{id}/revoke` for the Cloud Assignment decision surface.
-	@return ApiApproveCloudAssignmentRequest
-*/
-func (a *CloudAPIService) ApproveCloudAssignment(ctx context.Context, id string) ApiApproveCloudAssignmentRequest {
-	return ApiApproveCloudAssignmentRequest{
-		ApiService: a,
-		ctx:        ctx,
-		id:         id,
-	}
-}
-
-// Execute executes the request
-//
-//	@return CloudAssignmentResponse
-func (a *CloudAPIService) ApproveCloudAssignmentExecute(r ApiApproveCloudAssignmentRequest) (*CloudAssignmentResponse, *http.Response, error) {
-	var (
-		localVarHTTPMethod  = http.MethodPost
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *CloudAssignmentResponse
-	)
-
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CloudAPIService.ApproveCloudAssignment")
-	if err != nil {
-		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
-	}
-
-	localVarPath := localBasePath + "/v1/cloud-assignments/{id}/approve"
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := url.Values{}
-	localVarFormParams := url.Values{}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(req)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 401 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 403 {
-			var v PermissionDenied
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 404 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 409 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 500 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
-type ApiApproveCredentialAssignmentRequest struct {
-	ctx        context.Context
-	ApiService CloudAPI
-	id         string
-}
-
-func (r ApiApproveCredentialAssignmentRequest) Execute() (*CredentialAssignmentResponse, *http.Response, error) {
-	return r.ApiService.ApproveCredentialAssignmentExecute(r)
-}
-
-/*
-ApproveCredentialAssignment Approve a Credential Assignment.
-
-Approves the Credential Assignment identified by `{id}`. The handler reads the row to resolve the parent Project, runs the `manage` ReBAC check on that Project, then delegates to the Credential Assignment application service which moves the assignment to the `approved` state, materialises the binding, and appends a `CredentialAssignmentApproved` outbox event in a single transaction.  Approval is only legal from the `requested` state — any other source state returns `409 illegal_transition`. The caller may not approve an assignment they themselves requested; that self-approval is rejected with `403 self_approval_denied`.
-
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Credential Assignment identifier (UUIDv7). Bound on `/v1/credential-assignments/{id}/approve`, `/v1/credential-assignments/{id}/reject`, and `/v1/credential-assignments/{id}/revoke` for the Credential Assignment decision surface.
-	@return ApiApproveCredentialAssignmentRequest
-*/
-func (a *CloudAPIService) ApproveCredentialAssignment(ctx context.Context, id string) ApiApproveCredentialAssignmentRequest {
-	return ApiApproveCredentialAssignmentRequest{
-		ApiService: a,
-		ctx:        ctx,
-		id:         id,
-	}
-}
-
-// Execute executes the request
-//
-//	@return CredentialAssignmentResponse
-func (a *CloudAPIService) ApproveCredentialAssignmentExecute(r ApiApproveCredentialAssignmentRequest) (*CredentialAssignmentResponse, *http.Response, error) {
-	var (
-		localVarHTTPMethod  = http.MethodPost
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *CredentialAssignmentResponse
-	)
-
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CloudAPIService.ApproveCredentialAssignment")
-	if err != nil {
-		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
-	}
-
-	localVarPath := localBasePath + "/v1/credential-assignments/{id}/approve"
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := url.Values{}
-	localVarFormParams := url.Values{}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(req)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 401 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 403 {
-			var v PermissionDenied
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 404 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 409 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 500 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
 
 type ApiAttachCloudCredentialCloudRequest struct {
 	ctx                          context.Context
@@ -2773,7 +2375,7 @@ func (r ApiListCredentialAssignmentsRequest) Execute() (*CredentialAssignmentLis
 /*
 ListCredentialAssignments List the Credential Assignments owned by a Project.
 
-Returns a creation-ordered page of Credential Assignment lifecycle metadata for the Project identified by `{id}`. The handler runs a top-level `observe` ReBAC check on the parent Project BEFORE the persistence read, then layers a per-row `observe` filter on top so the response items are the subset of the persistence-level page the caller is authorised to see.  The projection carries the assignment identity, the owning Project, the bound Cloud Credential, the lifecycle state, a derived `materialised` flag, and the lifecycle timestamps.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
+Returns a creation-ordered page of Credential Assignment lifecycle metadata for the Project identified by `{id}`. The handler runs a top-level `read` ReBAC check on the parent Project BEFORE the persistence read; every assignment in the page belongs to the one path Project, so the project `read` check authorises the whole page and no per-row filter runs.  The projection carries the assignment identity, the owning Project, the bound Cloud Credential, the lifecycle state, a derived `materialised` flag, and the lifecycle timestamps.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
@@ -3051,388 +2653,6 @@ func (a *CloudAPIService) PatchCloudExecute(r ApiPatchCloudRequest) (*CloudRespo
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 404 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 413 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 500 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
-type ApiRejectCloudAssignmentRequest struct {
-	ctx                            context.Context
-	ApiService                     CloudAPI
-	id                             string
-	cloudAssignmentDecisionRequest *CloudAssignmentDecisionRequest
-}
-
-func (r ApiRejectCloudAssignmentRequest) CloudAssignmentDecisionRequest(cloudAssignmentDecisionRequest CloudAssignmentDecisionRequest) ApiRejectCloudAssignmentRequest {
-	r.cloudAssignmentDecisionRequest = &cloudAssignmentDecisionRequest
-	return r
-}
-
-func (r ApiRejectCloudAssignmentRequest) Execute() (*CloudAssignmentResponse, *http.Response, error) {
-	return r.ApiService.RejectCloudAssignmentExecute(r)
-}
-
-/*
-RejectCloudAssignment Reject a Cloud Assignment request.
-
-Rejects the Cloud Assignment identified by `{id}`. The handler reads the row to resolve the owning Cloud, runs the `assign` ReBAC check on that Cloud, then delegates to the Cloud Assignment application service which moves the assignment to the `rejected` state and appends a `CloudAssignmentRejected` outbox event in a single transaction. The `reason` from the body is recorded on the event as an operator-supplied audit string.  Rejection is only legal from the `requested` state — any other source state returns `409 illegal_transition`.
-
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Cloud Assignment identifier (UUIDv7). Bound on `/v1/cloud-assignments/{id}/approve`, `/v1/cloud-assignments/{id}/reject`, and `/v1/cloud-assignments/{id}/revoke` for the Cloud Assignment decision surface.
-	@return ApiRejectCloudAssignmentRequest
-*/
-func (a *CloudAPIService) RejectCloudAssignment(ctx context.Context, id string) ApiRejectCloudAssignmentRequest {
-	return ApiRejectCloudAssignmentRequest{
-		ApiService: a,
-		ctx:        ctx,
-		id:         id,
-	}
-}
-
-// Execute executes the request
-//
-//	@return CloudAssignmentResponse
-func (a *CloudAPIService) RejectCloudAssignmentExecute(r ApiRejectCloudAssignmentRequest) (*CloudAssignmentResponse, *http.Response, error) {
-	var (
-		localVarHTTPMethod  = http.MethodPost
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *CloudAssignmentResponse
-	)
-
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CloudAPIService.RejectCloudAssignment")
-	if err != nil {
-		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
-	}
-
-	localVarPath := localBasePath + "/v1/cloud-assignments/{id}/reject"
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := url.Values{}
-	localVarFormParams := url.Values{}
-	if r.cloudAssignmentDecisionRequest == nil {
-		return localVarReturnValue, nil, reportError("cloudAssignmentDecisionRequest is required and must be specified")
-	}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{"application/json"}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	// body params
-	localVarPostBody = r.cloudAssignmentDecisionRequest
-	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(req)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 401 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 403 {
-			var v PermissionDenied
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 404 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 409 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 413 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 500 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
-type ApiRejectCredentialAssignmentRequest struct {
-	ctx                                 context.Context
-	ApiService                          CloudAPI
-	id                                  string
-	credentialAssignmentDecisionRequest *CredentialAssignmentDecisionRequest
-}
-
-func (r ApiRejectCredentialAssignmentRequest) CredentialAssignmentDecisionRequest(credentialAssignmentDecisionRequest CredentialAssignmentDecisionRequest) ApiRejectCredentialAssignmentRequest {
-	r.credentialAssignmentDecisionRequest = &credentialAssignmentDecisionRequest
-	return r
-}
-
-func (r ApiRejectCredentialAssignmentRequest) Execute() (*CredentialAssignmentResponse, *http.Response, error) {
-	return r.ApiService.RejectCredentialAssignmentExecute(r)
-}
-
-/*
-RejectCredentialAssignment Reject a Credential Assignment.
-
-Rejects the Credential Assignment identified by `{id}`. The handler reads the row to resolve the parent Project, runs the `manage` ReBAC check on that Project, then delegates to the Credential Assignment application service which moves the assignment to the `rejected` state and appends a `CredentialAssignmentRejected` outbox event in a single transaction. The `reason` from the body is recorded on the event as an approver-supplied audit string.  Rejection is only legal from the `requested` state — any other source state returns `409 illegal_transition`.
-
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Credential Assignment identifier (UUIDv7). Bound on `/v1/credential-assignments/{id}/approve`, `/v1/credential-assignments/{id}/reject`, and `/v1/credential-assignments/{id}/revoke` for the Credential Assignment decision surface.
-	@return ApiRejectCredentialAssignmentRequest
-*/
-func (a *CloudAPIService) RejectCredentialAssignment(ctx context.Context, id string) ApiRejectCredentialAssignmentRequest {
-	return ApiRejectCredentialAssignmentRequest{
-		ApiService: a,
-		ctx:        ctx,
-		id:         id,
-	}
-}
-
-// Execute executes the request
-//
-//	@return CredentialAssignmentResponse
-func (a *CloudAPIService) RejectCredentialAssignmentExecute(r ApiRejectCredentialAssignmentRequest) (*CredentialAssignmentResponse, *http.Response, error) {
-	var (
-		localVarHTTPMethod  = http.MethodPost
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *CredentialAssignmentResponse
-	)
-
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CloudAPIService.RejectCredentialAssignment")
-	if err != nil {
-		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
-	}
-
-	localVarPath := localBasePath + "/v1/credential-assignments/{id}/reject"
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := url.Values{}
-	localVarFormParams := url.Values{}
-	if r.credentialAssignmentDecisionRequest == nil {
-		return localVarReturnValue, nil, reportError("credentialAssignmentDecisionRequest is required and must be specified")
-	}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{"application/json"}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	// body params
-	localVarPostBody = r.credentialAssignmentDecisionRequest
-	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(req)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 401 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 403 {
-			var v PermissionDenied
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 404 {
-			var v Problem
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		if localVarHTTPResponse.StatusCode == 409 {
 			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
@@ -3869,10 +3089,10 @@ func (r ApiRevokeCloudAssignmentRequest) Execute() (*CloudAssignmentResponse, *h
 /*
 RevokeCloudAssignment Revoke a Cloud Assignment.
 
-Revokes the Cloud Assignment identified by `{id}`. The handler reads the row to resolve the owning Cloud, runs the `assign` ReBAC check on that Cloud, then delegates to the Cloud Assignment application service which moves the assignment to the `revoked` state, narrow-deletes the `cloud#uses` binding so the Cloud is no longer usable in the Project, and appends a `CloudAssignmentRevoked` outbox event in a single transaction. The `reason` from the body is recorded on the event as an operator-supplied audit string.  Revocation is only legal from the `approved` state — any other source state returns `409 illegal_transition`.
+Revokes the Cloud Assignment identified by `{id}`. The handler reads the row to resolve the owning Cloud and the consuming Project, runs the dual ReBAC gate described below, then delegates to the Cloud Assignment application service which moves the assignment to the `revoked` state, narrow-deletes the `cloud#uses` binding so the Cloud is no longer usable in the Project, and appends a `CloudAssignmentRevoked` outbox event in a single transaction. The `reason` from the body is recorded on the event as an operator-supplied audit string.  The gate has two legs: `assign` on the owning Cloud, the object the assignment spends, and on its denial `deploy` on the consuming Project. Either leg authorises the revocation; the call is denied only when both deny. The second leg lets a Project owner hand back a Cloud they were granted without holding the Cloud-side `assign` relation.  Revocation is only legal from the `approved` state — any other source state returns `409 illegal_transition`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Cloud Assignment identifier (UUIDv7). Bound on `/v1/cloud-assignments/{id}/approve`, `/v1/cloud-assignments/{id}/reject`, and `/v1/cloud-assignments/{id}/revoke` for the Cloud Assignment decision surface.
+	@param id Cloud Assignment identifier (UUIDv7). Bound on `/v1/cloud-assignments/{id}/revoke` for the Cloud Assignment revocation surface.
 	@return ApiRevokeCloudAssignmentRequest
 */
 func (a *CloudAPIService) RevokeCloudAssignment(ctx context.Context, id string) ApiRevokeCloudAssignmentRequest {
@@ -4240,10 +3460,10 @@ func (r ApiRevokeCredentialAssignmentRequest) Execute() (*CredentialAssignmentRe
 /*
 RevokeCredentialAssignment Revoke a Credential Assignment.
 
-Revokes the Credential Assignment identified by `{id}`. The handler reads the row to resolve the parent Project, runs the `manage` ReBAC check on that Project, then delegates to the Credential Assignment application service which moves the assignment to the `revoked` state, tears down the materialised binding, and appends a `CredentialAssignmentRevoked` outbox event in a single transaction. The `reason` from the body is recorded on the event as an operator-supplied audit string.  Revocation is only legal from the `approved` state — any other source state returns `409 illegal_transition`.
+Revokes the Credential Assignment identified by `{id}`. The handler reads the row to resolve the owning Cloud Credential and the consuming Project, runs the dual ReBAC gate described below, then delegates to the Credential Assignment application service which moves the assignment to the `revoked` state, tears down the materialised binding, and appends a `CredentialAssignmentRevoked` outbox event in a single transaction. The `reason` from the body is recorded on the event as an operator-supplied audit string.  The gate has two legs: `assign` on the owning Cloud Credential, the object the assignment spends, and on its denial `deploy` on the consuming Project. Either leg authorises the revocation; the call is denied only when both deny. The second leg lets a Project owner hand back a Credential they were granted without holding the Credential-side `assign` relation.  Revocation is only legal from the `approved` state — any other source state returns `409 illegal_transition`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Credential Assignment identifier (UUIDv7). Bound on `/v1/credential-assignments/{id}/approve`, `/v1/credential-assignments/{id}/reject`, and `/v1/credential-assignments/{id}/revoke` for the Credential Assignment decision surface.
+	@param id Credential Assignment identifier (UUIDv7). Bound on `/v1/credential-assignments/{id}/revoke` for the Credential Assignment revocation surface.
 	@return ApiRevokeCredentialAssignmentRequest
 */
 func (a *CloudAPIService) RevokeCredentialAssignment(ctx context.Context, id string) ApiRevokeCredentialAssignmentRequest {

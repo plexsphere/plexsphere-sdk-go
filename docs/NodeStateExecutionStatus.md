@@ -1,15 +1,13 @@
-# MeshTopologyNodeReachability
+# NodeStateExecutionStatus
 
 ## Enum
 
 
-* `HEALTHY` (value: `"healthy"`)
+* `NodeStateExecutionStatusPending` (value: `"pending"`)
 
-* `STALE` (value: `"stale"`)
+* `NodeStateExecutionStatusAck` (value: `"ack"`)
 
-* `UNREACHABLE` (value: `"unreachable"`)
-
-* `NEVER_REPORTED` (value: `"never_reported"`)
+* `NodeStateExecutionStatusStarted` (value: `"started"`)
 
 * `UNKNOWN_DEFAULT_OPEN_API` (value: `"unknown_default_open_api"`)
 

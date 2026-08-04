@@ -19,7 +19,7 @@ import (
 // checks if the AuditEvent type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &AuditEvent{}
 
-// AuditEvent A single normalised audit event in a `POST /v1/nodes/{id}/audit` batch. The batch body is newline-delimited JSON (`application/x-ndjson`), one `AuditEvent` object per line. The closed `source` set mirrors the audit sources the README pins (Linux auditd via AF_AUDIT Netlink, or Kubernetes audit-log tailing). Events are tagged server-side with the originating Node's Domain and Project and routed to Grafana Loki with a separate retention class; the wire body never carries an identity subject or email. `source`, `action`, `outcome`, and `timestamp` are required.
+// AuditEvent A single normalised audit event in a `POST /v1/nodes/{id}/audit` batch. The batch body is newline-delimited JSON (`application/x-ndjson`), one `AuditEvent` object per line. The closed `source` set mirrors the audit sources the README pins (Linux auditd via AF_AUDIT Netlink, or Kubernetes audit-log tailing) and is closed on those two on purpose — the `source` field below records why an agent-originated event has no representation here and which leg carries it instead. Events are tagged server-side with the originating Node's Domain and Project and routed to Grafana Loki with a separate retention class; the wire body never carries an identity subject or email. `source`, `action`, `outcome`, and `timestamp` are required.
 type AuditEvent struct {
 	Source AuditEventSource `json:"source"`
 	// The audited action (e.g. the syscall name or Kubernetes verb). Required and non-empty.

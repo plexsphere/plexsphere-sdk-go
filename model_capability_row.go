@@ -19,7 +19,7 @@ import (
 // checks if the CapabilityRow type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &CapabilityRow{}
 
-// CapabilityRow One per-Node capability inventory row returned by `ListCapabilities` — a metadata-only projection of the Node's reported capability manifest paired with its checksum status.
+// CapabilityRow One per-Node capability inventory row returned by `ListCapabilities` — a projection of the Node's reported capability manifest paired with its checksum status. It carries the binary metadata, the checksum verdict, and the built-in action inventory the agent advertised; the hook lists are not projected here (see the Hook Catalog surfaces).
 type CapabilityRow struct {
 	// Node the capability row describes (UUIDv7).
 	NodeId string `json:"node_id"`
@@ -30,6 +30,8 @@ type CapabilityRow struct {
 	// SHA-256 digest of the running binary, 32 bytes base64-encoded with standard padding. Absent when the Node has not yet reported a checksum.
 	BinaryChecksum *string          `json:"binary_checksum,omitempty"`
 	Status         CapabilityStatus `json:"status"`
+	// The built-in actions the Node's agent advertised on its most recent capability manifest, in the order it reported them. This is the read side of `CapabilityManifestRequest.builtin_actions` — what an operator surface reads to offer a Node's actual actions rather than a fixed list.  Required, so every row carries the key and a client needs no null-check: a Node that reported no inventory renders the empty array. That is deliberately NOT the same claim as \"this Node supports no actions\" — an agent that predates the field and one that reports an empty list are indistinguishable here. Do not treat an empty array as a reason to refuse a dispatch; the Node remains the authority on what it can run.
+	BuiltinActions []BuiltinAction `json:"builtin_actions"`
 	// Timestamp at which the capability manifest snapshot was last reported (UTC).
 	ReportedAt           time.Time `json:"reported_at"`
 	AdditionalProperties map[string]interface{}
@@ -41,12 +43,13 @@ type _CapabilityRow CapabilityRow
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewCapabilityRow(nodeId string, domainId string, binaryVersion string, status CapabilityStatus, reportedAt time.Time) *CapabilityRow {
+func NewCapabilityRow(nodeId string, domainId string, binaryVersion string, status CapabilityStatus, builtinActions []BuiltinAction, reportedAt time.Time) *CapabilityRow {
 	this := CapabilityRow{}
 	this.NodeId = nodeId
 	this.DomainId = domainId
 	this.BinaryVersion = binaryVersion
 	this.Status = status
+	this.BuiltinActions = builtinActions
 	this.ReportedAt = reportedAt
 	return &this
 }
@@ -187,6 +190,30 @@ func (o *CapabilityRow) SetStatus(v CapabilityStatus) {
 	o.Status = v
 }
 
+// GetBuiltinActions returns the BuiltinActions field value
+func (o *CapabilityRow) GetBuiltinActions() []BuiltinAction {
+	if o == nil {
+		var ret []BuiltinAction
+		return ret
+	}
+
+	return o.BuiltinActions
+}
+
+// GetBuiltinActionsOk returns a tuple with the BuiltinActions field value
+// and a boolean to check if the value has been set.
+func (o *CapabilityRow) GetBuiltinActionsOk() ([]BuiltinAction, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return o.BuiltinActions, true
+}
+
+// SetBuiltinActions sets field value
+func (o *CapabilityRow) SetBuiltinActions(v []BuiltinAction) {
+	o.BuiltinActions = v
+}
+
 // GetReportedAt returns the ReportedAt field value
 func (o *CapabilityRow) GetReportedAt() time.Time {
 	if o == nil {
@@ -228,6 +255,7 @@ func (o CapabilityRow) ToMap() (map[string]interface{}, error) {
 		toSerialize["binary_checksum"] = o.BinaryChecksum
 	}
 	toSerialize["status"] = o.Status
+	toSerialize["builtin_actions"] = o.BuiltinActions
 	toSerialize["reported_at"] = o.ReportedAt
 
 	for key, value := range o.AdditionalProperties {
@@ -246,6 +274,7 @@ func (o *CapabilityRow) UnmarshalJSON(data []byte) (err error) {
 		"domain_id",
 		"binary_version",
 		"status",
+		"builtin_actions",
 		"reported_at",
 	}
 
@@ -281,6 +310,7 @@ func (o *CapabilityRow) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "binary_version")
 		delete(additionalProperties, "binary_checksum")
 		delete(additionalProperties, "status")
+		delete(additionalProperties, "builtin_actions")
 		delete(additionalProperties, "reported_at")
 		o.AdditionalProperties = additionalProperties
 	}

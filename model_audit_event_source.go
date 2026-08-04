@@ -15,7 +15,7 @@ import (
 	"fmt"
 )
 
-// AuditEventSource The audit source the event was normalised from. A value outside the closed set (`auditd`, `k8s`) is rejected with `400 ingest_batch_malformed`.
+// AuditEventSource The audit source the event was normalised from. A value outside the closed set (`auditd`, `k8s`) is rejected with `400 ingest_batch_malformed`, and because a batch is validated as a whole, one unrepresentable line refuses the entire batch rather than being dropped from it.  The set is closed on the two SYSTEM audit trails deliberately, and stays closed: this leg carries records about what happened on the host and in the cluster, under a retention class and a SIEM route that exist for exactly that material. The agent's own operational events are not audit records in this sense and have no value here — an agent restart, for one, is already reported to the control plane by the capability manifest the agent PUTs on boot, carrying the binary version and checksum that a `plexd started` line would not. Agent telemetry belongs on `POST /v1/nodes/{id}/logs`, which is shaped for it.  An agent with no auditd reader and no Kubernetes audit-log tail therefore has nothing to send on this leg, and that is the intended posture rather than a gap to close by widening the enum. Such an agent should omit the batch; it must not reclassify its own events as `auditd` to get them accepted, which would corrupt the one property this leg's consumers rely on — that a record attributed to a system audit trail came from one.
 type AuditEventSource string
 
 // List of AuditEvent_source
