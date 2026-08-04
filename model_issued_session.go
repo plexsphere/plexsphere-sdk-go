@@ -19,17 +19,15 @@ import (
 // checks if the IssuedSession type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &IssuedSession{}
 
-// IssuedSession Body of a successful `IssueSession`. Carries the metadata-only Session projection, the signed EdDSA JWT (delivered EXACTLY ONCE, here — it is never persisted server-side beyond the identifier and expiry, and never re-exposed through the list or read projections), the per-kind plexd listener endpoint the operator's client connects to, and the expiry.
+// IssuedSession Body of a successful `IssueSession`. Carries the metadata-only Session projection, the signed EdDSA JWT (delivered EXACTLY ONCE, here — it is never persisted server-side beyond the identifier and expiry, and never re-exposed through the list or read projections), and the expiry. The body carries no listener endpoint: the target Node reports its mediated-listener coordinate after issuance, and it settles on the nested Session projection served by `GetSession` / `ListSessions`.
 type IssuedSession struct {
 	// Identifier of the issued Session (UUIDv7). Equals the token's `jti`.
 	SessionId string `json:"session_id"`
 	// The signed, session-scoped EdDSA JWT. Delivered exactly once, in this response. Treat as a bearer secret.
 	Token string `json:"token"`
 	// Expiry timestamp (UTC) of the issued Session and its token.
-	ExpiresAt time.Time `json:"expires_at"`
-	// The on-Node endpoint (`host:port`) the operator's client connects to for this session kind.
-	ListenerEndpoint     *string `json:"listener_endpoint,omitempty" validate:"regexp=^.+:[0-9]{1,5}$"`
-	Session              Session `json:"session"`
+	ExpiresAt            time.Time `json:"expires_at"`
+	Session              Session   `json:"session"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -128,38 +126,6 @@ func (o *IssuedSession) SetExpiresAt(v time.Time) {
 	o.ExpiresAt = v
 }
 
-// GetListenerEndpoint returns the ListenerEndpoint field value if set, zero value otherwise.
-func (o *IssuedSession) GetListenerEndpoint() string {
-	if o == nil || IsNil(o.ListenerEndpoint) {
-		var ret string
-		return ret
-	}
-	return *o.ListenerEndpoint
-}
-
-// GetListenerEndpointOk returns a tuple with the ListenerEndpoint field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *IssuedSession) GetListenerEndpointOk() (*string, bool) {
-	if o == nil || IsNil(o.ListenerEndpoint) {
-		return nil, false
-	}
-	return o.ListenerEndpoint, true
-}
-
-// HasListenerEndpoint returns a boolean if a field has been set.
-func (o *IssuedSession) HasListenerEndpoint() bool {
-	if o != nil && !IsNil(o.ListenerEndpoint) {
-		return true
-	}
-
-	return false
-}
-
-// SetListenerEndpoint gets a reference to the given string and assigns it to the ListenerEndpoint field.
-func (o *IssuedSession) SetListenerEndpoint(v string) {
-	o.ListenerEndpoint = &v
-}
-
 // GetSession returns the Session field value
 func (o *IssuedSession) GetSession() Session {
 	if o == nil {
@@ -197,9 +163,6 @@ func (o IssuedSession) ToMap() (map[string]interface{}, error) {
 	toSerialize["session_id"] = o.SessionId
 	toSerialize["token"] = o.Token
 	toSerialize["expires_at"] = o.ExpiresAt
-	if !IsNil(o.ListenerEndpoint) {
-		toSerialize["listener_endpoint"] = o.ListenerEndpoint
-	}
 	toSerialize["session"] = o.Session
 
 	for key, value := range o.AdditionalProperties {
@@ -250,7 +213,6 @@ func (o *IssuedSession) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "session_id")
 		delete(additionalProperties, "token")
 		delete(additionalProperties, "expires_at")
-		delete(additionalProperties, "listener_endpoint")
 		delete(additionalProperties, "session")
 		o.AdditionalProperties = additionalProperties
 	}

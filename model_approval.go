@@ -19,12 +19,15 @@ import (
 // checks if the Approval type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &Approval{}
 
-// Approval Metadata projection of an Approval. The shape is shared by `ListApprovals`, `GetApproval`, `ApproveApproval`, `RejectApproval`, and `BreakGlassApproval` so clients only need one binding.
+// Approval Metadata projection of one approval-queue row. The shape is shared by `ListApprovals`, `GetApproval`, `ApproveApproval`, `RejectApproval`, and `BreakGlassApproval` so clients only need one binding, and it covers all three queue sources: generic Approvals, Credential Assignments, and Cloud Assignments. `kind` names the source, and a client reads it before any field a single source owns. `project_id` and `materialised` are set on assignment rows; `expires_at`, `payload`, and `caveat_context` are set on `approval` rows.
 type Approval struct {
 	// Approval identifier (UUIDv7).
-	Id string `json:"id"`
+	Id   string       `json:"id"`
+	Kind ApprovalKind `json:"kind"`
 	// Identifier of the owning Domain — the residency pivot the ReBAC gate authorises against.
 	DomainId string `json:"domain_id"`
+	// Identifier of the consuming Project the assignment binds into. Set on `credential_assignment` and `cloud_assignment` rows; absent on `approval` rows.
+	ProjectId *string `json:"project_id,omitempty"`
 	// ReBAC subject string of the principal that raised the proposal. A caller may never approve a proposal whose `proposer_subject` is themselves.
 	ProposerSubject string `json:"proposer_subject"`
 	// Kind of action the proposal would perform once approved. Matched against the Domain `ApprovalPolicy` rules to decide whether the proposal is gated.
@@ -34,6 +37,8 @@ type Approval struct {
 	// Raw JSON action payload applied verbatim once the proposal is approved. Opaque to the approval workflow — it carries the parameters of the action the proposer intends to run.
 	Payload map[string]interface{} `json:"payload,omitempty"`
 	State   ApprovalState          `json:"state"`
+	// Whether the assignment's ReBAC binding is currently live. `true` only while the assignment is in the `approved` state. Set on `credential_assignment` and `cloud_assignment` rows; absent on `approval` rows.
+	Materialised *bool `json:"materialised,omitempty"`
 	// Aggregate creation timestamp (UTC).
 	CreatedAt time.Time `json:"created_at"`
 	// Timestamp the proposal reached a terminal state (UTC). Absent while the proposal is still `proposed` or `pending-approval`.
@@ -42,8 +47,8 @@ type Approval struct {
 	DecidedBySubject *string `json:"decided_by_subject,omitempty"`
 	// Free-text rationale recorded with the decision. Absent while undecided and for the unattended `expired` path. For a break-glass override the rationale value is PII and is NOT surfaced here verbatim — only its field name is projected onto `caveat_context`.
 	DecisionReason *string `json:"decision_reason,omitempty"`
-	// Deadline past which the background sweeper expires an un-decided proposal (UTC).
-	ExpiresAt time.Time `json:"expires_at"`
+	// Deadline past which the background sweeper expires an un-decided proposal (UTC). Set on `approval` rows only. Assignment rows carry no deadline and never expire, so the field is absent on `credential_assignment` and `cloud_assignment` rows.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	// Names-only projection of the caveat field NAMES referenced on the decision's audit row — for a break-glass override this carries the `reason` field name. Values never cross this boundary: the map keys are caveat NAMES and the arrays are caveat-parameter NAMES, mirroring the Platform Audit Log invariant. Absent while the proposal carries no decision audit row.
 	CaveatContext        map[string][]string `json:"caveat_context,omitempty"`
 	AdditionalProperties map[string]interface{}
@@ -55,16 +60,16 @@ type _Approval Approval
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewApproval(id string, domainId string, proposerSubject string, actionKind string, targetResource string, state ApprovalState, createdAt time.Time, expiresAt time.Time) *Approval {
+func NewApproval(id string, kind ApprovalKind, domainId string, proposerSubject string, actionKind string, targetResource string, state ApprovalState, createdAt time.Time) *Approval {
 	this := Approval{}
 	this.Id = id
+	this.Kind = kind
 	this.DomainId = domainId
 	this.ProposerSubject = proposerSubject
 	this.ActionKind = actionKind
 	this.TargetResource = targetResource
 	this.State = state
 	this.CreatedAt = createdAt
-	this.ExpiresAt = expiresAt
 	return &this
 }
 
@@ -100,6 +105,30 @@ func (o *Approval) SetId(v string) {
 	o.Id = v
 }
 
+// GetKind returns the Kind field value
+func (o *Approval) GetKind() ApprovalKind {
+	if o == nil {
+		var ret ApprovalKind
+		return ret
+	}
+
+	return o.Kind
+}
+
+// GetKindOk returns a tuple with the Kind field value
+// and a boolean to check if the value has been set.
+func (o *Approval) GetKindOk() (*ApprovalKind, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.Kind, true
+}
+
+// SetKind sets field value
+func (o *Approval) SetKind(v ApprovalKind) {
+	o.Kind = v
+}
+
 // GetDomainId returns the DomainId field value
 func (o *Approval) GetDomainId() string {
 	if o == nil {
@@ -122,6 +151,38 @@ func (o *Approval) GetDomainIdOk() (*string, bool) {
 // SetDomainId sets field value
 func (o *Approval) SetDomainId(v string) {
 	o.DomainId = v
+}
+
+// GetProjectId returns the ProjectId field value if set, zero value otherwise.
+func (o *Approval) GetProjectId() string {
+	if o == nil || IsNil(o.ProjectId) {
+		var ret string
+		return ret
+	}
+	return *o.ProjectId
+}
+
+// GetProjectIdOk returns a tuple with the ProjectId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *Approval) GetProjectIdOk() (*string, bool) {
+	if o == nil || IsNil(o.ProjectId) {
+		return nil, false
+	}
+	return o.ProjectId, true
+}
+
+// HasProjectId returns a boolean if a field has been set.
+func (o *Approval) HasProjectId() bool {
+	if o != nil && !IsNil(o.ProjectId) {
+		return true
+	}
+
+	return false
+}
+
+// SetProjectId gets a reference to the given string and assigns it to the ProjectId field.
+func (o *Approval) SetProjectId(v string) {
+	o.ProjectId = &v
 }
 
 // GetProposerSubject returns the ProposerSubject field value
@@ -252,6 +313,38 @@ func (o *Approval) SetState(v ApprovalState) {
 	o.State = v
 }
 
+// GetMaterialised returns the Materialised field value if set, zero value otherwise.
+func (o *Approval) GetMaterialised() bool {
+	if o == nil || IsNil(o.Materialised) {
+		var ret bool
+		return ret
+	}
+	return *o.Materialised
+}
+
+// GetMaterialisedOk returns a tuple with the Materialised field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *Approval) GetMaterialisedOk() (*bool, bool) {
+	if o == nil || IsNil(o.Materialised) {
+		return nil, false
+	}
+	return o.Materialised, true
+}
+
+// HasMaterialised returns a boolean if a field has been set.
+func (o *Approval) HasMaterialised() bool {
+	if o != nil && !IsNil(o.Materialised) {
+		return true
+	}
+
+	return false
+}
+
+// SetMaterialised gets a reference to the given bool and assigns it to the Materialised field.
+func (o *Approval) SetMaterialised(v bool) {
+	o.Materialised = &v
+}
+
 // GetCreatedAt returns the CreatedAt field value
 func (o *Approval) GetCreatedAt() time.Time {
 	if o == nil {
@@ -372,28 +465,36 @@ func (o *Approval) SetDecisionReason(v string) {
 	o.DecisionReason = &v
 }
 
-// GetExpiresAt returns the ExpiresAt field value
+// GetExpiresAt returns the ExpiresAt field value if set, zero value otherwise.
 func (o *Approval) GetExpiresAt() time.Time {
-	if o == nil {
+	if o == nil || IsNil(o.ExpiresAt) {
 		var ret time.Time
 		return ret
 	}
-
-	return o.ExpiresAt
+	return *o.ExpiresAt
 }
 
-// GetExpiresAtOk returns a tuple with the ExpiresAt field value
+// GetExpiresAtOk returns a tuple with the ExpiresAt field value if set, nil otherwise
 // and a boolean to check if the value has been set.
 func (o *Approval) GetExpiresAtOk() (*time.Time, bool) {
-	if o == nil {
+	if o == nil || IsNil(o.ExpiresAt) {
 		return nil, false
 	}
-	return &o.ExpiresAt, true
+	return o.ExpiresAt, true
 }
 
-// SetExpiresAt sets field value
+// HasExpiresAt returns a boolean if a field has been set.
+func (o *Approval) HasExpiresAt() bool {
+	if o != nil && !IsNil(o.ExpiresAt) {
+		return true
+	}
+
+	return false
+}
+
+// SetExpiresAt gets a reference to the given time.Time and assigns it to the ExpiresAt field.
 func (o *Approval) SetExpiresAt(v time.Time) {
-	o.ExpiresAt = v
+	o.ExpiresAt = &v
 }
 
 // GetCaveatContext returns the CaveatContext field value if set, zero value otherwise.
@@ -439,7 +540,11 @@ func (o Approval) MarshalJSON() ([]byte, error) {
 func (o Approval) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["id"] = o.Id
+	toSerialize["kind"] = o.Kind
 	toSerialize["domain_id"] = o.DomainId
+	if !IsNil(o.ProjectId) {
+		toSerialize["project_id"] = o.ProjectId
+	}
 	toSerialize["proposer_subject"] = o.ProposerSubject
 	toSerialize["action_kind"] = o.ActionKind
 	toSerialize["target_resource"] = o.TargetResource
@@ -447,6 +552,9 @@ func (o Approval) ToMap() (map[string]interface{}, error) {
 		toSerialize["payload"] = o.Payload
 	}
 	toSerialize["state"] = o.State
+	if !IsNil(o.Materialised) {
+		toSerialize["materialised"] = o.Materialised
+	}
 	toSerialize["created_at"] = o.CreatedAt
 	if !IsNil(o.DecidedAt) {
 		toSerialize["decided_at"] = o.DecidedAt
@@ -457,7 +565,9 @@ func (o Approval) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.DecisionReason) {
 		toSerialize["decision_reason"] = o.DecisionReason
 	}
-	toSerialize["expires_at"] = o.ExpiresAt
+	if !IsNil(o.ExpiresAt) {
+		toSerialize["expires_at"] = o.ExpiresAt
+	}
 	if !IsNil(o.CaveatContext) {
 		toSerialize["caveat_context"] = o.CaveatContext
 	}
@@ -475,13 +585,13 @@ func (o *Approval) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"id",
+		"kind",
 		"domain_id",
 		"proposer_subject",
 		"action_kind",
 		"target_resource",
 		"state",
 		"created_at",
-		"expires_at",
 	}
 
 	allProperties := make(map[string]interface{})
@@ -512,12 +622,15 @@ func (o *Approval) UnmarshalJSON(data []byte) (err error) {
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "id")
+		delete(additionalProperties, "kind")
 		delete(additionalProperties, "domain_id")
+		delete(additionalProperties, "project_id")
 		delete(additionalProperties, "proposer_subject")
 		delete(additionalProperties, "action_kind")
 		delete(additionalProperties, "target_resource")
 		delete(additionalProperties, "payload")
 		delete(additionalProperties, "state")
+		delete(additionalProperties, "materialised")
 		delete(additionalProperties, "created_at")
 		delete(additionalProperties, "decided_at")
 		delete(additionalProperties, "decided_by_subject")

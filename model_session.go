@@ -45,8 +45,10 @@ type Session struct {
 	// Revocation timestamp (UTC); absent while the Session is live.
 	RevokedAt *time.Time `json:"revoked_at,omitempty"`
 	// Reason the Session was revoked. Omitted while the Session is live.
-	RevokeReason         *RevokeReason `json:"revoke_reason,omitempty"`
-	Target               SessionTarget `json:"target"`
+	RevokeReason *RevokeReason `json:"revoke_reason,omitempty"`
+	Target       SessionTarget `json:"target"`
+	// The `host:port` the target Node reported for this Session, and the endpoint the attach gateway dials. Absent until the Node's first `session_started` activity row for a `tcp` session settles it.
+	ListenerEndpoint     *string `json:"listener_endpoint,omitempty" validate:"regexp=^.+:[0-9]{1,5}$"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -440,6 +442,38 @@ func (o *Session) SetTarget(v SessionTarget) {
 	o.Target = v
 }
 
+// GetListenerEndpoint returns the ListenerEndpoint field value if set, zero value otherwise.
+func (o *Session) GetListenerEndpoint() string {
+	if o == nil || IsNil(o.ListenerEndpoint) {
+		var ret string
+		return ret
+	}
+	return *o.ListenerEndpoint
+}
+
+// GetListenerEndpointOk returns a tuple with the ListenerEndpoint field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *Session) GetListenerEndpointOk() (*string, bool) {
+	if o == nil || IsNil(o.ListenerEndpoint) {
+		return nil, false
+	}
+	return o.ListenerEndpoint, true
+}
+
+// HasListenerEndpoint returns a boolean if a field has been set.
+func (o *Session) HasListenerEndpoint() bool {
+	if o != nil && !IsNil(o.ListenerEndpoint) {
+		return true
+	}
+
+	return false
+}
+
+// SetListenerEndpoint gets a reference to the given string and assigns it to the ListenerEndpoint field.
+func (o *Session) SetListenerEndpoint(v string) {
+	o.ListenerEndpoint = &v
+}
+
 func (o Session) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -470,6 +504,9 @@ func (o Session) ToMap() (map[string]interface{}, error) {
 		toSerialize["revoke_reason"] = o.RevokeReason
 	}
 	toSerialize["target"] = o.Target
+	if !IsNil(o.ListenerEndpoint) {
+		toSerialize["listener_endpoint"] = o.ListenerEndpoint
+	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -537,6 +574,7 @@ func (o *Session) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "revoked_at")
 		delete(additionalProperties, "revoke_reason")
 		delete(additionalProperties, "target")
+		delete(additionalProperties, "listener_endpoint")
 		o.AdditionalProperties = additionalProperties
 	}
 

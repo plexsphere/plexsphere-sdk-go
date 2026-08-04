@@ -23,6 +23,7 @@ const (
 	MESHEDGESTATUS_HEALTHY                  MeshEdgeStatus = "healthy"
 	MESHEDGESTATUS_STALE                    MeshEdgeStatus = "stale"
 	MESHEDGESTATUS_UNREACHABLE              MeshEdgeStatus = "unreachable"
+	MESHEDGESTATUS_NEVER_REPORTED           MeshEdgeStatus = "never_reported"
 	MESHEDGESTATUS_UNKNOWN_DEFAULT_OPEN_API MeshEdgeStatus = "unknown_default_open_api"
 )
 
@@ -31,6 +32,7 @@ var AllowedMeshEdgeStatusEnumValues = []MeshEdgeStatus{
 	"healthy",
 	"stale",
 	"unreachable",
+	"never_reported",
 	"unknown_default_open_api",
 }
 

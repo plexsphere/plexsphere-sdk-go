@@ -29,7 +29,7 @@ type ResourceResponse struct {
 	DomainId string `json:"domain_id"`
 	// Resource kind discriminator.
 	Kind string `json:"kind"`
-	// Optional external-system reference. Absent when the Resource declared none.
+	// The Resource handle. On an adopted Resource this is the optional external-system reference the operator supplied, absent when they supplied none. On a provisioned Resource it is the platform-assigned handle the enrolling agent registers with, and it is always present — except on Resources created before the platform began assigning one, which are not repaired in place.
 	ExternalRef *string        `json:"external_ref,omitempty"`
 	Origin      ResourceOrigin `json:"origin"`
 	// Resource creation timestamp (UTC).

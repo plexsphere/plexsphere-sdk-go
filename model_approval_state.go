@@ -15,7 +15,7 @@ import (
 	"fmt"
 )
 
-// ApprovalState Lifecycle state of an Approval. `proposed` is the opening state before the policy is evaluated; `pending-approval` means the Domain's `ApprovalPolicy` gated the proposal and it awaits an operator decision; `approved` is the terminal accept state (reached by an operator decision, the empty-policy short-circuit, or a break-glass override); `rejected` is the terminal state an operator decision declines into; `expired` is the terminal state the background sweeper drives an un-decided proposal into past its deadline. The state is a stored column advanced only by the application service's transition rules.
+// ApprovalState Lifecycle state of a queue row. `proposed` is the opening state before the policy is evaluated; `pending-approval` means the Domain's `ApprovalPolicy` gated the proposal and it awaits an operator decision; `approved` is the terminal accept state (reached by an operator decision, the empty-policy short-circuit, or a break-glass override); `rejected` is the terminal state an operator decision declines into; `expired` is the terminal state the background sweeper drives an un-decided proposal into past its deadline; `revoked` is the terminal state a previously approved assignment row is torn down into. On an assignment row the wire state `pending-approval` presents the stored assignment state `requested`, and `expired` never occurs. The state is a stored column advanced only by the application service's transition rules.
 type ApprovalState string
 
 // List of ApprovalState
@@ -25,6 +25,7 @@ const (
 	APPROVALSTATE_APPROVED                 ApprovalState = "approved"
 	APPROVALSTATE_REJECTED                 ApprovalState = "rejected"
 	APPROVALSTATE_EXPIRED                  ApprovalState = "expired"
+	APPROVALSTATE_REVOKED                  ApprovalState = "revoked"
 	APPROVALSTATE_UNKNOWN_DEFAULT_OPEN_API ApprovalState = "unknown_default_open_api"
 )
 
@@ -35,6 +36,7 @@ var AllowedApprovalStateEnumValues = []ApprovalState{
 	"approved",
 	"rejected",
 	"expired",
+	"revoked",
 	"unknown_default_open_api",
 }
 

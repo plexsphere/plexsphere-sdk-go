@@ -19,7 +19,7 @@ import (
 // checks if the Reachability type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &Reachability{}
 
-// Reachability Per-Node reachability projection driven by the heartbeat handler. The state-machine transitions `healthy` → `stale` after 90 seconds without an accepted heartbeat and `stale` → `unreachable` after 300 seconds. `last_heartbeat_at` is absent until the first heartbeat is accepted; `changed_at` is always present and tracks the most recent state transition.
+// Reachability Per-Node reachability projection driven by the heartbeat handler. A Node enters the projection in `never_reported` and leaves it for a heartbeat-derived verdict once its first heartbeat is admitted. From there the state-machine transitions `healthy` → `stale` after 90 seconds without an accepted heartbeat and `stale` → `unreachable` after 300 seconds. `last_heartbeat_at` is absent until the first heartbeat is accepted; `changed_at` is always present and tracks the most recent state transition.
 type Reachability struct {
 	State ReachabilityState `json:"state"`
 	// Server-side timestamp of the most recently accepted heartbeat; absent until the first heartbeat is accepted.

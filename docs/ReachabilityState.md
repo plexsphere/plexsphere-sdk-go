@@ -9,6 +9,8 @@
 
 * `UNREACHABLE` (value: `"unreachable"`)
 
+* `NEVER_REPORTED` (value: `"never_reported"`)
+
 * `UNKNOWN_DEFAULT_OPEN_API` (value: `"unknown_default_open_api"`)
 
 

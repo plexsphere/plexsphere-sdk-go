@@ -8,7 +8,7 @@ Name | Type | Description | Notes
 **ProjectId** | **string** | Owning Project (UUIDv7) — exactly-one-parent rule.  | 
 **DomainId** | **string** | Owning Domain (UUIDv7). Denormalised from the parent Project so cross-Domain checks do not have to reload the Project on every Resource read.  | 
 **Kind** | **string** | Resource kind discriminator. | 
-**ExternalRef** | Pointer to **string** | Optional external-system reference. Absent when the Resource declared none.  | [optional] 
+**ExternalRef** | Pointer to **string** | The Resource handle. On an adopted Resource this is the optional external-system reference the operator supplied, absent when they supplied none. On a provisioned Resource it is the platform-assigned handle the enrolling agent registers with, and it is always present — except on Resources created before the platform began assigning one, which are not repaired in place.  | [optional] 
 **Origin** | [**ResourceOrigin**](ResourceOrigin.md) |  | 
 **CreatedAt** | **time.Time** | Resource creation timestamp (UTC). | 
 **UpdatedAt** | **time.Time** | Last-modified timestamp (UTC). | 

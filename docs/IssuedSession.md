@@ -7,7 +7,6 @@ Name | Type | Description | Notes
 **SessionId** | **string** | Identifier of the issued Session (UUIDv7). Equals the token&#39;s &#x60;jti&#x60;.  | 
 **Token** | **string** | The signed, session-scoped EdDSA JWT. Delivered exactly once, in this response. Treat as a bearer secret.  | 
 **ExpiresAt** | **time.Time** | Expiry timestamp (UTC) of the issued Session and its token.  | 
-**ListenerEndpoint** | Pointer to **string** | The on-Node endpoint (&#x60;host:port&#x60;) the operator&#39;s client connects to for this session kind.  | [optional] 
 **Session** | [**Session**](Session.md) |  | 
 
 ## Methods
@@ -88,31 +87,6 @@ and a boolean to check if the value has been set.
 
 SetExpiresAt sets ExpiresAt field to given value.
 
-
-### GetListenerEndpoint
-
-`func (o *IssuedSession) GetListenerEndpoint() string`
-
-GetListenerEndpoint returns the ListenerEndpoint field if non-nil, zero value otherwise.
-
-### GetListenerEndpointOk
-
-`func (o *IssuedSession) GetListenerEndpointOk() (*string, bool)`
-
-GetListenerEndpointOk returns a tuple with the ListenerEndpoint field if it's non-nil, zero value otherwise
-and a boolean to check if the value has been set.
-
-### SetListenerEndpoint
-
-`func (o *IssuedSession) SetListenerEndpoint(v string)`
-
-SetListenerEndpoint sets ListenerEndpoint field to given value.
-
-### HasListenerEndpoint
-
-`func (o *IssuedSession) HasListenerEndpoint() bool`
-
-HasListenerEndpoint returns a boolean if a field has been set.
 
 ### GetSession
 

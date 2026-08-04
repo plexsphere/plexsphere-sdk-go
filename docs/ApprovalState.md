@@ -13,6 +13,8 @@
 
 * `EXPIRED` (value: `"expired"`)
 
+* `REVOKED` (value: `"revoked"`)
+
 * `UNKNOWN_DEFAULT_OPEN_API` (value: `"unknown_default_open_api"`)
 
 

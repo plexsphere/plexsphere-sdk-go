@@ -25,6 +25,8 @@ type SessionActivityTCP struct {
 	TargetHost *string `json:"target_host,omitempty"`
 	// Target port the tunnel connected to. Present on `session_started`.
 	TargetPort *int32 `json:"target_port,omitempty"`
+	// The `host:port` the Node bound for this session on its mesh address. Present only on `session_started`.
+	ListenerEndpoint *string `json:"listener_endpoint,omitempty" validate:"regexp=^.+:[0-9]{1,5}$"`
 	// Bytes forwarded from the operator to the target. Present on `session_ended`.
 	BytesIn *int32 `json:"bytes_in,omitempty"`
 	// Bytes forwarded from the target to the operator. Present on `session_ended`.
@@ -141,6 +143,38 @@ func (o *SessionActivityTCP) SetTargetPort(v int32) {
 	o.TargetPort = &v
 }
 
+// GetListenerEndpoint returns the ListenerEndpoint field value if set, zero value otherwise.
+func (o *SessionActivityTCP) GetListenerEndpoint() string {
+	if o == nil || IsNil(o.ListenerEndpoint) {
+		var ret string
+		return ret
+	}
+	return *o.ListenerEndpoint
+}
+
+// GetListenerEndpointOk returns a tuple with the ListenerEndpoint field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SessionActivityTCP) GetListenerEndpointOk() (*string, bool) {
+	if o == nil || IsNil(o.ListenerEndpoint) {
+		return nil, false
+	}
+	return o.ListenerEndpoint, true
+}
+
+// HasListenerEndpoint returns a boolean if a field has been set.
+func (o *SessionActivityTCP) HasListenerEndpoint() bool {
+	if o != nil && !IsNil(o.ListenerEndpoint) {
+		return true
+	}
+
+	return false
+}
+
+// SetListenerEndpoint gets a reference to the given string and assigns it to the ListenerEndpoint field.
+func (o *SessionActivityTCP) SetListenerEndpoint(v string) {
+	o.ListenerEndpoint = &v
+}
+
 // GetBytesIn returns the BytesIn field value if set, zero value otherwise.
 func (o *SessionActivityTCP) GetBytesIn() int32 {
 	if o == nil || IsNil(o.BytesIn) {
@@ -254,6 +288,9 @@ func (o SessionActivityTCP) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.TargetPort) {
 		toSerialize["target_port"] = o.TargetPort
 	}
+	if !IsNil(o.ListenerEndpoint) {
+		toSerialize["listener_endpoint"] = o.ListenerEndpoint
+	}
 	if !IsNil(o.BytesIn) {
 		toSerialize["bytes_in"] = o.BytesIn
 	}
@@ -309,6 +346,7 @@ func (o *SessionActivityTCP) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "phase")
 		delete(additionalProperties, "target_host")
 		delete(additionalProperties, "target_port")
+		delete(additionalProperties, "listener_endpoint")
 		delete(additionalProperties, "bytes_in")
 		delete(additionalProperties, "bytes_out")
 		delete(additionalProperties, "terminated_by")

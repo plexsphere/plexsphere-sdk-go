@@ -19,7 +19,7 @@ import (
 // checks if the CredentialAssignmentResponse type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &CredentialAssignmentResponse{}
 
-// CredentialAssignmentResponse Metadata projection of a Credential Assignment. The shape is shared by `RequestCredentialAssignment`, `ListCredentialAssignments`, `ApproveCredentialAssignment`, `RejectCredentialAssignment`, and `RevokeCredentialAssignment` so clients only need one binding.
+// CredentialAssignmentResponse Metadata projection of a Credential Assignment. The shape is shared by `RequestCredentialAssignment`, `ListCredentialAssignments`, and `RevokeCredentialAssignment` so clients only need one binding.
 type CredentialAssignmentResponse struct {
 	// Credential Assignment identifier (UUIDv7).
 	Id string `json:"id"`

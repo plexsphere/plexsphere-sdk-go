@@ -8,6 +8,7 @@ Method | HTTP request | Description
 [**GetDomainMeshTopology**](MeshAPI.md#GetDomainMeshTopology) | **Get** /v1/domains/{domain_id}/mesh/topology | Return the mesh topology for a Domain.
 [**GetNodeEvents**](MeshAPI.md#GetNodeEvents) | **Get** /v1/nodes/{id}/events | Stream signed envelope events for a Node over SSE.
 [**GetNodeKeysRotatePreview**](MeshAPI.md#GetNodeKeysRotatePreview) | **Get** /v1/nodes/{id}/keys/rotate/preview | Preview the fleet impact of rotating a Node&#39;s mesh key.
+[**GetNodePeerPSK**](MeshAPI.md#GetNodePeerPSK) | **Get** /v1/nodes/{id}/peers/{peer_node_id}/psk | Fetch the pairwise edge PSK for a tunnel, rewrapped under the calling Node&#39;s NSK.
 [**GetNodeReachability**](MeshAPI.md#GetNodeReachability) | **Get** /v1/nodes/{id}/reachability | Read the reachability projection for a Node.
 [**GetNodeSecret**](MeshAPI.md#GetNodeSecret) | **Get** /v1/nodes/{id}/secrets/{name} | Fetch a Secret Store entry rewrapped under the calling Node&#39;s NSK.
 [**GetNodeState**](MeshAPI.md#GetNodeState) | **Get** /v1/nodes/{id}/state | Reconciliation pull for a Node — return the canonical NodeStateSnapshot.
@@ -225,7 +226,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+[nskBearer](../README.md#nskBearer), [operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -307,6 +308,79 @@ Name | Type | Description  | Notes
 [[Back to README]](../README.md)
 
 
+## GetNodePeerPSK
+
+> *os.File GetNodePeerPSK(ctx, id, peerNodeId).Execute()
+
+Fetch the pairwise edge PSK for a tunnel, rewrapped under the calling Node's NSK.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Node identifier (UUIDv7) of the addressed Node — the edge endpoint fetching the PSK. Must equal the NSK-authenticated calling Node. 
+	peerNodeId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Node identifier (UUIDv7) of the peer at the other end of the edge whose pairwise PSK is fetched. 
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.MeshAPI.GetNodePeerPSK(context.Background(), id, peerNodeId).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `MeshAPI.GetNodePeerPSK``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `GetNodePeerPSK`: *os.File
+	fmt.Fprintf(os.Stdout, "Response from `MeshAPI.GetNodePeerPSK`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+**id** | **string** | Node identifier (UUIDv7) of the addressed Node — the edge endpoint fetching the PSK. Must equal the NSK-authenticated calling Node.  | 
+**peerNodeId** | **string** | Node identifier (UUIDv7) of the peer at the other end of the edge whose pairwise PSK is fetched.  | 
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiGetNodePeerPSKRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+
+
+
+### Return type
+
+[***os.File**](*os.File.md)
+
+### Authorization
+
+[nskBearer](../README.md#nskBearer)
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/octet-stream, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
 ## GetNodeReachability
 
 > Reachability GetNodeReachability(ctx, id).Execute()
@@ -365,7 +439,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+[nskBearer](../README.md#nskBearer), [operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 
@@ -510,7 +584,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+[nskBearer](../README.md#nskBearer), [operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
 
 ### HTTP request headers
 

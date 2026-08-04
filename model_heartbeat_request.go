@@ -23,7 +23,7 @@ var _ MappedNullable = &HeartbeatRequest{}
 type HeartbeatRequest struct {
 	// Client wall-clock timestamp at the moment the heartbeat was assembled. The handler rejects the request with 400 `clock_skew` if the value drifts more than 60 seconds from server now.
 	ClientNow time.Time `json:"client_now"`
-	// SHA-256 digest of the running plexd binary. The wire form is the 32-byte raw digest encoded as either lowercase hex (64 characters) or base64 with standard padding (44 characters); the handler decodes both forms and rejects anything else with 400 `binary_checksum_empty`.
+	// SHA-256 digest of the running plexd binary, 32 bytes base64-encoded with standard padding (44 characters). Anything that does not decode to exactly 32 bytes is rejected with 400 `binary_checksum_empty`.  Base64 is the only accepted encoding, here and on `CapabilityManifestRequest.binary_checksum` and `DeclaredHook.checksum`. An earlier revision of this description also offered lowercase hex; no handler ever decoded it. `format: byte` means the generated server type is `[]byte` and the JSON decoder base64-decodes the value before any handler sees it, so a 64-character hex digest — itself valid base64 — arrives as 48 bytes and fails the length check with a message about the byte count that never mentions the encoding. The offer is withdrawn rather than implemented so one encoding holds across every checksum field on the node-facing surface.
 	BinaryChecksum string `json:"binary_checksum"`
 	// Human-readable plexd version string (e.g. `plexd-v0.4.2-ge5f3a1c`). Non-empty per the application- boundary invariants — the handler rejects an empty value with 400 `binary_version_empty`.
 	BinaryVersion string `json:"binary_version"`

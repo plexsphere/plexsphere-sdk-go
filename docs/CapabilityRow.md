@@ -9,13 +9,14 @@ Name | Type | Description | Notes
 **BinaryVersion** | **string** | Reported plexd agent version string of the Node&#39;s running binary.  | 
 **BinaryChecksum** | Pointer to **string** | SHA-256 digest of the running binary, 32 bytes base64-encoded with standard padding. Absent when the Node has not yet reported a checksum.  | [optional] 
 **Status** | [**CapabilityStatus**](CapabilityStatus.md) |  | 
+**BuiltinActions** | [**[]BuiltinAction**](BuiltinAction.md) | The built-in actions the Node&#39;s agent advertised on its most recent capability manifest, in the order it reported them. This is the read side of &#x60;CapabilityManifestRequest.builtin_actions&#x60; — what an operator surface reads to offer a Node&#39;s actual actions rather than a fixed list.  Required, so every row carries the key and a client needs no null-check: a Node that reported no inventory renders the empty array. That is deliberately NOT the same claim as \&quot;this Node supports no actions\&quot; — an agent that predates the field and one that reports an empty list are indistinguishable here. Do not treat an empty array as a reason to refuse a dispatch; the Node remains the authority on what it can run.  | 
 **ReportedAt** | **time.Time** | Timestamp at which the capability manifest snapshot was last reported (UTC).  | 
 
 ## Methods
 
 ### NewCapabilityRow
 
-`func NewCapabilityRow(nodeId string, domainId string, binaryVersion string, status CapabilityStatus, reportedAt time.Time, ) *CapabilityRow`
+`func NewCapabilityRow(nodeId string, domainId string, binaryVersion string, status CapabilityStatus, builtinActions []BuiltinAction, reportedAt time.Time, ) *CapabilityRow`
 
 NewCapabilityRow instantiates a new CapabilityRow object
 This constructor will assign default values to properties that have it defined,
@@ -133,6 +134,26 @@ and a boolean to check if the value has been set.
 `func (o *CapabilityRow) SetStatus(v CapabilityStatus)`
 
 SetStatus sets Status field to given value.
+
+
+### GetBuiltinActions
+
+`func (o *CapabilityRow) GetBuiltinActions() []BuiltinAction`
+
+GetBuiltinActions returns the BuiltinActions field if non-nil, zero value otherwise.
+
+### GetBuiltinActionsOk
+
+`func (o *CapabilityRow) GetBuiltinActionsOk() (*[]BuiltinAction, bool)`
+
+GetBuiltinActionsOk returns a tuple with the BuiltinActions field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetBuiltinActions
+
+`func (o *CapabilityRow) SetBuiltinActions(v []BuiltinAction)`
+
+SetBuiltinActions sets BuiltinActions field to given value.
 
 
 ### GetReportedAt

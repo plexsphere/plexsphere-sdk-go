@@ -9,6 +9,7 @@ Name | Type | Description | Notes
 **SshHostKeyFingerprint** | Pointer to **string** | Optional OpenSSH SHA-256 host-key fingerprint of the running agent, rendered as &#x60;SHA256:&lt;base64&gt;&#x60;. Empty or absent values are accepted; a non-empty value that does not match the canonical form is rejected with 400 &#x60;ssh_host_key_fingerprint_invalid&#x60;. Downstream integrity correlators branch on &#x60;host_key_changed&#x60; in the response to detect a host-key rotation between snapshots.  | [optional] 
 **DeclaredHooks** | Pointer to [**[]DeclaredHook**](DeclaredHook.md) | Optional list of hook declarations the agent advertises. Each entry pairs a hook name with the SHA-256 digest of the hook payload so the integrity correlator can detect a hook-content change without re-fetching the payload. The manifest invariants reject duplicate names (400 &#x60;declared_hook_duplicate&#x60;), more than 128 entries (400 &#x60;declared_hooks_too_many&#x60;), and any per-entry violation (400 &#x60;declared_hook_invalid&#x60;).  | [optional] 
 **PlexdHooks** | Pointer to [**[]PlexdHook**](PlexdHook.md) | Optional list of Kubernetes PlexdHook custom resources the agent discovered in its cluster and advertises read-only. Distinct from &#x60;declared_hooks&#x60;: each entry carries an OCI image digest, a free-form parameter map, an execution timeout, and a sandbox flag rather than a payload checksum. Discovery is read-only — plexsphere records what plexd observed and never writes PlexdHook objects back. The manifest invariants reject duplicate names (422 &#x60;plexd_hook_duplicate&#x60;), more than 128 entries (422 &#x60;plexd_hooks_too_many&#x60;), and any per-entry violation (422 &#x60;plexd_hook_invalid&#x60;).  | [optional] 
+**BuiltinActions** | Pointer to [**[]BuiltinAction**](BuiltinAction.md) | Optional inventory of the built-in actions the agent implements — the operations &#x60;POST /v1/projects/{project_id}/resources/{resource_id}/actions&#x60; can dispatch against this Node with &#x60;kind: builtin&#x60;. Each entry names an action, describes it, and declares the parameters it accepts.  The inventory is advisory and read-only. Dispatch does not consult it: an execution names its action, the Node is the authority on whether it can run it, and an unknown action fails at the Node. What the inventory buys is the ability to answer \&quot;what can this Node do?\&quot; without dispatching anything — so an operator surface can offer a Node&#39;s actual actions rather than a fixed list, and so a fleet-wide capability query has data to read.  Absent and empty are distinct in intent but not in effect: an agent that reports no inventory is simply one the platform cannot answer that question for. It is not an agent whose actions are known to be none, and nothing refuses a dispatch on that basis.  The manifest invariants reject duplicate action names (422 &#x60;builtin_action_duplicate&#x60;), more than 128 entries (422 &#x60;builtin_actions_too_many&#x60;), and any per-entry violation (422 &#x60;builtin_action_invalid&#x60;).  | [optional] 
 
 ## Methods
 
@@ -143,6 +144,31 @@ SetPlexdHooks sets PlexdHooks field to given value.
 `func (o *CapabilityManifestRequest) HasPlexdHooks() bool`
 
 HasPlexdHooks returns a boolean if a field has been set.
+
+### GetBuiltinActions
+
+`func (o *CapabilityManifestRequest) GetBuiltinActions() []BuiltinAction`
+
+GetBuiltinActions returns the BuiltinActions field if non-nil, zero value otherwise.
+
+### GetBuiltinActionsOk
+
+`func (o *CapabilityManifestRequest) GetBuiltinActionsOk() (*[]BuiltinAction, bool)`
+
+GetBuiltinActionsOk returns a tuple with the BuiltinActions field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetBuiltinActions
+
+`func (o *CapabilityManifestRequest) SetBuiltinActions(v []BuiltinAction)`
+
+SetBuiltinActions sets BuiltinActions field to given value.
+
+### HasBuiltinActions
+
+`func (o *CapabilityManifestRequest) HasBuiltinActions() bool`
+
+HasBuiltinActions returns a boolean if a field has been set.
 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
