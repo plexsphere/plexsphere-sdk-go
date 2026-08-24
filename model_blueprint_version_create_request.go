@@ -28,7 +28,7 @@ type BlueprintVersionCreateRequest struct {
 	Composition map[string]interface{} `json:"composition"`
 	// Typed parameter-schema document of the form `{\"parameters\":[{\"name\":…,\"type\":…,\"required\":…,\"default\"?:…}]}`. A structurally invalid document surfaces as `400 invalid_parameter_schema`.
 	ParameterSchema map[string]interface{} `json:"parameter_schema"`
-	// Closed-set infrastructure substrates this version can target. The server re-validates each value through the domain provider-kind parser; an out-of-set value is rejected with `400 invalid_provider_kind`. Non-empty. The enum mirrors `BlueprintVersionResponse.provider_kinds` so generated clients validate before the round-trip.
+	// Closed-set infrastructure substrates this version can target. The server re-validates each value through the domain provider-kind parser; an out-of-set value is rejected with `400 invalid_provider_kind`. Non-empty. The enum mirrors `BlueprintVersionResponse.provider_kinds` so generated clients validate before the round-trip.  Provisioning refuses a declaration whose Blueprint version accepts none of the kinds corresponding to the provider of the Cloud behind the chosen credential, with `422 blueprint_provider_mismatch`.
 	ProviderKinds        []BlueprintVersionCreateRequestProviderKindsInner `json:"provider_kinds"`
 	InjectionStrategy    BlueprintVersionCreateRequestInjectionStrategy    `json:"injection_strategy"`
 	AdditionalProperties map[string]interface{}

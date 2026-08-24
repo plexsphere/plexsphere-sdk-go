@@ -9,6 +9,8 @@
 
 * `CLOUD_ASSIGNMENT` (value: `"cloud_assignment"`)
 
+* `SINK_ENABLEMENT` (value: `"sink_enablement"`)
+
 * `UNKNOWN_DEFAULT_OPEN_API` (value: `"unknown_default_open_api"`)
 
 

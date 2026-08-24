@@ -51,6 +51,21 @@ type BlueprintAPI interface {
 	ListBlueprintsExecute(r ApiListBlueprintsRequest) (*BlueprintList, *http.Response, error)
 
 	/*
+		ListProjectBlueprints List the Blueprint Catalog with this Project's provisioning verdict.
+
+		Returns a slug-ordered page of the Blueprint Catalog, each entry carrying a `provisionable` verdict for the Project identified by `{id}` plus the provider kinds its published versions accept. The response also names `reachable_provider_kinds`: the provider kinds the Project's Clouds reach.  A Blueprint is `provisionable` when the union of `provider_kinds` across its published versions intersects that reachable set. The reachable set is derived from the Clouds the Project holds an `approved` Cloud Assignment for; `requested`, `rejected` and `revoked` assignments contribute nothing, and the Cloud-provider-to-Blueprint-kind correspondence is applied server-side rather than by comparing the two taxonomies as strings. A Cloud on a provider the correspondence does not know contributes nothing, so the verdict fails closed.  Blueprints that are not provisionable stay in the response marked `provisionable: false` on purpose: the two kind sets in the same body name the exact gap, so an operator reads which Cloud to request next instead of a template that appears not to exist. A `true` verdict is assignment-level and does not promise an assigned credential; `CreateResource` still refuses an incompatible pairing with `422 blueprint_provider_mismatch`.  Per-row visibility is layered on top of the page: rows whose `blueprint#user` ReBAC relation the caller does not hold are filtered out, so the response items are a subset of the persistence-level page. The whole surface is gated by a top-level `read` check on the Project, run BEFORE any persistence read.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
+		@return ApiListProjectBlueprintsRequest
+	*/
+	ListProjectBlueprints(ctx context.Context, id string) ApiListProjectBlueprintsRequest
+
+	// ListProjectBlueprintsExecute executes the request
+	//  @return ProjectBlueprintList
+	ListProjectBlueprintsExecute(r ApiListProjectBlueprintsRequest) (*ProjectBlueprintList, *http.Response, error)
+
+	/*
 		PublishBlueprintVersion Publish a Blueprint version.
 
 		Publishes an immutable version under an existing Blueprint. The service validates the request BEFORE any persistence write: the `provider_kinds` enum members, the `injection_strategy` enum, the `parameter_schema` document, and the structural XRD/Composition manifest pair are each checked, so a malformed payload never appends a `BlueprintVersionPublished` outbox row.  The handler authorises the caller against the `publish` permission on the addressed Blueprint (`blueprint#publish`) BEFORE invoking the service. The registrar of a Blueprint holds `owner`, which grants `publish`; the grant is written asynchronously after registration, so a publish issued in the same instant as the register may be refused until the tuple propagates.  A missing parent Blueprint surfaces as `404 blueprint_not_found`; a re-published `(blueprint, version)` pair surfaces as `409 blueprint_version_exists`. On success the handler emits a `blueprint.publish` audit row and the service appends a `BlueprintVersionPublished` outbox event in the same transaction.
@@ -285,6 +300,177 @@ func (a *BlueprintAPIService) ListBlueprintsExecute(r ApiListBlueprintsRequest) 
 	}
 
 	localVarPath := localBasePath + "/v1/blueprints"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.cursor != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "cursor", r.cursor, "form", "")
+	}
+	if r.limit != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "form", "")
+	} else {
+		var defaultValue int32 = 50
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", defaultValue, "form", "")
+		r.limit = &defaultValue
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiListProjectBlueprintsRequest struct {
+	ctx        context.Context
+	ApiService BlueprintAPI
+	id         string
+	cursor     *string
+	limit      *int32
+}
+
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
+func (r ApiListProjectBlueprintsRequest) Cursor(cursor string) ApiListProjectBlueprintsRequest {
+	r.cursor = &cursor
+	return r
+}
+
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
+func (r ApiListProjectBlueprintsRequest) Limit(limit int32) ApiListProjectBlueprintsRequest {
+	r.limit = &limit
+	return r
+}
+
+func (r ApiListProjectBlueprintsRequest) Execute() (*ProjectBlueprintList, *http.Response, error) {
+	return r.ApiService.ListProjectBlueprintsExecute(r)
+}
+
+/*
+ListProjectBlueprints List the Blueprint Catalog with this Project's provisioning verdict.
+
+Returns a slug-ordered page of the Blueprint Catalog, each entry carrying a `provisionable` verdict for the Project identified by `{id}` plus the provider kinds its published versions accept. The response also names `reachable_provider_kinds`: the provider kinds the Project's Clouds reach.  A Blueprint is `provisionable` when the union of `provider_kinds` across its published versions intersects that reachable set. The reachable set is derived from the Clouds the Project holds an `approved` Cloud Assignment for; `requested`, `rejected` and `revoked` assignments contribute nothing, and the Cloud-provider-to-Blueprint-kind correspondence is applied server-side rather than by comparing the two taxonomies as strings. A Cloud on a provider the correspondence does not know contributes nothing, so the verdict fails closed.  Blueprints that are not provisionable stay in the response marked `provisionable: false` on purpose: the two kind sets in the same body name the exact gap, so an operator reads which Cloud to request next instead of a template that appears not to exist. A `true` verdict is assignment-level and does not promise an assigned credential; `CreateResource` still refuses an incompatible pairing with `422 blueprint_provider_mismatch`.  Per-row visibility is layered on top of the page: rows whose `blueprint#user` ReBAC relation the caller does not hold are filtered out, so the response items are a subset of the persistence-level page. The whole surface is gated by a top-level `read` check on the Project, run BEFORE any persistence read.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
+	@return ApiListProjectBlueprintsRequest
+*/
+func (a *BlueprintAPIService) ListProjectBlueprints(ctx context.Context, id string) ApiListProjectBlueprintsRequest {
+	return ApiListProjectBlueprintsRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ProjectBlueprintList
+func (a *BlueprintAPIService) ListProjectBlueprintsExecute(r ApiListProjectBlueprintsRequest) (*ProjectBlueprintList, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ProjectBlueprintList
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "BlueprintAPIService.ListProjectBlueprints")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/projects/{id}/blueprints"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

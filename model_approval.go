@@ -19,14 +19,14 @@ import (
 // checks if the Approval type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &Approval{}
 
-// Approval Metadata projection of one approval-queue row. The shape is shared by `ListApprovals`, `GetApproval`, `ApproveApproval`, `RejectApproval`, and `BreakGlassApproval` so clients only need one binding, and it covers all three queue sources: generic Approvals, Credential Assignments, and Cloud Assignments. `kind` names the source, and a client reads it before any field a single source owns. `project_id` and `materialised` are set on assignment rows; `expires_at`, `payload`, and `caveat_context` are set on `approval` rows.
+// Approval Metadata projection of one approval-queue row. The shape is shared by `ListApprovals`, `GetApproval`, `ApproveApproval`, `RejectApproval`, and `BreakGlassApproval` so clients only need one binding, and it covers all four queue sources: generic Approvals, Credential Assignments, Cloud Assignments, and sink enablements. `kind` names the source, and a client reads it before any field a single source owns. `project_id` is set on assignment and sink-enablement rows and `materialised` on assignment rows alone; `expires_at`, `payload`, and `caveat_context` are set on `approval` rows.
 type Approval struct {
 	// Approval identifier (UUIDv7).
 	Id   string       `json:"id"`
 	Kind ApprovalKind `json:"kind"`
 	// Identifier of the owning Domain — the residency pivot the ReBAC gate authorises against.
 	DomainId string `json:"domain_id"`
-	// Identifier of the consuming Project the assignment binds into. Set on `credential_assignment` and `cloud_assignment` rows; absent on `approval` rows.
+	// Identifier of the consuming Project the row binds into. Set on `credential_assignment`, `cloud_assignment` and `sink_enablement` rows; absent on `approval` rows.
 	ProjectId *string `json:"project_id,omitempty"`
 	// ReBAC subject string of the principal that raised the proposal. A caller may never approve a proposal whose `proposer_subject` is themselves.
 	ProposerSubject string `json:"proposer_subject"`
@@ -37,7 +37,7 @@ type Approval struct {
 	// Raw JSON action payload applied verbatim once the proposal is approved. Opaque to the approval workflow — it carries the parameters of the action the proposer intends to run.
 	Payload map[string]interface{} `json:"payload,omitempty"`
 	State   ApprovalState          `json:"state"`
-	// Whether the assignment's ReBAC binding is currently live. `true` only while the assignment is in the `approved` state. Set on `credential_assignment` and `cloud_assignment` rows; absent on `approval` rows.
+	// Whether the assignment's ReBAC binding is currently live. `true` only while the assignment is in the `approved` state. Set on `credential_assignment` and `cloud_assignment` rows; absent on `approval` and `sink_enablement` rows. A sink enablement tracks no such column: the deciding service writes and deletes its `uses` tuple directly.
 	Materialised *bool `json:"materialised,omitempty"`
 	// Aggregate creation timestamp (UTC).
 	CreatedAt time.Time `json:"created_at"`
@@ -47,7 +47,7 @@ type Approval struct {
 	DecidedBySubject *string `json:"decided_by_subject,omitempty"`
 	// Free-text rationale recorded with the decision. Absent while undecided and for the unattended `expired` path. For a break-glass override the rationale value is PII and is NOT surfaced here verbatim — only its field name is projected onto `caveat_context`.
 	DecisionReason *string `json:"decision_reason,omitempty"`
-	// Deadline past which the background sweeper expires an un-decided proposal (UTC). Set on `approval` rows only. Assignment rows carry no deadline and never expire, so the field is absent on `credential_assignment` and `cloud_assignment` rows.
+	// Deadline past which the background sweeper expires an un-decided proposal (UTC). Set on `approval` rows only. Assignment and sink-enablement rows carry no deadline and never expire, so the field is absent on `credential_assignment`, `cloud_assignment` and `sink_enablement` rows.
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	// Names-only projection of the caveat field NAMES referenced on the decision's audit row — for a break-glass override this carries the `reason` field name. Values never cross this boundary: the map keys are caveat NAMES and the arrays are caveat-parameter NAMES, mirroring the Platform Audit Log invariant. Absent while the proposal carries no decision audit row.
 	CaveatContext        map[string][]string `json:"caveat_context,omitempty"`

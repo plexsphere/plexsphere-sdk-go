@@ -106,6 +106,8 @@ type APIClient struct {
 
 	SecretsAPI SecretsAPI
 
+	SinksAPI SinksAPI
+
 	TenancyAPI TenancyAPI
 }
 
@@ -154,6 +156,7 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.ProvisioningCredentialsAPI = (*ProvisioningCredentialsAPIService)(&c.common)
 	c.ResourceAPI = (*ResourceAPIService)(&c.common)
 	c.SecretsAPI = (*SecretsAPIService)(&c.common)
+	c.SinksAPI = (*SinksAPIService)(&c.common)
 	c.TenancyAPI = (*TenancyAPIService)(&c.common)
 
 	return c

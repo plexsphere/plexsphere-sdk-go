@@ -27,7 +27,7 @@ type CloudAPI interface {
 		Adds a usage edge so the Cloud Credential identified by `{id}` additionally serves the Cloud named in the body. The handler runs a `manage` ReBAC check on the credential's home Cloud BEFORE decoding the body, then — once the body names the target usage Cloud — a second `manage` check on that target Cloud, and only then delegates to the Cloud Credentials Custodian which records the usage edge. The caller must administer both Clouds: the home Cloud whose credential is mutated and the target Cloud that will start serving it.  Attach is idempotent: re-attaching an already-attached Cloud returns `201` without creating a second edge. A revoked credential cannot pick up further usage Clouds and is refused with `409 cloud_credential_revoked`; a body `cloud_id` that names no existing Cloud is refused with `404 cloud_not_found`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
+		@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
 		@return ApiAttachCloudCredentialCloudRequest
 	*/
 	AttachCloudCredentialCloud(ctx context.Context, id string) ApiAttachCloudCredentialCloudRequest
@@ -51,6 +51,20 @@ type CloudAPI interface {
 	CreateCloudExecute(r ApiCreateCloudRequest) (*CloudResponse, *http.Response, error)
 
 	/*
+		CreateProviderBundle Create a provider bundle.
+
+		Creates a new `ProviderBundle` aggregate — one reusable Crossplane provider-package declaration, authored once and addressed by a stable handle so a Cloud points at it instead of repeating the same packages inline. The aggregate enforces every issuance invariant — non-empty `display_name`, kebab-case `slug`, closed-enum `provider`, at least one provider package with each `source` named at most once, and a `<group>/<version>` `provider_config_api_version`. An invariant rejection surfaces as `400 invalid_provider_bundle`; a duplicate slug surfaces as `409 provider_bundle_slug_conflict`.  On success the handler emits a `provider_bundle.create` audit row and appends a `ProviderBundleCreated` outbox event in the same transaction.  The ReBAC grants that make the new bundle readable — the `platform` parent edge and the creating principal's `bundle_admin` grant — are written by the authz-sync consumer draining that outbox row, not by this request. The `201` is therefore ahead of the graph: until the consumer has drained, `GET /v1/provider-bundles/{id}` on the bundle just created answers `403` and `GET /v1/provider-bundles` omits the row. A client that reads back immediately should retry on `403` rather than treat it as a permanent denial.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return ApiCreateProviderBundleRequest
+	*/
+	CreateProviderBundle(ctx context.Context) ApiCreateProviderBundleRequest
+
+	// CreateProviderBundleExecute executes the request
+	//  @return ProviderBundleResponse
+	CreateProviderBundleExecute(r ApiCreateProviderBundleRequest) (*ProviderBundleResponse, *http.Response, error)
+
+	/*
 		DeleteCloud Delete a Cloud.
 
 		Deletes the Cloud identified by `{id}`. The empty-aggregate guard runs inside the same transaction as the row delete; at least one persisted `CloudCredential` forces `409 cloud_not_empty` with the `CloudChildCounts` payload in the Problem detail so the operator knows how many credentials are still attached. A concurrent INSERT racing the guard is caught by defense-in-depth — the foreign-key violation surfaces as the same `409` so the caller never observes a half-deleted Cloud.
@@ -65,12 +79,26 @@ type CloudAPI interface {
 	DeleteCloudExecute(r ApiDeleteCloudRequest) (*http.Response, error)
 
 	/*
+		DeleteProviderBundle Delete a provider bundle.
+
+		Deletes the `ProviderBundle` identified by `{id}`. The referenced-bundle guard runs inside the same transaction as the row delete: at least one Cloud that still takes its provider configuration from the bundle forces `409 provider_bundle_referenced` with the `referencing_clouds` count in the Problem body, so the operator knows how many Clouds to re-point before retrying. A Cloud that starts referencing the bundle between the guard's count and the DELETE is caught by defense-in-depth — the foreign-key violation surfaces as the same `409`, without the count.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param id Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle.
+		@return ApiDeleteProviderBundleRequest
+	*/
+	DeleteProviderBundle(ctx context.Context, id string) ApiDeleteProviderBundleRequest
+
+	// DeleteProviderBundleExecute executes the request
+	DeleteProviderBundleExecute(r ApiDeleteProviderBundleRequest) (*http.Response, error)
+
+	/*
 		DetachCloudCredentialCloud Detach a usage Cloud from a Cloud Credential.
 
 		Removes the usage edge that binds the Cloud Credential identified by `{id}` to the usage Cloud `{cloud_id}`. The handler authorises the detach against a `manage` ReBAC check on EITHER the credential's home Cloud OR the target usage Cloud — so the target Cloud's owner can remove an edge attached to their Cloud — then delegates to the Cloud Credentials Custodian.  Detach is idempotent: detaching an absent edge returns `204`. The credential's home Cloud anchors the KV-v2 path and can never be detached — a detach targeting it is refused with `409 cannot_detach_home_cloud`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
+		@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
 		@param cloudId Identifier of the usage Cloud to detach (UUIDv7). Must be a non-zero UUID — a malformed value is rejected with `400 invalid_cloud_id`.
 		@return ApiDetachCloudCredentialCloudRequest
 	*/
@@ -100,7 +128,7 @@ type CloudAPI interface {
 		Returns the lifecycle metadata for the Cloud Credential identified by `{id}`. The credential id does not encode its owning Cloud, so the handler must read the row to learn which Cloud to authorise against; the ReBAC `observe` check runs on the resolved parent Cloud and a denial returns `403` via the audit-first permission-denied path. A missing row surfaces as `404 cloud_credential_not_found`.  The projection is metadata-only and NEVER exposes the KV mount, KV path, KV version, or any secret material.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
+		@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
 		@return ApiGetCloudCredentialRequest
 	*/
 	GetCloudCredential(ctx context.Context, id string) ApiGetCloudCredentialRequest
@@ -108,6 +136,21 @@ type CloudAPI interface {
 	// GetCloudCredentialExecute executes the request
 	//  @return CloudCredentialResponse
 	GetCloudCredentialExecute(r ApiGetCloudCredentialRequest) (*CloudCredentialResponse, *http.Response, error)
+
+	/*
+		GetProviderBundle Fetch a provider bundle by identifier.
+
+		Returns the `ProviderBundle` identified by `{id}`. The handler runs the `observe` ReBAC check BEFORE the persistence read, so an unauthorised caller receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing aggregate surfaces as `404 provider_bundle_not_found` — but only for a caller the graph already grants `observe` on that id. An id no bundle ever answered to carries no tuples at all, so the gate denies it first and the caller reads `403`. That is the same withholding the check is there to perform: `404` and `403` are deliberately indistinguishable for an id the caller has no grant on.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param id Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle.
+		@return ApiGetProviderBundleRequest
+	*/
+	GetProviderBundle(ctx context.Context, id string) ApiGetProviderBundleRequest
+
+	// GetProviderBundleExecute executes the request
+	//  @return ProviderBundleResponse
+	GetProviderBundleExecute(r ApiGetProviderBundleRequest) (*ProviderBundleResponse, *http.Response, error)
 
 	/*
 		GrantCloudAssignment Grant a Cloud to a Project (operator push).
@@ -123,6 +166,21 @@ type CloudAPI interface {
 	// GrantCloudAssignmentExecute executes the request
 	//  @return CloudAssignmentResponse
 	GrantCloudAssignmentExecute(r ApiGrantCloudAssignmentRequest) (*CloudAssignmentResponse, *http.Response, error)
+
+	/*
+		GrantCredentialAssignment Grant a Cloud Credential to a Project (owner push).
+
+		Binds the Cloud Credential identified by `{id}` to the Project named in the body as a single authoritative action. The handler runs an `assign` ReBAC check on the credential BEFORE the persistence write, then delegates to the Credential Assignment application service which creates the assignment already approved AND materialised in one step — the credential is immediately usable in the Project — and appends a `CredentialAssignmentGranted` outbox event in a single transaction.  This is the owner-push counterpart to `RequestCredentialAssignment`, which the consuming Project initiates and a second party decides. The grant bypasses the second-party approval rule by design: there is no separate requester to compare against, which is also why it exists — requesting and then approving one's own request is refused by the self-approval guard, so without this route a credential's owner could not place it at all. Mirrors `GrantCloudAssignment` on the Cloud side.  The receiving Project must already be able to use the Cloud the credential belongs to — an approved Cloud Assignment — otherwise the grant is rejected with `422 cloud_not_usable_in_project`. A credential is only usable where both assignments are in place, so a grant without the Cloud Assignment would bind the credential and still be refused at deploy time. A `{id}` naming no credential at all is rejected with `422 credential_not_assignable`.  A second live assignment for the same (Project, Credential) pair is rejected with `409 duplicate_live_assignment`.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
+		@return ApiGrantCredentialAssignmentRequest
+	*/
+	GrantCredentialAssignment(ctx context.Context, id string) ApiGrantCredentialAssignmentRequest
+
+	// GrantCredentialAssignmentExecute executes the request
+	//  @return CredentialAssignmentResponse
+	GrantCredentialAssignmentExecute(r ApiGrantCredentialAssignmentRequest) (*CredentialAssignmentResponse, *http.Response, error)
 
 	/*
 		IssueCloudCredential Issue a new Cloud Credential under a Cloud.
@@ -145,7 +203,7 @@ type CloudAPI interface {
 		Returns a creation-ordered page of Cloud Assignment lifecycle metadata for the Project identified by `{id}`. The handler runs a top-level `read` ReBAC check on the parent Project BEFORE the persistence read; every assignment in the page belongs to the one path Project, so the project `read` check authorises the whole page.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
+		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
 		@return ApiListCloudAssignmentsRequest
 	*/
 	ListCloudAssignments(ctx context.Context, id string) ApiListCloudAssignmentsRequest
@@ -160,7 +218,7 @@ type CloudAPI interface {
 		Returns a cloud_id-ordered page of the Clouds the Cloud Credential identified by `{id}` serves — its home Cloud plus every additional usage Cloud attached over the association API. The handler resolves the credential's home Cloud, runs an `observe` ReBAC check on it BEFORE the persistence read, then pages the usage join.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
+		@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
 		@return ApiListCloudCredentialCloudsRequest
 	*/
 	ListCloudCredentialClouds(ctx context.Context, id string) ApiListCloudCredentialCloudsRequest
@@ -204,7 +262,7 @@ type CloudAPI interface {
 		Returns a creation-ordered page of Credential Assignment lifecycle metadata for the Project identified by `{id}`. The handler runs a top-level `read` ReBAC check on the parent Project BEFORE the persistence read; every assignment in the page belongs to the one path Project, so the project `read` check authorises the whole page and no per-row filter runs.  The projection carries the assignment identity, the owning Project, the bound Cloud Credential, the lifecycle state, a derived `materialised` flag, and the lifecycle timestamps.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
+		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
 		@return ApiListCredentialAssignmentsRequest
 	*/
 	ListCredentialAssignments(ctx context.Context, id string) ApiListCredentialAssignmentsRequest
@@ -212,6 +270,50 @@ type CloudAPI interface {
 	// ListCredentialAssignmentsExecute executes the request
 	//  @return CredentialAssignmentList
 	ListCredentialAssignmentsExecute(r ApiListCredentialAssignmentsRequest) (*CredentialAssignmentList, *http.Response, error)
+
+	/*
+		ListProviderBundleClouds List the Clouds that reference a provider bundle.
+
+		Returns a cloud_id-ordered page of the Clouds that take their provider configuration from the provider bundle identified by `{id}`. Each item carries the Cloud's id, slug, and display name, so a console rendering the roster needs no follow-up read per row.  The gate is `provider_bundle#manage` on the addressed bundle — the permission `PatchProviderBundle` and `DeleteProviderBundle` require, NOT the `observe` the other read verbs use — run BEFORE the persistence read. A roster row names a Cloud in whatever Domain holds it, and holding a permission on a bundle grants no `cloud#observe` anywhere, so the roster is scoped to the caller who is about to edit or delete the bundle rather than to every caller who may read it.  Under that gate the items are deliberately NOT filtered per Cloud: a per-row visibility filter would drop the Clouds the caller cannot observe individually and under-report how far a bundle edit reaches, which is the question the endpoint exists to answer, and would contradict the unfiltered `referencing_clouds` count a refused delete already carries.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. It is bound to this operation as well: a cursor minted by `ListProviderBundles` carries a different surface version byte and is refused with `400 invalid_cursor`, and so is a roster cursor presented there. A tampered envelope stays on `400 invalid_cursor` too.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param id Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle.
+		@return ApiListProviderBundleCloudsRequest
+	*/
+	ListProviderBundleClouds(ctx context.Context, id string) ApiListProviderBundleCloudsRequest
+
+	// ListProviderBundleCloudsExecute executes the request
+	//  @return ProviderBundleCloudList
+	ListProviderBundleCloudsExecute(r ApiListProviderBundleCloudsRequest) (*ProviderBundleCloudList, *http.Response, error)
+
+	/*
+		ListProviderBundleVersions List the published versions of a provider bundle.
+
+		Returns a newest-first page of the content versions the provider bundle identified by `{id}` has published. Each item carries the whole declaration that version froze — its package set and the apiVersion those packages serve their ProviderConfig under — so a client comparing two versions needs no follow-up read per row.  A published version is immutable. A content patch on the bundle appends the next one and rewrites none of the existing rows, so the declaration a Cloud pins answers the same bytes for as long as the pin stands.  The gate is `provider_bundle#observe` on the addressed bundle — the permission `GetProviderBundle` requires — run BEFORE the persistence read, so an unauthorised caller never learns from the response whether the bundle exists. The history is bundle content rather than a roster of the Clouds holding it, which is why the gate is the read one and not the `manage` `ListProviderBundleClouds` requires.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. It is bound to this operation as well: a cursor minted by `ListProviderBundles` or `ListProviderBundleClouds` carries a different surface version byte and is refused with `400 invalid_cursor`. A tampered envelope stays on `400 invalid_cursor` too.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param id Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle.
+		@return ApiListProviderBundleVersionsRequest
+	*/
+	ListProviderBundleVersions(ctx context.Context, id string) ApiListProviderBundleVersionsRequest
+
+	// ListProviderBundleVersionsExecute executes the request
+	//  @return ProviderBundleVersionList
+	ListProviderBundleVersionsExecute(r ApiListProviderBundleVersionsRequest) (*ProviderBundleVersionList, *http.Response, error)
+
+	/*
+		ListProviderBundles List provider bundles.
+
+		Returns a slug-ordered page of `ProviderBundle` aggregates the caller is authorised to see. Per-row visibility is layered on top of the page: rows the caller cannot `observe` are filtered out so the response items are a subset of the persistence-level page.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@return ApiListProviderBundlesRequest
+	*/
+	ListProviderBundles(ctx context.Context) ApiListProviderBundlesRequest
+
+	// ListProviderBundlesExecute executes the request
+	//  @return ProviderBundleList
+	ListProviderBundlesExecute(r ApiListProviderBundlesRequest) (*ProviderBundleList, *http.Response, error)
 
 	/*
 		PatchCloud Patch mutable fields on a Cloud.
@@ -229,12 +331,27 @@ type CloudAPI interface {
 	PatchCloudExecute(r ApiPatchCloudRequest) (*CloudResponse, *http.Response, error)
 
 	/*
+		PatchProviderBundle Patch mutable fields on a provider bundle.
+
+		Patches the `ProviderBundle` identified by `{id}`. The body MUST set at least one of `display_name`, `provider_packages`, or `provider_config_api_version` — an empty body surfaces as `400 empty_patch`. A `provider_packages` patch replaces the whole set: the packages the body names become the bundle's packages and every package it omits is dropped.  A content patch — one carrying `provider_packages` or `provider_config_api_version` — publishes a NEW immutable version of the bundle rather than rewriting the current one. The two content fields publish one version between them even when the body names both, and the response reports the number that version was published under in `latest_version`. A rename-only patch publishes nothing.  Publishing moves no Cloud. Every Cloud referencing the bundle keeps serving the version it pins and converges with that declaration until a Cloud write moves the pin — a `PATCH /v1/clouds/{id}` naming `provider_bundle_version`, which promotes that one Cloud. Read the published history at `GET /v1/provider-bundles/{id}/versions` to see which versions a Cloud can be promoted onto.  DECISION: BOTH `slug` and `provider` are intentionally NOT patchable fields. The slug is the URL handle an operator types to address the bundle, so re-slugging in place breaks every bookmarked URL. The provider is the compatibility key a bundle is checked against before a Cloud may reference it: every stored reference was admitted against the provider the bundle carried at the time, and nothing re-checks a reference once it is stored. The handler rejects any body that carries a `slug` key (even with the same value) with `400 slug_immutable`, and any body that carries a `provider` key with `400 provider_immutable`.  The read and the write are two transactions, so the merged aggregate can be stale by the time it is written. The write is gated on the version the read observed and a competing writer that got there first surfaces as `409 provider_bundle_stale`; nothing is written and no event is emitted in that case.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param id Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle.
+		@return ApiPatchProviderBundleRequest
+	*/
+	PatchProviderBundle(ctx context.Context, id string) ApiPatchProviderBundleRequest
+
+	// PatchProviderBundleExecute executes the request
+	//  @return ProviderBundleResponse
+	PatchProviderBundleExecute(r ApiPatchProviderBundleRequest) (*ProviderBundleResponse, *http.Response, error)
+
+	/*
 		RequestCloudAssignment Request usage of a Cloud for a Project.
 
 		Opens a Cloud Assignment request that asks for the Cloud named in the body to be made usable in the Project identified by `{id}`. The handler runs a `deploy` ReBAC check on the parent Project BEFORE the persistence write, then delegates to the Cloud Assignment application service which records the request in the `requested` state and appends a `CloudAssignmentRequested` outbox event in a single transaction.  The request is not yet usable — the Cloud only becomes usable in the Project once an operator approves it. A second open request for the same (Project, Cloud) pair while an earlier one is still live is rejected with `409 duplicate_live_cloud_assignment`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
+		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
 		@return ApiRequestCloudAssignmentRequest
 	*/
 	RequestCloudAssignment(ctx context.Context, id string) ApiRequestCloudAssignmentRequest
@@ -246,10 +363,10 @@ type CloudAPI interface {
 	/*
 		RequestCredentialAssignment Request a Credential Assignment for a Project.
 
-		Opens a Credential Assignment request that binds a Cloud Credential to the Project identified by `{id}`. The body names the credential either directly (`cloud_credential_id`) or indirectly by Cloud (`cloud_id`), in which case the system auto-selects the most recently issued eligible credential serving that Cloud. The handler runs a `deploy` ReBAC check on the parent Project BEFORE the persistence write, then delegates to the Credential Assignment application service which records the request in the `requested` state and appends a `CredentialAssignmentRequested` outbox event in a single transaction.  The newly opened assignment is not yet materialised — the binding only becomes live once an approver moves it to the `approved` state. A second open request for the same (Project, Cloud Credential) pair while an earlier one is still live is rejected with `409 duplicate_live_assignment`. A Cloud Credential that is not in an assignable lifecycle state is rejected with `422 credential_not_assignable`.  For the `cloud_id` form: the Cloud must be usable in the Project (an approved Cloud Assignment) — otherwise `422 cloud_not_usable_in_project` — and at least one eligible credential must serve the Cloud — otherwise `422 no_eligible_credential_for_cloud`.
+		Opens a Credential Assignment request that binds a Cloud Credential to the Project identified by `{id}`. The body names the credential either directly (`cloud_credential_id`) or indirectly by Cloud (`cloud_id`), in which case the system auto-selects the most recently issued eligible credential serving that Cloud. The handler runs a `deploy` ReBAC check on the parent Project BEFORE the persistence write, then delegates to the Credential Assignment application service which records the request in the `requested` state and appends a `CredentialAssignmentRequested` outbox event in a single transaction.  The newly opened assignment is not yet materialised — the binding only becomes live once an approver moves it to the `approved` state. A second open request for the same (Project, Cloud Credential) pair while an earlier one is still live is rejected with `409 duplicate_live_assignment`. A Cloud Credential that is not in an assignable lifecycle state is rejected with `422 credential_not_assignable`.  Either form requires the Cloud the credential belongs to to be usable in the Project — an approved Cloud Assignment — otherwise the request is rejected with `422 cloud_not_usable_in_project`. A credential is only usable where both assignments are in place, so a request opened without the Cloud Assignment would be approved and still refused at deploy time. The `cloud_id` form checks the Cloud it names before auto-selecting, and both forms then check the Cloud the selected credential actually belongs to — which the credential-to-Cloud usage join may make a different one.  For the `cloud_id` form additionally: at least one eligible credential must serve the Cloud — otherwise `422 no_eligible_credential_for_cloud`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
+		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
 		@return ApiRequestCredentialAssignmentRequest
 	*/
 	RequestCredentialAssignment(ctx context.Context, id string) ApiRequestCredentialAssignmentRequest
@@ -279,7 +396,7 @@ type CloudAPI interface {
 		Revokes the Cloud Credential identified by `{id}`. The handler reads the row to resolve the parent Cloud, runs the `manage` ReBAC check on that Cloud, then delegates to the Cloud Credentials Custodian which stamps `revoked_at`, soft-deletes the underlying secret, and appends a `CloudCredentialRevoked` outbox event in a single transaction.  Revocation is idempotent: revoking an already-revoked credential returns `200` with the unchanged metadata rather than an error. The response carries the metadata-only projection showing the populated `revoked_at`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
+		@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
 		@return ApiRevokeCloudCredentialRequest
 	*/
 	RevokeCloudCredential(ctx context.Context, id string) ApiRevokeCloudCredentialRequest
@@ -329,7 +446,7 @@ AttachCloudCredentialCloud Attach a usage Cloud to a Cloud Credential.
 Adds a usage edge so the Cloud Credential identified by `{id}` additionally serves the Cloud named in the body. The handler runs a `manage` ReBAC check on the credential's home Cloud BEFORE decoding the body, then — once the body names the target usage Cloud — a second `manage` check on that target Cloud, and only then delegates to the Cloud Credentials Custodian which records the usage edge. The caller must administer both Clouds: the home Cloud whose credential is mutated and the target Cloud that will start serving it.  Attach is idempotent: re-attaching an already-attached Cloud returns `201` without creating a second edge. A revoked credential cannot pick up further usage Clouds and is refused with `409 cloud_credential_revoked`; a body `cloud_id` that names no existing Cloud is refused with `404 cloud_not_found`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
+	@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
 	@return ApiAttachCloudCredentialCloudRequest
 */
 func (a *CloudAPIService) AttachCloudCredentialCloud(ctx context.Context, id string) ApiAttachCloudCredentialCloudRequest {
@@ -674,6 +791,182 @@ func (a *CloudAPIService) CreateCloudExecute(r ApiCreateCloudRequest) (*CloudRes
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiCreateProviderBundleRequest struct {
+	ctx                         context.Context
+	ApiService                  CloudAPI
+	providerBundleCreateRequest *ProviderBundleCreateRequest
+}
+
+func (r ApiCreateProviderBundleRequest) ProviderBundleCreateRequest(providerBundleCreateRequest ProviderBundleCreateRequest) ApiCreateProviderBundleRequest {
+	r.providerBundleCreateRequest = &providerBundleCreateRequest
+	return r
+}
+
+func (r ApiCreateProviderBundleRequest) Execute() (*ProviderBundleResponse, *http.Response, error) {
+	return r.ApiService.CreateProviderBundleExecute(r)
+}
+
+/*
+CreateProviderBundle Create a provider bundle.
+
+Creates a new `ProviderBundle` aggregate — one reusable Crossplane provider-package declaration, authored once and addressed by a stable handle so a Cloud points at it instead of repeating the same packages inline. The aggregate enforces every issuance invariant — non-empty `display_name`, kebab-case `slug`, closed-enum `provider`, at least one provider package with each `source` named at most once, and a `<group>/<version>` `provider_config_api_version`. An invariant rejection surfaces as `400 invalid_provider_bundle`; a duplicate slug surfaces as `409 provider_bundle_slug_conflict`.  On success the handler emits a `provider_bundle.create` audit row and appends a `ProviderBundleCreated` outbox event in the same transaction.  The ReBAC grants that make the new bundle readable — the `platform` parent edge and the creating principal's `bundle_admin` grant — are written by the authz-sync consumer draining that outbox row, not by this request. The `201` is therefore ahead of the graph: until the consumer has drained, `GET /v1/provider-bundles/{id}` on the bundle just created answers `403` and `GET /v1/provider-bundles` omits the row. A client that reads back immediately should retry on `403` rather than treat it as a permanent denial.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiCreateProviderBundleRequest
+*/
+func (a *CloudAPIService) CreateProviderBundle(ctx context.Context) ApiCreateProviderBundleRequest {
+	return ApiCreateProviderBundleRequest{
+		ApiService: a,
+		ctx:        ctx,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ProviderBundleResponse
+func (a *CloudAPIService) CreateProviderBundleExecute(r ApiCreateProviderBundleRequest) (*ProviderBundleResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ProviderBundleResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CloudAPIService.CreateProviderBundle")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/provider-bundles"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.providerBundleCreateRequest == nil {
+		return localVarReturnValue, nil, reportError("providerBundleCreateRequest is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.providerBundleCreateRequest
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 413 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiDeleteCloudRequest struct {
 	ctx        context.Context
 	ApiService CloudAPI
@@ -831,6 +1124,163 @@ func (a *CloudAPIService) DeleteCloudExecute(r ApiDeleteCloudRequest) (*http.Res
 	return localVarHTTPResponse, nil
 }
 
+type ApiDeleteProviderBundleRequest struct {
+	ctx        context.Context
+	ApiService CloudAPI
+	id         string
+}
+
+func (r ApiDeleteProviderBundleRequest) Execute() (*http.Response, error) {
+	return r.ApiService.DeleteProviderBundleExecute(r)
+}
+
+/*
+DeleteProviderBundle Delete a provider bundle.
+
+Deletes the `ProviderBundle` identified by `{id}`. The referenced-bundle guard runs inside the same transaction as the row delete: at least one Cloud that still takes its provider configuration from the bundle forces `409 provider_bundle_referenced` with the `referencing_clouds` count in the Problem body, so the operator knows how many Clouds to re-point before retrying. A Cloud that starts referencing the bundle between the guard's count and the DELETE is caught by defense-in-depth — the foreign-key violation surfaces as the same `409`, without the count.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle.
+	@return ApiDeleteProviderBundleRequest
+*/
+func (a *CloudAPIService) DeleteProviderBundle(ctx context.Context, id string) ApiDeleteProviderBundleRequest {
+	return ApiDeleteProviderBundleRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+func (a *CloudAPIService) DeleteProviderBundleExecute(r ApiDeleteProviderBundleRequest) (*http.Response, error) {
+	var (
+		localVarHTTPMethod = http.MethodDelete
+		localVarPostBody   interface{}
+		formFiles          []formFile
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CloudAPIService.DeleteProviderBundle")
+	if err != nil {
+		return nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/provider-bundles/{id}"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarHTTPResponse, newErr
+	}
+
+	return localVarHTTPResponse, nil
+}
+
 type ApiDetachCloudCredentialCloudRequest struct {
 	ctx        context.Context
 	ApiService CloudAPI
@@ -848,7 +1298,7 @@ DetachCloudCredentialCloud Detach a usage Cloud from a Cloud Credential.
 Removes the usage edge that binds the Cloud Credential identified by `{id}` to the usage Cloud `{cloud_id}`. The handler authorises the detach against a `manage` ReBAC check on EITHER the credential's home Cloud OR the target usage Cloud — so the target Cloud's owner can remove an edge attached to their Cloud — then delegates to the Cloud Credentials Custodian.  Detach is idempotent: detaching an absent edge returns `204`. The credential's home Cloud anchors the KV-v2 path and can never be detached — a detach targeting it is refused with `409 cannot_detach_home_cloud`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
+	@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
 	@param cloudId Identifier of the usage Cloud to detach (UUIDv7). Must be a non-zero UUID — a malformed value is rejected with `400 invalid_cloud_id`.
 	@return ApiDetachCloudCredentialCloudRequest
 */
@@ -1166,7 +1616,7 @@ GetCloudCredential Fetch a Cloud Credential's lifecycle metadata.
 Returns the lifecycle metadata for the Cloud Credential identified by `{id}`. The credential id does not encode its owning Cloud, so the handler must read the row to learn which Cloud to authorise against; the ReBAC `observe` check runs on the resolved parent Cloud and a denial returns `403` via the audit-first permission-denied path. A missing row surfaces as `404 cloud_credential_not_found`.  The projection is metadata-only and NEVER exposes the KV mount, KV path, KV version, or any secret material.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
+	@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
 	@return ApiGetCloudCredentialRequest
 */
 func (a *CloudAPIService) GetCloudCredential(ctx context.Context, id string) ApiGetCloudCredentialRequest {
@@ -1194,6 +1644,164 @@ func (a *CloudAPIService) GetCloudCredentialExecute(r ApiGetCloudCredentialReque
 	}
 
 	localVarPath := localBasePath + "/v1/cloud-credentials/{id}"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiGetProviderBundleRequest struct {
+	ctx        context.Context
+	ApiService CloudAPI
+	id         string
+}
+
+func (r ApiGetProviderBundleRequest) Execute() (*ProviderBundleResponse, *http.Response, error) {
+	return r.ApiService.GetProviderBundleExecute(r)
+}
+
+/*
+GetProviderBundle Fetch a provider bundle by identifier.
+
+Returns the `ProviderBundle` identified by `{id}`. The handler runs the `observe` ReBAC check BEFORE the persistence read, so an unauthorised caller receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing aggregate surfaces as `404 provider_bundle_not_found` — but only for a caller the graph already grants `observe` on that id. An id no bundle ever answered to carries no tuples at all, so the gate denies it first and the caller reads `403`. That is the same withholding the check is there to perform: `404` and `403` are deliberately indistinguishable for an id the caller has no grant on.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle.
+	@return ApiGetProviderBundleRequest
+*/
+func (a *CloudAPIService) GetProviderBundle(ctx context.Context, id string) ApiGetProviderBundleRequest {
+	return ApiGetProviderBundleRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ProviderBundleResponse
+func (a *CloudAPIService) GetProviderBundleExecute(r ApiGetProviderBundleRequest) (*ProviderBundleResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ProviderBundleResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CloudAPIService.GetProviderBundle")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/provider-bundles/{id}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -1488,6 +2096,197 @@ func (a *CloudAPIService) GrantCloudAssignmentExecute(r ApiGrantCloudAssignmentR
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiGrantCredentialAssignmentRequest struct {
+	ctx                              context.Context
+	ApiService                       CloudAPI
+	id                               string
+	credentialAssignmentGrantRequest *CredentialAssignmentGrantRequest
+}
+
+func (r ApiGrantCredentialAssignmentRequest) CredentialAssignmentGrantRequest(credentialAssignmentGrantRequest CredentialAssignmentGrantRequest) ApiGrantCredentialAssignmentRequest {
+	r.credentialAssignmentGrantRequest = &credentialAssignmentGrantRequest
+	return r
+}
+
+func (r ApiGrantCredentialAssignmentRequest) Execute() (*CredentialAssignmentResponse, *http.Response, error) {
+	return r.ApiService.GrantCredentialAssignmentExecute(r)
+}
+
+/*
+GrantCredentialAssignment Grant a Cloud Credential to a Project (owner push).
+
+Binds the Cloud Credential identified by `{id}` to the Project named in the body as a single authoritative action. The handler runs an `assign` ReBAC check on the credential BEFORE the persistence write, then delegates to the Credential Assignment application service which creates the assignment already approved AND materialised in one step — the credential is immediately usable in the Project — and appends a `CredentialAssignmentGranted` outbox event in a single transaction.  This is the owner-push counterpart to `RequestCredentialAssignment`, which the consuming Project initiates and a second party decides. The grant bypasses the second-party approval rule by design: there is no separate requester to compare against, which is also why it exists — requesting and then approving one's own request is refused by the self-approval guard, so without this route a credential's owner could not place it at all. Mirrors `GrantCloudAssignment` on the Cloud side.  The receiving Project must already be able to use the Cloud the credential belongs to — an approved Cloud Assignment — otherwise the grant is rejected with `422 cloud_not_usable_in_project`. A credential is only usable where both assignments are in place, so a grant without the Cloud Assignment would bind the credential and still be refused at deploy time. A `{id}` naming no credential at all is rejected with `422 credential_not_assignable`.  A second live assignment for the same (Project, Credential) pair is rejected with `409 duplicate_live_assignment`.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
+	@return ApiGrantCredentialAssignmentRequest
+*/
+func (a *CloudAPIService) GrantCredentialAssignment(ctx context.Context, id string) ApiGrantCredentialAssignmentRequest {
+	return ApiGrantCredentialAssignmentRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return CredentialAssignmentResponse
+func (a *CloudAPIService) GrantCredentialAssignmentExecute(r ApiGrantCredentialAssignmentRequest) (*CredentialAssignmentResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *CredentialAssignmentResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CloudAPIService.GrantCredentialAssignment")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/cloud-credentials/{id}/credential-assignments"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.credentialAssignmentGrantRequest == nil {
+		return localVarReturnValue, nil, reportError("credentialAssignmentGrantRequest is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.credentialAssignmentGrantRequest
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 413 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 422 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiIssueCloudCredentialRequest struct {
 	ctx                         context.Context
 	ApiService                  CloudAPI
@@ -1687,7 +2486,7 @@ ListCloudAssignments List the Cloud Assignments owned by a Project.
 Returns a creation-ordered page of Cloud Assignment lifecycle metadata for the Project identified by `{id}`. The handler runs a top-level `read` ReBAC check on the parent Project BEFORE the persistence read; every assignment in the page belongs to the one path Project, so the project `read` check authorises the whole page.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
+	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
 	@return ApiListCloudAssignmentsRequest
 */
 func (a *CloudAPIService) ListCloudAssignments(ctx context.Context, id string) ApiListCloudAssignmentsRequest {
@@ -1858,7 +2657,7 @@ ListCloudCredentialClouds List the Clouds a Cloud Credential serves.
 Returns a cloud_id-ordered page of the Clouds the Cloud Credential identified by `{id}` serves — its home Cloud plus every additional usage Cloud attached over the association API. The handler resolves the credential's home Cloud, runs an `observe` ReBAC check on it BEFORE the persistence read, then pages the usage join.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
+	@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
 	@return ApiListCloudCredentialCloudsRequest
 */
 func (a *CloudAPIService) ListCloudCredentialClouds(ctx context.Context, id string) ApiListCloudCredentialCloudsRequest {
@@ -2378,7 +3177,7 @@ ListCredentialAssignments List the Credential Assignments owned by a Project.
 Returns a creation-ordered page of Credential Assignment lifecycle metadata for the Project identified by `{id}`. The handler runs a top-level `read` ReBAC check on the parent Project BEFORE the persistence read; every assignment in the page belongs to the one path Project, so the project `read` check authorises the whole page and no per-row filter runs.  The projection carries the assignment identity, the owning Project, the bound Cloud Credential, the lifecycle state, a derived `materialised` flag, and the lifecycle timestamps.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
+	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
 	@return ApiListCredentialAssignmentsRequest
 */
 func (a *CloudAPIService) ListCredentialAssignments(ctx context.Context, id string) ApiListCredentialAssignmentsRequest {
@@ -2407,6 +3206,548 @@ func (a *CloudAPIService) ListCredentialAssignmentsExecute(r ApiListCredentialAs
 
 	localVarPath := localBasePath + "/v1/projects/{id}/credential-assignments"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.cursor != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "cursor", r.cursor, "form", "")
+	}
+	if r.limit != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "form", "")
+	} else {
+		var defaultValue int32 = 50
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", defaultValue, "form", "")
+		r.limit = &defaultValue
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiListProviderBundleCloudsRequest struct {
+	ctx        context.Context
+	ApiService CloudAPI
+	id         string
+	cursor     *string
+	limit      *int32
+}
+
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
+func (r ApiListProviderBundleCloudsRequest) Cursor(cursor string) ApiListProviderBundleCloudsRequest {
+	r.cursor = &cursor
+	return r
+}
+
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
+func (r ApiListProviderBundleCloudsRequest) Limit(limit int32) ApiListProviderBundleCloudsRequest {
+	r.limit = &limit
+	return r
+}
+
+func (r ApiListProviderBundleCloudsRequest) Execute() (*ProviderBundleCloudList, *http.Response, error) {
+	return r.ApiService.ListProviderBundleCloudsExecute(r)
+}
+
+/*
+ListProviderBundleClouds List the Clouds that reference a provider bundle.
+
+Returns a cloud_id-ordered page of the Clouds that take their provider configuration from the provider bundle identified by `{id}`. Each item carries the Cloud's id, slug, and display name, so a console rendering the roster needs no follow-up read per row.  The gate is `provider_bundle#manage` on the addressed bundle — the permission `PatchProviderBundle` and `DeleteProviderBundle` require, NOT the `observe` the other read verbs use — run BEFORE the persistence read. A roster row names a Cloud in whatever Domain holds it, and holding a permission on a bundle grants no `cloud#observe` anywhere, so the roster is scoped to the caller who is about to edit or delete the bundle rather than to every caller who may read it.  Under that gate the items are deliberately NOT filtered per Cloud: a per-row visibility filter would drop the Clouds the caller cannot observe individually and under-report how far a bundle edit reaches, which is the question the endpoint exists to answer, and would contradict the unfiltered `referencing_clouds` count a refused delete already carries.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. It is bound to this operation as well: a cursor minted by `ListProviderBundles` carries a different surface version byte and is refused with `400 invalid_cursor`, and so is a roster cursor presented there. A tampered envelope stays on `400 invalid_cursor` too.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle.
+	@return ApiListProviderBundleCloudsRequest
+*/
+func (a *CloudAPIService) ListProviderBundleClouds(ctx context.Context, id string) ApiListProviderBundleCloudsRequest {
+	return ApiListProviderBundleCloudsRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ProviderBundleCloudList
+func (a *CloudAPIService) ListProviderBundleCloudsExecute(r ApiListProviderBundleCloudsRequest) (*ProviderBundleCloudList, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ProviderBundleCloudList
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CloudAPIService.ListProviderBundleClouds")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/provider-bundles/{id}/clouds"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.cursor != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "cursor", r.cursor, "form", "")
+	}
+	if r.limit != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "form", "")
+	} else {
+		var defaultValue int32 = 50
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", defaultValue, "form", "")
+		r.limit = &defaultValue
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiListProviderBundleVersionsRequest struct {
+	ctx        context.Context
+	ApiService CloudAPI
+	id         string
+	cursor     *string
+	limit      *int32
+}
+
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
+func (r ApiListProviderBundleVersionsRequest) Cursor(cursor string) ApiListProviderBundleVersionsRequest {
+	r.cursor = &cursor
+	return r
+}
+
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
+func (r ApiListProviderBundleVersionsRequest) Limit(limit int32) ApiListProviderBundleVersionsRequest {
+	r.limit = &limit
+	return r
+}
+
+func (r ApiListProviderBundleVersionsRequest) Execute() (*ProviderBundleVersionList, *http.Response, error) {
+	return r.ApiService.ListProviderBundleVersionsExecute(r)
+}
+
+/*
+ListProviderBundleVersions List the published versions of a provider bundle.
+
+Returns a newest-first page of the content versions the provider bundle identified by `{id}` has published. Each item carries the whole declaration that version froze — its package set and the apiVersion those packages serve their ProviderConfig under — so a client comparing two versions needs no follow-up read per row.  A published version is immutable. A content patch on the bundle appends the next one and rewrites none of the existing rows, so the declaration a Cloud pins answers the same bytes for as long as the pin stands.  The gate is `provider_bundle#observe` on the addressed bundle — the permission `GetProviderBundle` requires — run BEFORE the persistence read, so an unauthorised caller never learns from the response whether the bundle exists. The history is bundle content rather than a roster of the Clouds holding it, which is why the gate is the read one and not the `manage` `ListProviderBundleClouds` requires.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. It is bound to this operation as well: a cursor minted by `ListProviderBundles` or `ListProviderBundleClouds` carries a different surface version byte and is refused with `400 invalid_cursor`. A tampered envelope stays on `400 invalid_cursor` too.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle.
+	@return ApiListProviderBundleVersionsRequest
+*/
+func (a *CloudAPIService) ListProviderBundleVersions(ctx context.Context, id string) ApiListProviderBundleVersionsRequest {
+	return ApiListProviderBundleVersionsRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ProviderBundleVersionList
+func (a *CloudAPIService) ListProviderBundleVersionsExecute(r ApiListProviderBundleVersionsRequest) (*ProviderBundleVersionList, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ProviderBundleVersionList
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CloudAPIService.ListProviderBundleVersions")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/provider-bundles/{id}/versions"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.cursor != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "cursor", r.cursor, "form", "")
+	}
+	if r.limit != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "form", "")
+	} else {
+		var defaultValue int32 = 50
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", defaultValue, "form", "")
+		r.limit = &defaultValue
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 503 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiListProviderBundlesRequest struct {
+	ctx        context.Context
+	ApiService CloudAPI
+	cursor     *string
+	limit      *int32
+}
+
+// Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.
+func (r ApiListProviderBundlesRequest) Cursor(cursor string) ApiListProviderBundlesRequest {
+	r.cursor = &cursor
+	return r
+}
+
+// Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.
+func (r ApiListProviderBundlesRequest) Limit(limit int32) ApiListProviderBundlesRequest {
+	r.limit = &limit
+	return r
+}
+
+func (r ApiListProviderBundlesRequest) Execute() (*ProviderBundleList, *http.Response, error) {
+	return r.ApiService.ListProviderBundlesExecute(r)
+}
+
+/*
+ListProviderBundles List provider bundles.
+
+Returns a slug-ordered page of `ProviderBundle` aggregates the caller is authorised to see. Per-row visibility is layered on top of the page: rows the caller cannot `observe` are filtered out so the response items are a subset of the persistence-level page.  The pagination cursor is HMAC-signed and bound to the per-(caller, pepper) pseudonym, so a cursor minted by one principal cannot be replayed by another — the cross-caller replay surfaces as `403 cursor_binding_mismatch`. A tampered envelope or unknown version byte stays on `400 invalid_cursor`.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiListProviderBundlesRequest
+*/
+func (a *CloudAPIService) ListProviderBundles(ctx context.Context) ApiListProviderBundlesRequest {
+	return ApiListProviderBundlesRequest{
+		ApiService: a,
+		ctx:        ctx,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ProviderBundleList
+func (a *CloudAPIService) ListProviderBundlesExecute(r ApiListProviderBundlesRequest) (*ProviderBundleList, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ProviderBundleList
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CloudAPIService.ListProviderBundles")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/provider-bundles"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -2663,6 +4004,208 @@ func (a *CloudAPIService) PatchCloudExecute(r ApiPatchCloudRequest) (*CloudRespo
 			newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 413 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiPatchProviderBundleRequest struct {
+	ctx                        context.Context
+	ApiService                 CloudAPI
+	id                         string
+	providerBundlePatchRequest *ProviderBundlePatchRequest
+}
+
+func (r ApiPatchProviderBundleRequest) ProviderBundlePatchRequest(providerBundlePatchRequest ProviderBundlePatchRequest) ApiPatchProviderBundleRequest {
+	r.providerBundlePatchRequest = &providerBundlePatchRequest
+	return r
+}
+
+func (r ApiPatchProviderBundleRequest) Execute() (*ProviderBundleResponse, *http.Response, error) {
+	return r.ApiService.PatchProviderBundleExecute(r)
+}
+
+/*
+PatchProviderBundle Patch mutable fields on a provider bundle.
+
+Patches the `ProviderBundle` identified by `{id}`. The body MUST set at least one of `display_name`, `provider_packages`, or `provider_config_api_version` — an empty body surfaces as `400 empty_patch`. A `provider_packages` patch replaces the whole set: the packages the body names become the bundle's packages and every package it omits is dropped.  A content patch — one carrying `provider_packages` or `provider_config_api_version` — publishes a NEW immutable version of the bundle rather than rewriting the current one. The two content fields publish one version between them even when the body names both, and the response reports the number that version was published under in `latest_version`. A rename-only patch publishes nothing.  Publishing moves no Cloud. Every Cloud referencing the bundle keeps serving the version it pins and converges with that declaration until a Cloud write moves the pin — a `PATCH /v1/clouds/{id}` naming `provider_bundle_version`, which promotes that one Cloud. Read the published history at `GET /v1/provider-bundles/{id}/versions` to see which versions a Cloud can be promoted onto.  DECISION: BOTH `slug` and `provider` are intentionally NOT patchable fields. The slug is the URL handle an operator types to address the bundle, so re-slugging in place breaks every bookmarked URL. The provider is the compatibility key a bundle is checked against before a Cloud may reference it: every stored reference was admitted against the provider the bundle carried at the time, and nothing re-checks a reference once it is stored. The handler rejects any body that carries a `slug` key (even with the same value) with `400 slug_immutable`, and any body that carries a `provider` key with `400 provider_immutable`.  The read and the write are two transactions, so the merged aggregate can be stale by the time it is written. The write is gated on the version the read observed and a competing writer that got there first surfaces as `409 provider_bundle_stale`; nothing is written and no event is emitted in that case.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle.
+	@return ApiPatchProviderBundleRequest
+*/
+func (a *CloudAPIService) PatchProviderBundle(ctx context.Context, id string) ApiPatchProviderBundleRequest {
+	return ApiPatchProviderBundleRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ProviderBundleResponse
+func (a *CloudAPIService) PatchProviderBundleExecute(r ApiPatchProviderBundleRequest) (*ProviderBundleResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPatch
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ProviderBundleResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "CloudAPIService.PatchProviderBundle")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/provider-bundles/{id}"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.providerBundlePatchRequest == nil {
+		return localVarReturnValue, nil, reportError("providerBundlePatchRequest is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.providerBundlePatchRequest
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 404 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
 		if localVarHTTPResponse.StatusCode == 413 {
 			var v Problem
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -2721,7 +4264,7 @@ RequestCloudAssignment Request usage of a Cloud for a Project.
 Opens a Cloud Assignment request that asks for the Cloud named in the body to be made usable in the Project identified by `{id}`. The handler runs a `deploy` ReBAC check on the parent Project BEFORE the persistence write, then delegates to the Cloud Assignment application service which records the request in the `requested` state and appends a `CloudAssignmentRequested` outbox event in a single transaction.  The request is not yet usable — the Cloud only becomes usable in the Project once an operator approves it. A second open request for the same (Project, Cloud) pair while an earlier one is still live is rejected with `409 duplicate_live_cloud_assignment`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
+	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
 	@return ApiRequestCloudAssignmentRequest
 */
 func (a *CloudAPIService) RequestCloudAssignment(ctx context.Context, id string) ApiRequestCloudAssignmentRequest {
@@ -2898,10 +4441,10 @@ func (r ApiRequestCredentialAssignmentRequest) Execute() (*CredentialAssignmentR
 /*
 RequestCredentialAssignment Request a Credential Assignment for a Project.
 
-Opens a Credential Assignment request that binds a Cloud Credential to the Project identified by `{id}`. The body names the credential either directly (`cloud_credential_id`) or indirectly by Cloud (`cloud_id`), in which case the system auto-selects the most recently issued eligible credential serving that Cloud. The handler runs a `deploy` ReBAC check on the parent Project BEFORE the persistence write, then delegates to the Credential Assignment application service which records the request in the `requested` state and appends a `CredentialAssignmentRequested` outbox event in a single transaction.  The newly opened assignment is not yet materialised — the binding only becomes live once an approver moves it to the `approved` state. A second open request for the same (Project, Cloud Credential) pair while an earlier one is still live is rejected with `409 duplicate_live_assignment`. A Cloud Credential that is not in an assignable lifecycle state is rejected with `422 credential_not_assignable`.  For the `cloud_id` form: the Cloud must be usable in the Project (an approved Cloud Assignment) — otherwise `422 cloud_not_usable_in_project` — and at least one eligible credential must serve the Cloud — otherwise `422 no_eligible_credential_for_cloud`.
+Opens a Credential Assignment request that binds a Cloud Credential to the Project identified by `{id}`. The body names the credential either directly (`cloud_credential_id`) or indirectly by Cloud (`cloud_id`), in which case the system auto-selects the most recently issued eligible credential serving that Cloud. The handler runs a `deploy` ReBAC check on the parent Project BEFORE the persistence write, then delegates to the Credential Assignment application service which records the request in the `requested` state and appends a `CredentialAssignmentRequested` outbox event in a single transaction.  The newly opened assignment is not yet materialised — the binding only becomes live once an approver moves it to the `approved` state. A second open request for the same (Project, Cloud Credential) pair while an earlier one is still live is rejected with `409 duplicate_live_assignment`. A Cloud Credential that is not in an assignable lifecycle state is rejected with `422 credential_not_assignable`.  Either form requires the Cloud the credential belongs to to be usable in the Project — an approved Cloud Assignment — otherwise the request is rejected with `422 cloud_not_usable_in_project`. A credential is only usable where both assignments are in place, so a request opened without the Cloud Assignment would be approved and still refused at deploy time. The `cloud_id` form checks the Cloud it names before auto-selecting, and both forms then check the Cloud the selected credential actually belongs to — which the credential-to-Cloud usage join may make a different one.  For the `cloud_id` form additionally: at least one eligible credential must serve the Cloud — otherwise `422 no_eligible_credential_for_cloud`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
+	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
 	@return ApiRequestCredentialAssignmentRequest
 */
 func (a *CloudAPIService) RequestCredentialAssignment(ctx context.Context, id string) ApiRequestCredentialAssignmentRequest {
@@ -3283,7 +4826,7 @@ RevokeCloudCredential Revoke a Cloud Credential.
 Revokes the Cloud Credential identified by `{id}`. The handler reads the row to resolve the parent Cloud, runs the `manage` ReBAC check on that Cloud, then delegates to the Cloud Credentials Custodian which stamps `revoked_at`, soft-deletes the underlying secret, and appends a `CloudCredentialRevoked` outbox event in a single transaction.  Revocation is idempotent: revoking an already-revoked credential returns `200` with the unchanged metadata rather than an error. The response carries the metadata-only projection showing the populated `revoked_at`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
+	@param id Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.
 	@return ApiRevokeCloudCredentialRequest
 */
 func (a *CloudAPIService) RevokeCloudCredential(ctx context.Context, id string) ApiRevokeCloudCredentialRequest {

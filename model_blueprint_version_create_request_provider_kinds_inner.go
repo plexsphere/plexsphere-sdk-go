@@ -21,6 +21,7 @@ type BlueprintVersionCreateRequestProviderKindsInner string
 // List of BlueprintVersionCreateRequest_provider_kinds_inner
 const (
 	BLUEPRINTVERSIONCREATEREQUESTPROVIDERKINDSINNER_AWS                      BlueprintVersionCreateRequestProviderKindsInner = "aws"
+	BLUEPRINTVERSIONCREATEREQUESTPROVIDERKINDSINNER_AZURE                    BlueprintVersionCreateRequestProviderKindsInner = "azure"
 	BLUEPRINTVERSIONCREATEREQUESTPROVIDERKINDSINNER_GCP                      BlueprintVersionCreateRequestProviderKindsInner = "gcp"
 	BLUEPRINTVERSIONCREATEREQUESTPROVIDERKINDSINNER_HETZNER                  BlueprintVersionCreateRequestProviderKindsInner = "hetzner"
 	BLUEPRINTVERSIONCREATEREQUESTPROVIDERKINDSINNER_OPENSTACK                BlueprintVersionCreateRequestProviderKindsInner = "openstack"
@@ -30,6 +31,7 @@ const (
 // All allowed values of BlueprintVersionCreateRequestProviderKindsInner enum
 var AllowedBlueprintVersionCreateRequestProviderKindsInnerEnumValues = []BlueprintVersionCreateRequestProviderKindsInner{
 	"aws",
+	"azure",
 	"gcp",
 	"hetzner",
 	"openstack",

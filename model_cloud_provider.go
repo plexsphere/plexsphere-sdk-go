@@ -15,13 +15,16 @@ import (
 	"fmt"
 )
 
-// CloudProvider Closed-set discriminator naming the upstream cloud provider for a Cloud aggregate. The two values mirror the `cloud.ParseProvider` allowlist and the SQL CHECK constraint on `plexsphere.clouds.provider`. The provider is the validator-routing key for the per-provider validator family and is INTENTIONALLY immutable post-creation — see the `cloud` tag description for the rationale.
+// CloudProvider Closed-set discriminator naming the upstream cloud provider for a Cloud aggregate. The values mirror the `cloud.ParseProvider` allowlist and the SQL CHECK constraint on `plexsphere.clouds.provider`. The provider is the validator-routing key for the per-provider validator family and is INTENTIONALLY immutable post-creation — see the `cloud` tag description for the rationale.  Each provider requires its own `endpoint` and `region_defaults` fields; the per-provider table is in the Clouds API reference.
 type CloudProvider string
 
 // List of CloudProvider
 const (
 	CLOUDPROVIDER_CloudProviderAws         CloudProvider = "aws"
 	CLOUDPROVIDER_CloudProviderAzure       CloudProvider = "azure"
+	CLOUDPROVIDER_CloudProviderGcp         CloudProvider = "gcp"
+	CLOUDPROVIDER_CloudProviderHetzner     CloudProvider = "hetzner"
+	CLOUDPROVIDER_CloudProviderOpenstack   CloudProvider = "openstack"
 	CLOUDPROVIDER_UNKNOWN_DEFAULT_OPEN_API CloudProvider = "unknown_default_open_api"
 )
 
@@ -29,6 +32,9 @@ const (
 var AllowedCloudProviderEnumValues = []CloudProvider{
 	"aws",
 	"azure",
+	"gcp",
+	"hetzner",
+	"openstack",
 	"unknown_default_open_api",
 }
 

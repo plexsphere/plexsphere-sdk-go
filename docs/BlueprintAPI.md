@@ -6,6 +6,7 @@ Method | HTTP request | Description
 ------------- | ------------- | -------------
 [**GetBlueprint**](BlueprintAPI.md#GetBlueprint) | **Get** /v1/blueprints/{id} | Fetch a Blueprint by identifier.
 [**ListBlueprints**](BlueprintAPI.md#ListBlueprints) | **Get** /v1/blueprints | List the Blueprint Catalog.
+[**ListProjectBlueprints**](BlueprintAPI.md#ListProjectBlueprints) | **Get** /v1/projects/{id}/blueprints | List the Blueprint Catalog with this Project&#39;s provisioning verdict.
 [**PublishBlueprintVersion**](BlueprintAPI.md#PublishBlueprintVersion) | **Post** /v1/blueprints/{id}/versions | Publish a Blueprint version.
 [**RegisterBlueprint**](BlueprintAPI.md#RegisterBlueprint) | **Post** /v1/blueprints | Register a Blueprint Catalog entry.
 
@@ -134,6 +135,80 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**BlueprintList**](BlueprintList.md)
+
+### Authorization
+
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## ListProjectBlueprints
+
+> ProjectBlueprintList ListProjectBlueprints(ctx, id).Cursor(cursor).Limit(limit).Execute()
+
+List the Blueprint Catalog with this Project's provisioning verdict.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces. 
+	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.BlueprintAPI.ListProjectBlueprints(context.Background(), id).Cursor(cursor).Limit(limit).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `BlueprintAPI.ListProjectBlueprints``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `ListProjectBlueprints`: ProjectBlueprintList
+	fmt.Fprintf(os.Stdout, "Response from `BlueprintAPI.ListProjectBlueprints`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface, on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list, on &#x60;/v1/projects/{id}/credential-assignments&#x60; and &#x60;/v1/projects/{id}/cloud-assignments&#x60; for the assignment request/list surfaces, on &#x60;/v1/projects/{id}/blueprints&#x60; for the project-scoped Blueprint offer list, and on &#x60;/v1/projects/{id}/sink-enablements&#x60; and &#x60;/v1/projects/{id}/telemetry-routes&#x60; for the sink-enablement and Telemetry Route surfaces.  | 
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiListProjectBlueprintsRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+
+ **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
+
+### Return type
+
+[**ProjectBlueprintList**](ProjectBlueprintList.md)
 
 ### Authorization
 

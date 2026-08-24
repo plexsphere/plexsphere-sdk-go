@@ -99,7 +99,7 @@ type TenancyAPI interface {
 		Deletes the Project identified by `{id}`. The empty-aggregate guard runs inside the same transaction as the row delete; at least one persisted Resource, Node, or relation tuple forces `409 project_not_empty` with the `ProjectChildCounts` payload in the Problem detail so the operator knows which sub-aggregate to drain first. A concurrent INSERT racing the guard is caught by defense-in-depth — the foreign-key violation surfaces as the same `409` so the caller never observes a half-deleted Project.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
+		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
 		@return ApiDeleteProjectRequest
 	*/
 	DeleteProject(ctx context.Context, id string) ApiDeleteProjectRequest
@@ -160,7 +160,7 @@ type TenancyAPI interface {
 		Returns the Project identified by `{id}`. The handler runs the `read` ReBAC check BEFORE the persistence read; an unauthorised caller therefore receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing aggregate surfaces as `404 project_not_found`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
+		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
 		@return ApiGetProjectRequest
 	*/
 	GetProject(ctx context.Context, id string) ApiGetProjectRequest
@@ -248,7 +248,7 @@ type TenancyAPI interface {
 		Patches the Project identified by `{id}`. The body MUST set at least one of `name`, `description`, `sub_range_cidr`, or `release_sub_range` — an empty body surfaces as `400 empty_patch`.  DECISION: `slug` is intentionally NOT a patchable field — it is the URL handle exported into cached dashboard links and outbox projections. The handler rejects any body that carries a `slug` key (even with the same value) at decode time with `400 slug_immutable`.  Retargeting `sub_range_cidr` triggers an in-tx sibling-overlap guard inside the parent Domain. A patch that would overlap a sibling Project's reservation surfaces as `422 sub_range_invalidates_allocation` carrying the offending `project_id` and `sub_range` in the Problem detail.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
+		@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
 		@return ApiPatchProjectRequest
 	*/
 	PatchProject(ctx context.Context, id string) ApiPatchProjectRequest
@@ -1194,7 +1194,7 @@ DeleteProject Delete a Project.
 Deletes the Project identified by `{id}`. The empty-aggregate guard runs inside the same transaction as the row delete; at least one persisted Resource, Node, or relation tuple forces `409 project_not_empty` with the `ProjectChildCounts` payload in the Problem detail so the operator knows which sub-aggregate to drain first. A concurrent INSERT racing the guard is caught by defense-in-depth — the foreign-key violation surfaces as the same `409` so the caller never observes a half-deleted Project.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
+	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
 	@return ApiDeleteProjectRequest
 */
 func (a *TenancyAPIService) DeleteProject(ctx context.Context, id string) ApiDeleteProjectRequest {
@@ -1833,7 +1833,7 @@ GetProject Fetch a Project by identifier.
 Returns the Project identified by `{id}`. The handler runs the `read` ReBAC check BEFORE the persistence read; an unauthorised caller therefore receives `403` without the existence side-channel a \"load-then-check\" flow would leak. A missing aggregate surfaces as `404 project_not_found`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
+	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
 	@return ApiGetProjectRequest
 */
 func (a *TenancyAPIService) GetProject(ctx context.Context, id string) ApiGetProjectRequest {
@@ -2927,7 +2927,7 @@ PatchProject Patch mutable fields on a Project.
 Patches the Project identified by `{id}`. The body MUST set at least one of `name`, `description`, `sub_range_cidr`, or `release_sub_range` — an empty body surfaces as `400 empty_patch`.  DECISION: `slug` is intentionally NOT a patchable field — it is the URL handle exported into cached dashboard links and outbox projections. The handler rejects any body that carries a `slug` key (even with the same value) at decode time with `400 slug_immutable`.  Retargeting `sub_range_cidr` triggers an in-tx sibling-overlap guard inside the parent Domain. A patch that would overlap a sibling Project's reservation surfaces as `422 sub_range_invalidates_allocation` carrying the offending `project_id` and `sub_range` in the Problem detail.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces.
+	@param id Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces.
 	@return ApiPatchProjectRequest
 */
 func (a *TenancyAPIService) PatchProject(ctx context.Context, id string) ApiPatchProjectRequest {

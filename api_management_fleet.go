@@ -27,7 +27,7 @@ type ManagementFleetAPI interface {
 		Returns the metadata for the management cluster identified by `{id}`. The handler runs an `observe` ReBAC check on `managementcluster:{id}` (which derives from the fleet singleton, so a fleet observer transitively observes every cluster). A missing row surfaces as `404 management_cluster_not_found`.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}` and `/v1/management-clusters/{id}/assignments` for the operator-facing Management Fleet surface.
+		@param id Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}`, `/v1/management-clusters/{id}/assignments` and `/v1/management-clusters/{id}/provider-packages` for the operator-facing Management Fleet surface.
 		@return ApiGetManagementClusterRequest
 	*/
 	GetManagementCluster(ctx context.Context, id string) ApiGetManagementClusterRequest
@@ -57,7 +57,7 @@ type ManagementFleetAPI interface {
 		Returns the project-id-ordered set of Project ↔ cluster assignments placed on the management cluster identified by `{id}`, including each namespace's lifecycle phase. The handler runs an `observe` ReBAC check on `managementcluster:{id}` before the read. An unknown cluster id yields an empty list — the assignment table carries no cluster existence oracle and the gate already authorised the caller against the cluster object.
 
 		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-		@param id Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}` and `/v1/management-clusters/{id}/assignments` for the operator-facing Management Fleet surface.
+		@param id Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}`, `/v1/management-clusters/{id}/assignments` and `/v1/management-clusters/{id}/provider-packages` for the operator-facing Management Fleet surface.
 		@return ApiListManagementClusterAssignmentsRequest
 	*/
 	ListManagementClusterAssignments(ctx context.Context, id string) ApiListManagementClusterAssignmentsRequest
@@ -65,6 +65,21 @@ type ManagementFleetAPI interface {
 	// ListManagementClusterAssignmentsExecute executes the request
 	//  @return ProjectClusterAssignmentList
 	ListManagementClusterAssignmentsExecute(r ApiListManagementClusterAssignmentsRequest) (*ProjectClusterAssignmentList, *http.Response, error)
+
+	/*
+		ListManagementClusterProviderPackages List the provider packages the platform manages on a cluster.
+
+		Returns the package-source-ordered set of Crossplane provider packages the platform has converged onto the management cluster identified by `{id}`, each with the version it was converged to and its last observed phase. A package is desired on a cluster when a Cloud that names it holds an approved assignment to a Project the cluster hosts.  The handler runs an `observe` ReBAC check on `managementcluster:{id}` before the read. An unknown cluster id yields an empty list — the install table carries no cluster existence oracle and the gate already authorised the caller against the cluster object.  The list reports only what the platform manages. A provider installed on the cluster by hand is absent from it until a Cloud names that package.
+
+		@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+		@param id Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}`, `/v1/management-clusters/{id}/assignments` and `/v1/management-clusters/{id}/provider-packages` for the operator-facing Management Fleet surface.
+		@return ApiListManagementClusterProviderPackagesRequest
+	*/
+	ListManagementClusterProviderPackages(ctx context.Context, id string) ApiListManagementClusterProviderPackagesRequest
+
+	// ListManagementClusterProviderPackagesExecute executes the request
+	//  @return ClusterProviderPackageList
+	ListManagementClusterProviderPackagesExecute(r ApiListManagementClusterProviderPackagesRequest) (*ClusterProviderPackageList, *http.Response, error)
 
 	/*
 		ListManagementClusters List the registered management clusters.
@@ -129,7 +144,7 @@ GetManagementCluster Fetch one management cluster.
 Returns the metadata for the management cluster identified by `{id}`. The handler runs an `observe` ReBAC check on `managementcluster:{id}` (which derives from the fleet singleton, so a fleet observer transitively observes every cluster). A missing row surfaces as `404 management_cluster_not_found`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}` and `/v1/management-clusters/{id}/assignments` for the operator-facing Management Fleet surface.
+	@param id Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}`, `/v1/management-clusters/{id}/assignments` and `/v1/management-clusters/{id}/provider-packages` for the operator-facing Management Fleet surface.
 	@return ApiGetManagementClusterRequest
 */
 func (a *ManagementFleetAPIService) GetManagementCluster(ctx context.Context, id string) ApiGetManagementClusterRequest {
@@ -445,7 +460,7 @@ ListManagementClusterAssignments List the Project assignments placed on a cluste
 Returns the project-id-ordered set of Project ↔ cluster assignments placed on the management cluster identified by `{id}`, including each namespace's lifecycle phase. The handler runs an `observe` ReBAC check on `managementcluster:{id}` before the read. An unknown cluster id yields an empty list — the assignment table carries no cluster existence oracle and the gate already authorised the caller against the cluster object.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}` and `/v1/management-clusters/{id}/assignments` for the operator-facing Management Fleet surface.
+	@param id Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}`, `/v1/management-clusters/{id}/assignments` and `/v1/management-clusters/{id}/provider-packages` for the operator-facing Management Fleet surface.
 	@return ApiListManagementClusterAssignmentsRequest
 */
 func (a *ManagementFleetAPIService) ListManagementClusterAssignments(ctx context.Context, id string) ApiListManagementClusterAssignmentsRequest {
@@ -473,6 +488,153 @@ func (a *ManagementFleetAPIService) ListManagementClusterAssignmentsExecute(r Ap
 	}
 
 	localVarPath := localBasePath + "/v1/management-clusters/{id}/assignments"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json", "application/problem+json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v PermissionDenied
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 500 {
+			var v Problem
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+			newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+			newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiListManagementClusterProviderPackagesRequest struct {
+	ctx        context.Context
+	ApiService ManagementFleetAPI
+	id         string
+}
+
+func (r ApiListManagementClusterProviderPackagesRequest) Execute() (*ClusterProviderPackageList, *http.Response, error) {
+	return r.ApiService.ListManagementClusterProviderPackagesExecute(r)
+}
+
+/*
+ListManagementClusterProviderPackages List the provider packages the platform manages on a cluster.
+
+Returns the package-source-ordered set of Crossplane provider packages the platform has converged onto the management cluster identified by `{id}`, each with the version it was converged to and its last observed phase. A package is desired on a cluster when a Cloud that names it holds an approved assignment to a Project the cluster hosts.  The handler runs an `observe` ReBAC check on `managementcluster:{id}` before the read. An unknown cluster id yields an empty list — the install table carries no cluster existence oracle and the gate already authorised the caller against the cluster object.  The list reports only what the platform manages. A provider installed on the cluster by hand is absent from it until a Cloud names that package.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}`, `/v1/management-clusters/{id}/assignments` and `/v1/management-clusters/{id}/provider-packages` for the operator-facing Management Fleet surface.
+	@return ApiListManagementClusterProviderPackagesRequest
+*/
+func (a *ManagementFleetAPIService) ListManagementClusterProviderPackages(ctx context.Context, id string) ApiListManagementClusterProviderPackagesRequest {
+	return ApiListManagementClusterProviderPackagesRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return ClusterProviderPackageList
+func (a *ManagementFleetAPIService) ListManagementClusterProviderPackagesExecute(r ApiListManagementClusterProviderPackagesRequest) (*ClusterProviderPackageList, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *ClusterProviderPackageList
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ManagementFleetAPIService.ListManagementClusterProviderPackages")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/v1/management-clusters/{id}/provider-packages"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)

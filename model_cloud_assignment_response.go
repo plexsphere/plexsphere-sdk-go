@@ -34,7 +34,9 @@ type CloudAssignmentResponse struct {
 	// Aggregate creation timestamp (UTC).
 	CreatedAt time.Time `json:"created_at"`
 	// Last-modified timestamp (UTC). Bumped by every lifecycle transition — approve, reject, revoke.
-	UpdatedAt            time.Time `json:"updated_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	// Readiness of every Crossplane provider package the assigned Cloud declares, one entry per package, ordered by `source` the same way `provider_packages` is on the Cloud itself. Present only while the assignment is `approved`: a `requested`, `rejected`, or `revoked` assignment installs nothing, so the property is absent rather than reporting phases that do not apply. An absent array means nothing is installed for this assignment; a readiness the platform cannot read fails the request instead.  Assigning a Cloud to a Project is what causes its provider packages to be installed, so this is the answer to \"can the Project provision against this Cloud yet\": yes only once every entry reports `Serving`.
+	ProviderInstalls     []CloudAssignmentProviderInstall `json:"provider_installs,omitempty"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -232,6 +234,38 @@ func (o *CloudAssignmentResponse) SetUpdatedAt(v time.Time) {
 	o.UpdatedAt = v
 }
 
+// GetProviderInstalls returns the ProviderInstalls field value if set, zero value otherwise.
+func (o *CloudAssignmentResponse) GetProviderInstalls() []CloudAssignmentProviderInstall {
+	if o == nil || IsNil(o.ProviderInstalls) {
+		var ret []CloudAssignmentProviderInstall
+		return ret
+	}
+	return o.ProviderInstalls
+}
+
+// GetProviderInstallsOk returns a tuple with the ProviderInstalls field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudAssignmentResponse) GetProviderInstallsOk() ([]CloudAssignmentProviderInstall, bool) {
+	if o == nil || IsNil(o.ProviderInstalls) {
+		return nil, false
+	}
+	return o.ProviderInstalls, true
+}
+
+// HasProviderInstalls returns a boolean if a field has been set.
+func (o *CloudAssignmentResponse) HasProviderInstalls() bool {
+	if o != nil && !IsNil(o.ProviderInstalls) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderInstalls gets a reference to the given []CloudAssignmentProviderInstall and assigns it to the ProviderInstalls field.
+func (o *CloudAssignmentResponse) SetProviderInstalls(v []CloudAssignmentProviderInstall) {
+	o.ProviderInstalls = v
+}
+
 func (o CloudAssignmentResponse) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -249,6 +283,9 @@ func (o CloudAssignmentResponse) ToMap() (map[string]interface{}, error) {
 	toSerialize["materialised"] = o.Materialised
 	toSerialize["created_at"] = o.CreatedAt
 	toSerialize["updated_at"] = o.UpdatedAt
+	if !IsNil(o.ProviderInstalls) {
+		toSerialize["provider_installs"] = o.ProviderInstalls
+	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -305,6 +342,7 @@ func (o *CloudAssignmentResponse) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "materialised")
 		delete(additionalProperties, "created_at")
 		delete(additionalProperties, "updated_at")
+		delete(additionalProperties, "provider_installs")
 		o.AdditionalProperties = additionalProperties
 	}
 

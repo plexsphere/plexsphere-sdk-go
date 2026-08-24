@@ -64,6 +64,20 @@ func Test_plexsphere_ManagementFleetAPIService(t *testing.T) {
 
 	})
 
+	t.Run("Test ManagementFleetAPIService ListManagementClusterProviderPackages", func(t *testing.T) {
+
+		t.Skip("skip test") // remove to run test
+
+		var id string
+
+		resp, httpRes, err := apiClient.ManagementFleetAPI.ListManagementClusterProviderPackages(context.Background(), id).Execute()
+
+		require.Nil(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, 200, httpRes.StatusCode)
+
+	})
+
 	t.Run("Test ManagementFleetAPIService ListManagementClusters", func(t *testing.T) {
 
 		t.Skip("skip test") // remove to run test
