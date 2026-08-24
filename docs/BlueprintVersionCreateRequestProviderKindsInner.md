@@ -5,6 +5,8 @@
 
 * `AWS` (value: `"aws"`)
 
+* `AZURE` (value: `"azure"`)
+
 * `GCP` (value: `"gcp"`)
 
 * `HETZNER` (value: `"hetzner"`)

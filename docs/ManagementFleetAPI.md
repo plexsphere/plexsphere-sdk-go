@@ -7,6 +7,7 @@ Method | HTTP request | Description
 [**GetManagementCluster**](ManagementFleetAPI.md#GetManagementCluster) | **Get** /v1/management-clusters/{id} | Fetch one management cluster.
 [**GetProjectManagementClusterAssignment**](ManagementFleetAPI.md#GetProjectManagementClusterAssignment) | **Get** /v1/projects/{project_id}/management-cluster-assignment | Look up a Project&#39;s management-cluster assignment.
 [**ListManagementClusterAssignments**](ManagementFleetAPI.md#ListManagementClusterAssignments) | **Get** /v1/management-clusters/{id}/assignments | List the Project assignments placed on a cluster.
+[**ListManagementClusterProviderPackages**](ManagementFleetAPI.md#ListManagementClusterProviderPackages) | **Get** /v1/management-clusters/{id}/provider-packages | List the provider packages the platform manages on a cluster.
 [**ListManagementClusters**](ManagementFleetAPI.md#ListManagementClusters) | **Get** /v1/management-clusters | List the registered management clusters.
 [**RegisterManagementCluster**](ManagementFleetAPI.md#RegisterManagementCluster) | **Post** /v1/management-clusters | Register a management cluster into the fleet.
 [**TerminateProjectManagementClusterAssignment**](ManagementFleetAPI.md#TerminateProjectManagementClusterAssignment) | **Post** /v1/projects/{project_id}/management-cluster-assignment/terminate | Request teardown of a Project&#39;s namespace.
@@ -34,7 +35,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}` and `/v1/management-clusters/{id}/assignments` for the operator-facing Management Fleet surface. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}`, `/v1/management-clusters/{id}/assignments` and `/v1/management-clusters/{id}/provider-packages` for the operator-facing Management Fleet surface. 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -54,7 +55,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Management cluster identifier (UUIDv7). Bound on &#x60;/v1/management-clusters/{id}&#x60; and &#x60;/v1/management-clusters/{id}/assignments&#x60; for the operator-facing Management Fleet surface.  | 
+**id** | **string** | Management cluster identifier (UUIDv7). Bound on &#x60;/v1/management-clusters/{id}&#x60;, &#x60;/v1/management-clusters/{id}/assignments&#x60; and &#x60;/v1/management-clusters/{id}/provider-packages&#x60; for the operator-facing Management Fleet surface.  | 
 
 ### Other Parameters
 
@@ -174,7 +175,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}` and `/v1/management-clusters/{id}/assignments` for the operator-facing Management Fleet surface. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}`, `/v1/management-clusters/{id}/assignments` and `/v1/management-clusters/{id}/provider-packages` for the operator-facing Management Fleet surface. 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -194,7 +195,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Management cluster identifier (UUIDv7). Bound on &#x60;/v1/management-clusters/{id}&#x60; and &#x60;/v1/management-clusters/{id}/assignments&#x60; for the operator-facing Management Fleet surface.  | 
+**id** | **string** | Management cluster identifier (UUIDv7). Bound on &#x60;/v1/management-clusters/{id}&#x60;, &#x60;/v1/management-clusters/{id}/assignments&#x60; and &#x60;/v1/management-clusters/{id}/provider-packages&#x60; for the operator-facing Management Fleet surface.  | 
 
 ### Other Parameters
 
@@ -208,6 +209,76 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**ProjectClusterAssignmentList**](ProjectClusterAssignmentList.md)
+
+### Authorization
+
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## ListManagementClusterProviderPackages
+
+> ClusterProviderPackageList ListManagementClusterProviderPackages(ctx, id).Execute()
+
+List the provider packages the platform manages on a cluster.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Management cluster identifier (UUIDv7). Bound on `/v1/management-clusters/{id}`, `/v1/management-clusters/{id}/assignments` and `/v1/management-clusters/{id}/provider-packages` for the operator-facing Management Fleet surface. 
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.ManagementFleetAPI.ListManagementClusterProviderPackages(context.Background(), id).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `ManagementFleetAPI.ListManagementClusterProviderPackages``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `ListManagementClusterProviderPackages`: ClusterProviderPackageList
+	fmt.Fprintf(os.Stdout, "Response from `ManagementFleetAPI.ListManagementClusterProviderPackages`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+**id** | **string** | Management cluster identifier (UUIDv7). Bound on &#x60;/v1/management-clusters/{id}&#x60;, &#x60;/v1/management-clusters/{id}/assignments&#x60; and &#x60;/v1/management-clusters/{id}/provider-packages&#x60; for the operator-facing Management Fleet surface.  | 
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiListManagementClusterProviderPackagesRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+
+
+### Return type
+
+[**ClusterProviderPackageList**](ClusterProviderPackageList.md)
 
 ### Authorization
 

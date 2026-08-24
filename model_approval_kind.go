@@ -15,7 +15,7 @@ import (
 	"fmt"
 )
 
-// ApprovalKind Source family the queue row was projected from. `approval` marks a dual-control Approval raised against a Domain `ApprovalPolicy`; `credential_assignment` marks a Credential Assignment awaiting a decision on the Cloud Credential it spends; `cloud_assignment` marks a Cloud Assignment awaiting a decision on the Cloud it spends. The kind selects which per-row authorisation check and which decide path apply.
+// ApprovalKind Source family the queue row was projected from. `approval` marks a dual-control Approval raised against a Domain `ApprovalPolicy`; `credential_assignment` marks a Credential Assignment awaiting a decision on the Cloud Credential it spends; `cloud_assignment` marks a Cloud Assignment awaiting a decision on the Cloud it spends; `sink_enablement` marks a sink enablement awaiting a decision on the telemetry sink it spends. The kind selects which per-row authorisation check and which decide path apply.
 type ApprovalKind string
 
 // List of ApprovalKind
@@ -23,6 +23,7 @@ const (
 	APPROVALKIND_APPROVAL                 ApprovalKind = "approval"
 	APPROVALKIND_CREDENTIAL_ASSIGNMENT    ApprovalKind = "credential_assignment"
 	APPROVALKIND_CLOUD_ASSIGNMENT         ApprovalKind = "cloud_assignment"
+	APPROVALKIND_SINK_ENABLEMENT          ApprovalKind = "sink_enablement"
 	APPROVALKIND_UNKNOWN_DEFAULT_OPEN_API ApprovalKind = "unknown_default_open_api"
 )
 
@@ -31,6 +32,7 @@ var AllowedApprovalKindEnumValues = []ApprovalKind{
 	"approval",
 	"credential_assignment",
 	"cloud_assignment",
+	"sink_enablement",
 	"unknown_default_open_api",
 }
 

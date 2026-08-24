@@ -17,15 +17,25 @@ import (
 // checks if the CloudPatchRequest type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &CloudPatchRequest{}
 
-// CloudPatchRequest Body for `PATCH /v1/clouds/{id}`. All properties are optional — but the body MUST set at least one of `display_name`, `endpoint`, or `region_defaults`. An empty body is rejected at the handler with `400 empty_patch`.  The immutable `slug` and `provider` are intentionally absent from this schema; the handler rejects a body carrying `slug` with `400 slug_immutable` and one carrying `provider` with `400 provider_immutable`. `provider` is the validator-routing key for the per-provider validator family — changing it would invalidate every previously-stored endpoint blob. See the `cloud` tag description and the DECISION on `cloud.Cloud`.
+// CloudPatchRequest Body for `PATCH /v1/clouds/{id}`. All properties are optional — but the body MUST set at least one of `display_name`, `endpoint`, `region_defaults`, `provider_packages`, `provider_config_api_version`, `provider_bundle_id`, `provider_bundle_version`, or `provider_package_overrides`. An empty body is rejected at the handler with `400 empty_patch`. A `provider_packages` patch replaces the whole set as one unit: the packages the body names become the Cloud's packages and every package it omits is dropped. An empty array, a duplicate `source`, or a package missing one of its two members is rejected with `400 invalid_cloud`.  The two provider-configuration modes are exclusive here the way they are on create: a patch names EITHER `provider_bundle_id` OR the inline pair, never both, and one that names both is rejected with `400 invalid_cloud_provider_mode`. Setting `provider_bundle_id` on a Cloud that declares its packages inline is the switch into bundle mode; setting BOTH inline fields on a Cloud that references a bundle is the switch back. A patch that takes a referencing Cloud only halfway out of bundle mode is rejected with `400 invalid_cloud_provider_mode` naming the field it left out, because such a Cloud has neither a package set nor an apiVersion of its own to fall back on.  `provider_bundle_version` belongs to bundle mode as well. Alongside `provider_bundle_id` it pins the version the new reference takes, and omitting it there takes the bundle's latest. On its own, against a Cloud already in bundle mode, it is the promotion: the one write that moves this Cloud onto another declaration of the bundle it already references, and it moves no other Cloud. Naming it while the Cloud is not in bundle mode, and the patch does not put it there, is rejected with `400 invalid_cloud_provider_mode`.  `provider_package_overrides` belongs to bundle mode on the same terms, and is rejected with `400 invalid_cloud_provider_mode` when the patched Cloud ends the write declaring its packages inline. It rides along with an attach or a promotion in the same patch, and the stated set is what the Cloud carries afterwards whichever of the two the patch also did.  The immutable `slug` and `provider` are intentionally absent from this schema; the handler rejects a body carrying `slug` with `400 slug_immutable` and one carrying `provider` with `400 provider_immutable`. `provider` is the validator-routing key for the per-provider validator family — changing it would invalidate every previously-stored endpoint blob. See the `cloud` tag description and the DECISION on `cloud.Cloud`.
 type CloudPatchRequest struct {
 	// New human-readable Cloud name. The aggregate's `Rename` mutator validates the same constraints as `NewCloud`.
 	DisplayName *string `json:"display_name,omitempty"`
 	// New provider-specific connection metadata. Triggers a re-run of the per-provider validator on the merged next- state.
 	Endpoint map[string]interface{} `json:"endpoint,omitempty"`
 	// New provider-specific region/default metadata. Triggers a re-run of the per-provider validator on the merged next- state.
-	RegionDefaults       map[string]interface{} `json:"region_defaults,omitempty"`
-	AdditionalProperties map[string]interface{}
+	RegionDefaults map[string]interface{} `json:"region_defaults,omitempty"`
+	// Replacement package set. The whole set is replaced rather than merged. Omit the field to leave the current set untouched. The read surfaces render the result in canonical source-ascending order.
+	ProviderPackages []CloudProviderPackage `json:"provider_packages,omitempty"`
+	// New `<group>/<version>` every declared package serves its ProviderConfig under. Patchable independently of `provider_packages`, except on a Cloud leaving bundle mode, where both inline fields have to be stated together.
+	ProviderConfigApiVersion *string `json:"provider_config_api_version,omitempty" validate:"regexp=^[a-z0-9]([a-z0-9.-]*[a-z0-9])?\\/v[0-9]+((alpha|beta)[0-9]+)?$"`
+	// Identifier (UUID) of the provider bundle the Cloud takes its provider configuration from after the patch. Forbidden alongside `provider_packages` and `provider_config_api_version`. The bundle must exist and must serve the same `provider` as the Cloud: an unknown id is rejected with `400 unknown_provider_bundle`, a bundle of another provider with `400 provider_bundle_provider_mismatch`.  DECISION: the field carries no `format: uuid`, for the reason the create request records — a format-annotated field is rejected during JSON decoding, so a malformed id would answer `400 invalid_body` before the service's admission check runs and the operator would never learn which field was wrong.
+	ProviderBundleId *string `json:"provider_bundle_id,omitempty"`
+	// The content version of the referenced bundle the Cloud pins after the patch. Omitted alongside a `provider_bundle_id` that puts the Cloud into bundle mode, the write pins that bundle's latest version; on its own it promotes a Cloud already in bundle mode onto the named version.  Naming it while the Cloud neither is nor becomes a bundle reference is rejected with `400 invalid_cloud_provider_mode`. A version the bundle never published is rejected with `400 provider_bundle_version_not_found`.
+	ProviderBundleVersion *int64 `json:"provider_bundle_version,omitempty"`
+	// Replacement override set. The whole set is replaced rather than merged. Omit the field to leave the current set untouched; state `[]` to clear it, which puts the Cloud back on the pinned bundle version as it stands. Each `source` may appear only once.  Stating it while the patched Cloud ends the write declaring its packages inline is rejected with `400 invalid_cloud_provider_mode`.
+	ProviderPackageOverrides []CloudProviderPackage `json:"provider_package_overrides,omitempty"`
+	AdditionalProperties     map[string]interface{}
 }
 
 type _CloudPatchRequest CloudPatchRequest
@@ -143,6 +153,166 @@ func (o *CloudPatchRequest) SetRegionDefaults(v map[string]interface{}) {
 	o.RegionDefaults = v
 }
 
+// GetProviderPackages returns the ProviderPackages field value if set, zero value otherwise.
+func (o *CloudPatchRequest) GetProviderPackages() []CloudProviderPackage {
+	if o == nil || IsNil(o.ProviderPackages) {
+		var ret []CloudProviderPackage
+		return ret
+	}
+	return o.ProviderPackages
+}
+
+// GetProviderPackagesOk returns a tuple with the ProviderPackages field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudPatchRequest) GetProviderPackagesOk() ([]CloudProviderPackage, bool) {
+	if o == nil || IsNil(o.ProviderPackages) {
+		return nil, false
+	}
+	return o.ProviderPackages, true
+}
+
+// HasProviderPackages returns a boolean if a field has been set.
+func (o *CloudPatchRequest) HasProviderPackages() bool {
+	if o != nil && !IsNil(o.ProviderPackages) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderPackages gets a reference to the given []CloudProviderPackage and assigns it to the ProviderPackages field.
+func (o *CloudPatchRequest) SetProviderPackages(v []CloudProviderPackage) {
+	o.ProviderPackages = v
+}
+
+// GetProviderConfigApiVersion returns the ProviderConfigApiVersion field value if set, zero value otherwise.
+func (o *CloudPatchRequest) GetProviderConfigApiVersion() string {
+	if o == nil || IsNil(o.ProviderConfigApiVersion) {
+		var ret string
+		return ret
+	}
+	return *o.ProviderConfigApiVersion
+}
+
+// GetProviderConfigApiVersionOk returns a tuple with the ProviderConfigApiVersion field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudPatchRequest) GetProviderConfigApiVersionOk() (*string, bool) {
+	if o == nil || IsNil(o.ProviderConfigApiVersion) {
+		return nil, false
+	}
+	return o.ProviderConfigApiVersion, true
+}
+
+// HasProviderConfigApiVersion returns a boolean if a field has been set.
+func (o *CloudPatchRequest) HasProviderConfigApiVersion() bool {
+	if o != nil && !IsNil(o.ProviderConfigApiVersion) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderConfigApiVersion gets a reference to the given string and assigns it to the ProviderConfigApiVersion field.
+func (o *CloudPatchRequest) SetProviderConfigApiVersion(v string) {
+	o.ProviderConfigApiVersion = &v
+}
+
+// GetProviderBundleId returns the ProviderBundleId field value if set, zero value otherwise.
+func (o *CloudPatchRequest) GetProviderBundleId() string {
+	if o == nil || IsNil(o.ProviderBundleId) {
+		var ret string
+		return ret
+	}
+	return *o.ProviderBundleId
+}
+
+// GetProviderBundleIdOk returns a tuple with the ProviderBundleId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudPatchRequest) GetProviderBundleIdOk() (*string, bool) {
+	if o == nil || IsNil(o.ProviderBundleId) {
+		return nil, false
+	}
+	return o.ProviderBundleId, true
+}
+
+// HasProviderBundleId returns a boolean if a field has been set.
+func (o *CloudPatchRequest) HasProviderBundleId() bool {
+	if o != nil && !IsNil(o.ProviderBundleId) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderBundleId gets a reference to the given string and assigns it to the ProviderBundleId field.
+func (o *CloudPatchRequest) SetProviderBundleId(v string) {
+	o.ProviderBundleId = &v
+}
+
+// GetProviderBundleVersion returns the ProviderBundleVersion field value if set, zero value otherwise.
+func (o *CloudPatchRequest) GetProviderBundleVersion() int64 {
+	if o == nil || IsNil(o.ProviderBundleVersion) {
+		var ret int64
+		return ret
+	}
+	return *o.ProviderBundleVersion
+}
+
+// GetProviderBundleVersionOk returns a tuple with the ProviderBundleVersion field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudPatchRequest) GetProviderBundleVersionOk() (*int64, bool) {
+	if o == nil || IsNil(o.ProviderBundleVersion) {
+		return nil, false
+	}
+	return o.ProviderBundleVersion, true
+}
+
+// HasProviderBundleVersion returns a boolean if a field has been set.
+func (o *CloudPatchRequest) HasProviderBundleVersion() bool {
+	if o != nil && !IsNil(o.ProviderBundleVersion) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderBundleVersion gets a reference to the given int64 and assigns it to the ProviderBundleVersion field.
+func (o *CloudPatchRequest) SetProviderBundleVersion(v int64) {
+	o.ProviderBundleVersion = &v
+}
+
+// GetProviderPackageOverrides returns the ProviderPackageOverrides field value if set, zero value otherwise.
+func (o *CloudPatchRequest) GetProviderPackageOverrides() []CloudProviderPackage {
+	if o == nil || IsNil(o.ProviderPackageOverrides) {
+		var ret []CloudProviderPackage
+		return ret
+	}
+	return o.ProviderPackageOverrides
+}
+
+// GetProviderPackageOverridesOk returns a tuple with the ProviderPackageOverrides field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudPatchRequest) GetProviderPackageOverridesOk() ([]CloudProviderPackage, bool) {
+	if o == nil || IsNil(o.ProviderPackageOverrides) {
+		return nil, false
+	}
+	return o.ProviderPackageOverrides, true
+}
+
+// HasProviderPackageOverrides returns a boolean if a field has been set.
+func (o *CloudPatchRequest) HasProviderPackageOverrides() bool {
+	if o != nil && !IsNil(o.ProviderPackageOverrides) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderPackageOverrides gets a reference to the given []CloudProviderPackage and assigns it to the ProviderPackageOverrides field.
+func (o *CloudPatchRequest) SetProviderPackageOverrides(v []CloudProviderPackage) {
+	o.ProviderPackageOverrides = v
+}
+
 func (o CloudPatchRequest) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -161,6 +331,21 @@ func (o CloudPatchRequest) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.RegionDefaults) {
 		toSerialize["region_defaults"] = o.RegionDefaults
+	}
+	if !IsNil(o.ProviderPackages) {
+		toSerialize["provider_packages"] = o.ProviderPackages
+	}
+	if !IsNil(o.ProviderConfigApiVersion) {
+		toSerialize["provider_config_api_version"] = o.ProviderConfigApiVersion
+	}
+	if !IsNil(o.ProviderBundleId) {
+		toSerialize["provider_bundle_id"] = o.ProviderBundleId
+	}
+	if !IsNil(o.ProviderBundleVersion) {
+		toSerialize["provider_bundle_version"] = o.ProviderBundleVersion
+	}
+	if !IsNil(o.ProviderPackageOverrides) {
+		toSerialize["provider_package_overrides"] = o.ProviderPackageOverrides
 	}
 
 	for key, value := range o.AdditionalProperties {
@@ -187,6 +372,11 @@ func (o *CloudPatchRequest) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "display_name")
 		delete(additionalProperties, "endpoint")
 		delete(additionalProperties, "region_defaults")
+		delete(additionalProperties, "provider_packages")
+		delete(additionalProperties, "provider_config_api_version")
+		delete(additionalProperties, "provider_bundle_id")
+		delete(additionalProperties, "provider_bundle_version")
+		delete(additionalProperties, "provider_package_overrides")
 		o.AdditionalProperties = additionalProperties
 	}
 

@@ -18,7 +18,7 @@ import (
 // checks if the CloudCreateRequest type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &CloudCreateRequest{}
 
-// CloudCreateRequest Body for `POST /v1/clouds`. Field set mirrors the Cloud aggregate's `NewCloud` invariants. The handler authorises the call against the platform-level `manage` relation BEFORE invoking the service so an unauthorised caller never produces a `CloudCreated` outbox row.
+// CloudCreateRequest Body for `POST /v1/clouds`. Field set mirrors the Cloud aggregate's `NewCloud` invariants. The handler authorises the call against the platform-level `manage` relation BEFORE invoking the service so an unauthorised caller never produces a `CloudCreated` outbox row.  The Cloud holds its provider configuration in exactly one of two ways, so a request names EITHER `provider_bundle_id` OR the inline pair `provider_packages` + `provider_config_api_version`, never both. A request naming a bundle alongside either inline field is rejected with `400 invalid_cloud_provider_mode` naming every field that took part in the conflict; a request that sets neither, or only one half of the inline pair, is rejected with `400 invalid_cloud`.  A request in bundle mode may name `provider_bundle_version` to pin an older declaration; omitting it pins the bundle's latest. It may also name `provider_package_overrides` to run some of that declaration's packages at other versions. Both fields belong to bundle mode: stating either without `provider_bundle_id` is rejected with `400 invalid_cloud_provider_mode` naming the field.
 type CloudCreateRequest struct {
 	// Human-readable Cloud name. Whitespace-only is rejected.
 	DisplayName string `json:"display_name"`
@@ -30,8 +30,18 @@ type CloudCreateRequest struct {
 	// Provider-specific region/default metadata. The per- provider validator runs at decode time; field-level rejections surface as `400 invalid_cloud_region_defaults`.
 	RegionDefaults map[string]interface{} `json:"region_defaults"`
 	// Upstream provider account identifier. Combined with `provider` must be unique across all Clouds.
-	ExternalId           string `json:"external_id"`
-	AdditionalProperties map[string]interface{}
+	ExternalId string `json:"external_id"`
+	// The Crossplane provider packages the Cloud declares inline. Required in inline mode and forbidden alongside `provider_bundle_id`. Each `source` may appear only once. The read surfaces render the set in canonical source-ascending order, not in the order stated here.
+	ProviderPackages []CloudProviderPackage `json:"provider_packages,omitempty"`
+	// The `<group>/<version>` every inline-declared package serves its ProviderConfig under (e.g. `aws.m.upbound.io/v1beta1`). Required in inline mode and forbidden alongside `provider_bundle_id`. The Provisioning Broker stamps this value as the rendered ProviderConfig's apiVersion.
+	ProviderConfigApiVersion *string `json:"provider_config_api_version,omitempty" validate:"regexp=^[a-z0-9]([a-z0-9.-]*[a-z0-9])?\\/v[0-9]+((alpha|beta)[0-9]+)?$"`
+	// Identifier (UUID) of the provider bundle this Cloud takes its provider configuration from. Naming it puts the Cloud in bundle mode, which forbids `provider_packages` and `provider_config_api_version` in the same request. The bundle must exist and must serve the same `provider` as the Cloud: an unknown id is rejected with `400 unknown_provider_bundle`, a bundle of another provider with `400 provider_bundle_provider_mismatch`.  DECISION: the field carries no `format: uuid`. A format-annotated field is rejected during JSON decoding, so a malformed id would answer `400 invalid_body` before the service's admission check runs and the operator would never learn which field was wrong. The value is a canonical UUID string and a malformed one surfaces as `400 invalid_cloud_provider_mode` naming `provider_bundle_id`.
+	ProviderBundleId *string `json:"provider_bundle_id,omitempty"`
+	// The content version of the named bundle the new Cloud pins. Omit it and the write pins the bundle's latest version, which is the declaration an operator reads when they pick the bundle; name one to pin an older declaration instead.  The field belongs to bundle mode: setting it without `provider_bundle_id` is rejected with `400 invalid_cloud_provider_mode`. A version the bundle never published is rejected with `400 provider_bundle_version_not_found`.
+	ProviderBundleVersion *int64 `json:"provider_bundle_version,omitempty"`
+	// Packages the new Cloud runs differently from the version it pins. Each `source` may appear only once. Omit the field, or state the empty array, and the Cloud takes the pinned version as it stands.  The field belongs to bundle mode: setting it without `provider_bundle_id` is rejected with `400 invalid_cloud_provider_mode`. An override is a deviation from a referenced declaration, and a Cloud that owns its package set runs another version by editing that set.
+	ProviderPackageOverrides []CloudProviderPackage `json:"provider_package_overrides,omitempty"`
+	AdditionalProperties     map[string]interface{}
 }
 
 type _CloudCreateRequest CloudCreateRequest
@@ -203,6 +213,166 @@ func (o *CloudCreateRequest) SetExternalId(v string) {
 	o.ExternalId = v
 }
 
+// GetProviderPackages returns the ProviderPackages field value if set, zero value otherwise.
+func (o *CloudCreateRequest) GetProviderPackages() []CloudProviderPackage {
+	if o == nil || IsNil(o.ProviderPackages) {
+		var ret []CloudProviderPackage
+		return ret
+	}
+	return o.ProviderPackages
+}
+
+// GetProviderPackagesOk returns a tuple with the ProviderPackages field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudCreateRequest) GetProviderPackagesOk() ([]CloudProviderPackage, bool) {
+	if o == nil || IsNil(o.ProviderPackages) {
+		return nil, false
+	}
+	return o.ProviderPackages, true
+}
+
+// HasProviderPackages returns a boolean if a field has been set.
+func (o *CloudCreateRequest) HasProviderPackages() bool {
+	if o != nil && !IsNil(o.ProviderPackages) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderPackages gets a reference to the given []CloudProviderPackage and assigns it to the ProviderPackages field.
+func (o *CloudCreateRequest) SetProviderPackages(v []CloudProviderPackage) {
+	o.ProviderPackages = v
+}
+
+// GetProviderConfigApiVersion returns the ProviderConfigApiVersion field value if set, zero value otherwise.
+func (o *CloudCreateRequest) GetProviderConfigApiVersion() string {
+	if o == nil || IsNil(o.ProviderConfigApiVersion) {
+		var ret string
+		return ret
+	}
+	return *o.ProviderConfigApiVersion
+}
+
+// GetProviderConfigApiVersionOk returns a tuple with the ProviderConfigApiVersion field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudCreateRequest) GetProviderConfigApiVersionOk() (*string, bool) {
+	if o == nil || IsNil(o.ProviderConfigApiVersion) {
+		return nil, false
+	}
+	return o.ProviderConfigApiVersion, true
+}
+
+// HasProviderConfigApiVersion returns a boolean if a field has been set.
+func (o *CloudCreateRequest) HasProviderConfigApiVersion() bool {
+	if o != nil && !IsNil(o.ProviderConfigApiVersion) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderConfigApiVersion gets a reference to the given string and assigns it to the ProviderConfigApiVersion field.
+func (o *CloudCreateRequest) SetProviderConfigApiVersion(v string) {
+	o.ProviderConfigApiVersion = &v
+}
+
+// GetProviderBundleId returns the ProviderBundleId field value if set, zero value otherwise.
+func (o *CloudCreateRequest) GetProviderBundleId() string {
+	if o == nil || IsNil(o.ProviderBundleId) {
+		var ret string
+		return ret
+	}
+	return *o.ProviderBundleId
+}
+
+// GetProviderBundleIdOk returns a tuple with the ProviderBundleId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudCreateRequest) GetProviderBundleIdOk() (*string, bool) {
+	if o == nil || IsNil(o.ProviderBundleId) {
+		return nil, false
+	}
+	return o.ProviderBundleId, true
+}
+
+// HasProviderBundleId returns a boolean if a field has been set.
+func (o *CloudCreateRequest) HasProviderBundleId() bool {
+	if o != nil && !IsNil(o.ProviderBundleId) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderBundleId gets a reference to the given string and assigns it to the ProviderBundleId field.
+func (o *CloudCreateRequest) SetProviderBundleId(v string) {
+	o.ProviderBundleId = &v
+}
+
+// GetProviderBundleVersion returns the ProviderBundleVersion field value if set, zero value otherwise.
+func (o *CloudCreateRequest) GetProviderBundleVersion() int64 {
+	if o == nil || IsNil(o.ProviderBundleVersion) {
+		var ret int64
+		return ret
+	}
+	return *o.ProviderBundleVersion
+}
+
+// GetProviderBundleVersionOk returns a tuple with the ProviderBundleVersion field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudCreateRequest) GetProviderBundleVersionOk() (*int64, bool) {
+	if o == nil || IsNil(o.ProviderBundleVersion) {
+		return nil, false
+	}
+	return o.ProviderBundleVersion, true
+}
+
+// HasProviderBundleVersion returns a boolean if a field has been set.
+func (o *CloudCreateRequest) HasProviderBundleVersion() bool {
+	if o != nil && !IsNil(o.ProviderBundleVersion) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderBundleVersion gets a reference to the given int64 and assigns it to the ProviderBundleVersion field.
+func (o *CloudCreateRequest) SetProviderBundleVersion(v int64) {
+	o.ProviderBundleVersion = &v
+}
+
+// GetProviderPackageOverrides returns the ProviderPackageOverrides field value if set, zero value otherwise.
+func (o *CloudCreateRequest) GetProviderPackageOverrides() []CloudProviderPackage {
+	if o == nil || IsNil(o.ProviderPackageOverrides) {
+		var ret []CloudProviderPackage
+		return ret
+	}
+	return o.ProviderPackageOverrides
+}
+
+// GetProviderPackageOverridesOk returns a tuple with the ProviderPackageOverrides field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudCreateRequest) GetProviderPackageOverridesOk() ([]CloudProviderPackage, bool) {
+	if o == nil || IsNil(o.ProviderPackageOverrides) {
+		return nil, false
+	}
+	return o.ProviderPackageOverrides, true
+}
+
+// HasProviderPackageOverrides returns a boolean if a field has been set.
+func (o *CloudCreateRequest) HasProviderPackageOverrides() bool {
+	if o != nil && !IsNil(o.ProviderPackageOverrides) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderPackageOverrides gets a reference to the given []CloudProviderPackage and assigns it to the ProviderPackageOverrides field.
+func (o *CloudCreateRequest) SetProviderPackageOverrides(v []CloudProviderPackage) {
+	o.ProviderPackageOverrides = v
+}
+
 func (o CloudCreateRequest) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -219,6 +389,21 @@ func (o CloudCreateRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize["endpoint"] = o.Endpoint
 	toSerialize["region_defaults"] = o.RegionDefaults
 	toSerialize["external_id"] = o.ExternalId
+	if !IsNil(o.ProviderPackages) {
+		toSerialize["provider_packages"] = o.ProviderPackages
+	}
+	if !IsNil(o.ProviderConfigApiVersion) {
+		toSerialize["provider_config_api_version"] = o.ProviderConfigApiVersion
+	}
+	if !IsNil(o.ProviderBundleId) {
+		toSerialize["provider_bundle_id"] = o.ProviderBundleId
+	}
+	if !IsNil(o.ProviderBundleVersion) {
+		toSerialize["provider_bundle_version"] = o.ProviderBundleVersion
+	}
+	if !IsNil(o.ProviderPackageOverrides) {
+		toSerialize["provider_package_overrides"] = o.ProviderPackageOverrides
+	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -273,6 +458,11 @@ func (o *CloudCreateRequest) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "endpoint")
 		delete(additionalProperties, "region_defaults")
 		delete(additionalProperties, "external_id")
+		delete(additionalProperties, "provider_packages")
+		delete(additionalProperties, "provider_config_api_version")
+		delete(additionalProperties, "provider_bundle_id")
+		delete(additionalProperties, "provider_bundle_version")
+		delete(additionalProperties, "provider_package_overrides")
 		o.AdditionalProperties = additionalProperties
 	}
 

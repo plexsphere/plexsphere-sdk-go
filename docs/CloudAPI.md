@@ -6,18 +6,26 @@ Method | HTTP request | Description
 ------------- | ------------- | -------------
 [**AttachCloudCredentialCloud**](CloudAPI.md#AttachCloudCredentialCloud) | **Post** /v1/cloud-credentials/{id}/clouds | Attach a usage Cloud to a Cloud Credential.
 [**CreateCloud**](CloudAPI.md#CreateCloud) | **Post** /v1/clouds | Create a Cloud Inventory entry.
+[**CreateProviderBundle**](CloudAPI.md#CreateProviderBundle) | **Post** /v1/provider-bundles | Create a provider bundle.
 [**DeleteCloud**](CloudAPI.md#DeleteCloud) | **Delete** /v1/clouds/{id} | Delete a Cloud.
+[**DeleteProviderBundle**](CloudAPI.md#DeleteProviderBundle) | **Delete** /v1/provider-bundles/{id} | Delete a provider bundle.
 [**DetachCloudCredentialCloud**](CloudAPI.md#DetachCloudCredentialCloud) | **Delete** /v1/cloud-credentials/{id}/clouds/{cloud_id} | Detach a usage Cloud from a Cloud Credential.
 [**GetCloud**](CloudAPI.md#GetCloud) | **Get** /v1/clouds/{id} | Fetch a Cloud by identifier.
 [**GetCloudCredential**](CloudAPI.md#GetCloudCredential) | **Get** /v1/cloud-credentials/{id} | Fetch a Cloud Credential&#39;s lifecycle metadata.
+[**GetProviderBundle**](CloudAPI.md#GetProviderBundle) | **Get** /v1/provider-bundles/{id} | Fetch a provider bundle by identifier.
 [**GrantCloudAssignment**](CloudAPI.md#GrantCloudAssignment) | **Post** /v1/clouds/{id}/cloud-assignments | Grant a Cloud to a Project (operator push).
+[**GrantCredentialAssignment**](CloudAPI.md#GrantCredentialAssignment) | **Post** /v1/cloud-credentials/{id}/credential-assignments | Grant a Cloud Credential to a Project (owner push).
 [**IssueCloudCredential**](CloudAPI.md#IssueCloudCredential) | **Post** /v1/clouds/{id}/cloud-credentials | Issue a new Cloud Credential under a Cloud.
 [**ListCloudAssignments**](CloudAPI.md#ListCloudAssignments) | **Get** /v1/projects/{id}/cloud-assignments | List the Cloud Assignments owned by a Project.
 [**ListCloudCredentialClouds**](CloudAPI.md#ListCloudCredentialClouds) | **Get** /v1/cloud-credentials/{id}/clouds | List the Clouds a Cloud Credential serves.
 [**ListCloudCredentials**](CloudAPI.md#ListCloudCredentials) | **Get** /v1/clouds/{id}/cloud-credentials | List Cloud Credentials owned by a Cloud.
 [**ListClouds**](CloudAPI.md#ListClouds) | **Get** /v1/clouds | List Cloud Inventory entries.
 [**ListCredentialAssignments**](CloudAPI.md#ListCredentialAssignments) | **Get** /v1/projects/{id}/credential-assignments | List the Credential Assignments owned by a Project.
+[**ListProviderBundleClouds**](CloudAPI.md#ListProviderBundleClouds) | **Get** /v1/provider-bundles/{id}/clouds | List the Clouds that reference a provider bundle.
+[**ListProviderBundleVersions**](CloudAPI.md#ListProviderBundleVersions) | **Get** /v1/provider-bundles/{id}/versions | List the published versions of a provider bundle.
+[**ListProviderBundles**](CloudAPI.md#ListProviderBundles) | **Get** /v1/provider-bundles | List provider bundles.
 [**PatchCloud**](CloudAPI.md#PatchCloud) | **Patch** /v1/clouds/{id} | Patch mutable fields on a Cloud.
+[**PatchProviderBundle**](CloudAPI.md#PatchProviderBundle) | **Patch** /v1/provider-bundles/{id} | Patch mutable fields on a provider bundle.
 [**RequestCloudAssignment**](CloudAPI.md#RequestCloudAssignment) | **Post** /v1/projects/{id}/cloud-assignments | Request usage of a Cloud for a Project.
 [**RequestCredentialAssignment**](CloudAPI.md#RequestCredentialAssignment) | **Post** /v1/projects/{id}/credential-assignments | Request a Credential Assignment for a Project.
 [**RevokeCloudAssignment**](CloudAPI.md#RevokeCloudAssignment) | **Post** /v1/cloud-assignments/{id}/revoke | Revoke a Cloud Assignment.
@@ -47,7 +55,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface. 
 	cloudCredentialAttachRequest := *openapiclient.NewCloudCredentialAttachRequest("CloudId_example") // CloudCredentialAttachRequest | 
 
 	configuration := openapiclient.NewConfiguration()
@@ -68,7 +76,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Cloud Credential identifier (UUIDv7). Bound on &#x60;/v1/cloud-credentials/{id}&#x60;, &#x60;/v1/cloud-credentials/{id}/revoke&#x60;, &#x60;/v1/cloud-credentials/{id}/clouds&#x60;, and &#x60;/v1/cloud-credentials/{id}/clouds/{cloud_id}&#x60; for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.  | 
+**id** | **string** | Cloud Credential identifier (UUIDv7). Bound on &#x60;/v1/cloud-credentials/{id}&#x60;, &#x60;/v1/cloud-credentials/{id}/revoke&#x60;, &#x60;/v1/cloud-credentials/{id}/clouds&#x60;, &#x60;/v1/cloud-credentials/{id}/credential-assignments&#x60;, and &#x60;/v1/cloud-credentials/{id}/clouds/{cloud_id}&#x60; for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.  | 
 
 ### Other Parameters
 
@@ -164,6 +172,72 @@ Name | Type | Description  | Notes
 [[Back to README]](../README.md)
 
 
+## CreateProviderBundle
+
+> ProviderBundleResponse CreateProviderBundle(ctx).ProviderBundleCreateRequest(providerBundleCreateRequest).Execute()
+
+Create a provider bundle.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	providerBundleCreateRequest := *openapiclient.NewProviderBundleCreateRequest("DisplayName_example", "Slug_example", openapiclient.CloudProvider("aws"), []openapiclient.CloudProviderPackage{*openapiclient.NewCloudProviderPackage("Source_example", "Version_example")}, "ProviderConfigApiVersion_example") // ProviderBundleCreateRequest | 
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.CloudAPI.CreateProviderBundle(context.Background()).ProviderBundleCreateRequest(providerBundleCreateRequest).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `CloudAPI.CreateProviderBundle``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `CreateProviderBundle`: ProviderBundleResponse
+	fmt.Fprintf(os.Stdout, "Response from `CloudAPI.CreateProviderBundle`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiCreateProviderBundleRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **providerBundleCreateRequest** | [**ProviderBundleCreateRequest**](ProviderBundleCreateRequest.md) |  | 
+
+### Return type
+
+[**ProviderBundleResponse**](ProviderBundleResponse.md)
+
+### Authorization
+
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+
+### HTTP request headers
+
+- **Content-Type**: application/json
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
 ## DeleteCloud
 
 > DeleteCloud(ctx, id).Execute()
@@ -232,6 +306,74 @@ Name | Type | Description  | Notes
 [[Back to README]](../README.md)
 
 
+## DeleteProviderBundle
+
+> DeleteProviderBundle(ctx, id).Execute()
+
+Delete a provider bundle.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle. 
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	r, err := apiClient.CloudAPI.DeleteProviderBundle(context.Background(), id).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `CloudAPI.DeleteProviderBundle``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+}
+```
+
+### Path Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+**id** | **string** | Provider bundle identifier (UUIDv7). Bound on &#x60;/v1/provider-bundles/{id}&#x60; for the Cloud Inventory provider-bundle CRUD surface, and on &#x60;/v1/provider-bundles/{id}/clouds&#x60; for the roster of Clouds that reference the bundle.  | 
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiDeleteProviderBundleRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+
+
+### Return type
+
+ (empty response body)
+
+### Authorization
+
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
 ## DetachCloudCredentialCloud
 
 > DetachCloudCredentialCloud(ctx, id, cloudId).Execute()
@@ -253,7 +395,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface. 
 	cloudId := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Identifier of the usage Cloud to detach (UUIDv7). Must be a non-zero UUID — a malformed value is rejected with `400 invalid_cloud_id`. 
 
 	configuration := openapiclient.NewConfiguration()
@@ -272,7 +414,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Cloud Credential identifier (UUIDv7). Bound on &#x60;/v1/cloud-credentials/{id}&#x60;, &#x60;/v1/cloud-credentials/{id}/revoke&#x60;, &#x60;/v1/cloud-credentials/{id}/clouds&#x60;, and &#x60;/v1/cloud-credentials/{id}/clouds/{cloud_id}&#x60; for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.  | 
+**id** | **string** | Cloud Credential identifier (UUIDv7). Bound on &#x60;/v1/cloud-credentials/{id}&#x60;, &#x60;/v1/cloud-credentials/{id}/revoke&#x60;, &#x60;/v1/cloud-credentials/{id}/clouds&#x60;, &#x60;/v1/cloud-credentials/{id}/credential-assignments&#x60;, and &#x60;/v1/cloud-credentials/{id}/clouds/{cloud_id}&#x60; for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.  | 
 **cloudId** | **string** | Identifier of the usage Cloud to detach (UUIDv7). Must be a non-zero UUID — a malformed value is rejected with &#x60;400 invalid_cloud_id&#x60;.  | 
 
 ### Other Parameters
@@ -394,7 +536,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface. 
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
@@ -414,7 +556,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Cloud Credential identifier (UUIDv7). Bound on &#x60;/v1/cloud-credentials/{id}&#x60;, &#x60;/v1/cloud-credentials/{id}/revoke&#x60;, &#x60;/v1/cloud-credentials/{id}/clouds&#x60;, and &#x60;/v1/cloud-credentials/{id}/clouds/{cloud_id}&#x60; for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.  | 
+**id** | **string** | Cloud Credential identifier (UUIDv7). Bound on &#x60;/v1/cloud-credentials/{id}&#x60;, &#x60;/v1/cloud-credentials/{id}/revoke&#x60;, &#x60;/v1/cloud-credentials/{id}/clouds&#x60;, &#x60;/v1/cloud-credentials/{id}/credential-assignments&#x60;, and &#x60;/v1/cloud-credentials/{id}/clouds/{cloud_id}&#x60; for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.  | 
 
 ### Other Parameters
 
@@ -428,6 +570,76 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**CloudCredentialResponse**](CloudCredentialResponse.md)
+
+### Authorization
+
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## GetProviderBundle
+
+> ProviderBundleResponse GetProviderBundle(ctx, id).Execute()
+
+Fetch a provider bundle by identifier.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle. 
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.CloudAPI.GetProviderBundle(context.Background(), id).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `CloudAPI.GetProviderBundle``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `GetProviderBundle`: ProviderBundleResponse
+	fmt.Fprintf(os.Stdout, "Response from `CloudAPI.GetProviderBundle`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+**id** | **string** | Provider bundle identifier (UUIDv7). Bound on &#x60;/v1/provider-bundles/{id}&#x60; for the Cloud Inventory provider-bundle CRUD surface, and on &#x60;/v1/provider-bundles/{id}/clouds&#x60; for the roster of Clouds that reference the bundle.  | 
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiGetProviderBundleRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+
+
+### Return type
+
+[**ProviderBundleResponse**](ProviderBundleResponse.md)
 
 ### Authorization
 
@@ -500,6 +712,78 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**CloudAssignmentResponse**](CloudAssignmentResponse.md)
+
+### Authorization
+
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+
+### HTTP request headers
+
+- **Content-Type**: application/json
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## GrantCredentialAssignment
+
+> CredentialAssignmentResponse GrantCredentialAssignment(ctx, id).CredentialAssignmentGrantRequest(credentialAssignmentGrantRequest).Execute()
+
+Grant a Cloud Credential to a Project (owner push).
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface. 
+	credentialAssignmentGrantRequest := *openapiclient.NewCredentialAssignmentGrantRequest("ProjectId_example") // CredentialAssignmentGrantRequest | 
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.CloudAPI.GrantCredentialAssignment(context.Background(), id).CredentialAssignmentGrantRequest(credentialAssignmentGrantRequest).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `CloudAPI.GrantCredentialAssignment``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `GrantCredentialAssignment`: CredentialAssignmentResponse
+	fmt.Fprintf(os.Stdout, "Response from `CloudAPI.GrantCredentialAssignment`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+**id** | **string** | Cloud Credential identifier (UUIDv7). Bound on &#x60;/v1/cloud-credentials/{id}&#x60;, &#x60;/v1/cloud-credentials/{id}/revoke&#x60;, &#x60;/v1/cloud-credentials/{id}/clouds&#x60;, &#x60;/v1/cloud-credentials/{id}/credential-assignments&#x60;, and &#x60;/v1/cloud-credentials/{id}/clouds/{cloud_id}&#x60; for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.  | 
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiGrantCredentialAssignmentRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+
+ **credentialAssignmentGrantRequest** | [**CredentialAssignmentGrantRequest**](CredentialAssignmentGrantRequest.md) |  | 
+
+### Return type
+
+[**CredentialAssignmentResponse**](CredentialAssignmentResponse.md)
 
 ### Authorization
 
@@ -608,7 +892,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces. 
 	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
 	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
 
@@ -630,7 +914,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface, on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list, and on &#x60;/v1/projects/{id}/credential-assignments&#x60; and &#x60;/v1/projects/{id}/cloud-assignments&#x60; for the assignment request/list surfaces.  | 
+**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface, on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list, on &#x60;/v1/projects/{id}/credential-assignments&#x60; and &#x60;/v1/projects/{id}/cloud-assignments&#x60; for the assignment request/list surfaces, on &#x60;/v1/projects/{id}/blueprints&#x60; for the project-scoped Blueprint offer list, and on &#x60;/v1/projects/{id}/sink-enablements&#x60; and &#x60;/v1/projects/{id}/telemetry-routes&#x60; for the sink-enablement and Telemetry Route surfaces.  | 
 
 ### Other Parameters
 
@@ -682,7 +966,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface. 
 	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
 	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
 
@@ -704,7 +988,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Cloud Credential identifier (UUIDv7). Bound on &#x60;/v1/cloud-credentials/{id}&#x60;, &#x60;/v1/cloud-credentials/{id}/revoke&#x60;, &#x60;/v1/cloud-credentials/{id}/clouds&#x60;, and &#x60;/v1/cloud-credentials/{id}/clouds/{cloud_id}&#x60; for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.  | 
+**id** | **string** | Cloud Credential identifier (UUIDv7). Bound on &#x60;/v1/cloud-credentials/{id}&#x60;, &#x60;/v1/cloud-credentials/{id}/revoke&#x60;, &#x60;/v1/cloud-credentials/{id}/clouds&#x60;, &#x60;/v1/cloud-credentials/{id}/credential-assignments&#x60;, and &#x60;/v1/cloud-credentials/{id}/clouds/{cloud_id}&#x60; for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.  | 
 
 ### Other Parameters
 
@@ -898,7 +1182,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces. 
 	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
 	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
 
@@ -920,7 +1204,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface, on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list, and on &#x60;/v1/projects/{id}/credential-assignments&#x60; and &#x60;/v1/projects/{id}/cloud-assignments&#x60; for the assignment request/list surfaces.  | 
+**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface, on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list, on &#x60;/v1/projects/{id}/credential-assignments&#x60; and &#x60;/v1/projects/{id}/cloud-assignments&#x60; for the assignment request/list surfaces, on &#x60;/v1/projects/{id}/blueprints&#x60; for the project-scoped Blueprint offer list, and on &#x60;/v1/projects/{id}/sink-enablements&#x60; and &#x60;/v1/projects/{id}/telemetry-routes&#x60; for the sink-enablement and Telemetry Route surfaces.  | 
 
 ### Other Parameters
 
@@ -936,6 +1220,222 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**CredentialAssignmentList**](CredentialAssignmentList.md)
+
+### Authorization
+
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## ListProviderBundleClouds
+
+> ProviderBundleCloudList ListProviderBundleClouds(ctx, id).Cursor(cursor).Limit(limit).Execute()
+
+List the Clouds that reference a provider bundle.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle. 
+	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.CloudAPI.ListProviderBundleClouds(context.Background(), id).Cursor(cursor).Limit(limit).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `CloudAPI.ListProviderBundleClouds``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `ListProviderBundleClouds`: ProviderBundleCloudList
+	fmt.Fprintf(os.Stdout, "Response from `CloudAPI.ListProviderBundleClouds`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+**id** | **string** | Provider bundle identifier (UUIDv7). Bound on &#x60;/v1/provider-bundles/{id}&#x60; for the Cloud Inventory provider-bundle CRUD surface, and on &#x60;/v1/provider-bundles/{id}/clouds&#x60; for the roster of Clouds that reference the bundle.  | 
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiListProviderBundleCloudsRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+
+ **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
+
+### Return type
+
+[**ProviderBundleCloudList**](ProviderBundleCloudList.md)
+
+### Authorization
+
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## ListProviderBundleVersions
+
+> ProviderBundleVersionList ListProviderBundleVersions(ctx, id).Cursor(cursor).Limit(limit).Execute()
+
+List the published versions of a provider bundle.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle. 
+	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.CloudAPI.ListProviderBundleVersions(context.Background(), id).Cursor(cursor).Limit(limit).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `CloudAPI.ListProviderBundleVersions``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `ListProviderBundleVersions`: ProviderBundleVersionList
+	fmt.Fprintf(os.Stdout, "Response from `CloudAPI.ListProviderBundleVersions`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+**id** | **string** | Provider bundle identifier (UUIDv7). Bound on &#x60;/v1/provider-bundles/{id}&#x60; for the Cloud Inventory provider-bundle CRUD surface, and on &#x60;/v1/provider-bundles/{id}/clouds&#x60; for the roster of Clouds that reference the bundle.  | 
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiListProviderBundleVersionsRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+
+ **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
+
+### Return type
+
+[**ProviderBundleVersionList**](ProviderBundleVersionList.md)
+
+### Authorization
+
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## ListProviderBundles
+
+> ProviderBundleList ListProviderBundles(ctx).Cursor(cursor).Limit(limit).Execute()
+
+List provider bundles.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	cursor := "cursor_example" // string | Opaque continuation token returned by a previous call's `next_cursor`. The encoding is HMAC-signed by the server so a tampered cursor surfaces as `400`.  (optional)
+	limit := int32(56) // int32 | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a `400` Problem rather than silently clamped.  (optional) (default to 50)
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.CloudAPI.ListProviderBundles(context.Background()).Cursor(cursor).Limit(limit).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `CloudAPI.ListProviderBundles``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `ListProviderBundles`: ProviderBundleList
+	fmt.Fprintf(os.Stdout, "Response from `CloudAPI.ListProviderBundles`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiListProviderBundlesRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **cursor** | **string** | Opaque continuation token returned by a previous call&#39;s &#x60;next_cursor&#x60;. The encoding is HMAC-signed by the server so a tampered cursor surfaces as &#x60;400&#x60;.  | 
+ **limit** | **int32** | Maximum number of items to return in a single page. A value outside [1, 200] is rejected with a &#x60;400&#x60; Problem rather than silently clamped.  | [default to 50]
+
+### Return type
+
+[**ProviderBundleList**](ProviderBundleList.md)
 
 ### Authorization
 
@@ -1023,6 +1523,78 @@ Name | Type | Description  | Notes
 [[Back to README]](../README.md)
 
 
+## PatchProviderBundle
+
+> ProviderBundleResponse PatchProviderBundle(ctx, id).ProviderBundlePatchRequest(providerBundlePatchRequest).Execute()
+
+Patch mutable fields on a provider bundle.
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/plexsphere/plexsphere-sdk-go"
+)
+
+func main() {
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Provider bundle identifier (UUIDv7). Bound on `/v1/provider-bundles/{id}` for the Cloud Inventory provider-bundle CRUD surface, and on `/v1/provider-bundles/{id}/clouds` for the roster of Clouds that reference the bundle. 
+	providerBundlePatchRequest := *openapiclient.NewProviderBundlePatchRequest() // ProviderBundlePatchRequest | 
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.CloudAPI.PatchProviderBundle(context.Background(), id).ProviderBundlePatchRequest(providerBundlePatchRequest).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `CloudAPI.PatchProviderBundle``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `PatchProviderBundle`: ProviderBundleResponse
+	fmt.Fprintf(os.Stdout, "Response from `CloudAPI.PatchProviderBundle`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+**ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
+**id** | **string** | Provider bundle identifier (UUIDv7). Bound on &#x60;/v1/provider-bundles/{id}&#x60; for the Cloud Inventory provider-bundle CRUD surface, and on &#x60;/v1/provider-bundles/{id}/clouds&#x60; for the roster of Clouds that reference the bundle.  | 
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiPatchProviderBundleRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+
+ **providerBundlePatchRequest** | [**ProviderBundlePatchRequest**](ProviderBundlePatchRequest.md) |  | 
+
+### Return type
+
+[**ProviderBundleResponse**](ProviderBundleResponse.md)
+
+### Authorization
+
+[operatorBearer](../README.md#operatorBearer), [sessionCookie](../README.md#sessionCookie)
+
+### HTTP request headers
+
+- **Content-Type**: application/json
+- **Accept**: application/json, application/problem+json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
 ## RequestCloudAssignment
 
 > CloudAssignmentResponse RequestCloudAssignment(ctx, id).CloudAssignmentRequestBody(cloudAssignmentRequestBody).Execute()
@@ -1044,7 +1616,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces. 
 	cloudAssignmentRequestBody := *openapiclient.NewCloudAssignmentRequestBody("CloudId_example") // CloudAssignmentRequestBody | 
 
 	configuration := openapiclient.NewConfiguration()
@@ -1065,7 +1637,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface, on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list, and on &#x60;/v1/projects/{id}/credential-assignments&#x60; and &#x60;/v1/projects/{id}/cloud-assignments&#x60; for the assignment request/list surfaces.  | 
+**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface, on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list, on &#x60;/v1/projects/{id}/credential-assignments&#x60; and &#x60;/v1/projects/{id}/cloud-assignments&#x60; for the assignment request/list surfaces, on &#x60;/v1/projects/{id}/blueprints&#x60; for the project-scoped Blueprint offer list, and on &#x60;/v1/projects/{id}/sink-enablements&#x60; and &#x60;/v1/projects/{id}/telemetry-routes&#x60; for the sink-enablement and Telemetry Route surfaces.  | 
 
 ### Other Parameters
 
@@ -1116,7 +1688,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, and on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Project identifier (UUIDv7). Bound on `/v1/projects/{id}` for the tenancy CRUD surface, on `/v1/projects/{id}/credentials` for the operator-facing OpenBao Credential Broker inventory list, on `/v1/projects/{id}/credential-assignments` and `/v1/projects/{id}/cloud-assignments` for the assignment request/list surfaces, on `/v1/projects/{id}/blueprints` for the project-scoped Blueprint offer list, and on `/v1/projects/{id}/sink-enablements` and `/v1/projects/{id}/telemetry-routes` for the sink-enablement and Telemetry Route surfaces. 
 	credentialAssignmentRequest := *openapiclient.NewCredentialAssignmentRequest() // CredentialAssignmentRequest | 
 
 	configuration := openapiclient.NewConfiguration()
@@ -1137,7 +1709,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface, on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list, and on &#x60;/v1/projects/{id}/credential-assignments&#x60; and &#x60;/v1/projects/{id}/cloud-assignments&#x60; for the assignment request/list surfaces.  | 
+**id** | **string** | Project identifier (UUIDv7). Bound on &#x60;/v1/projects/{id}&#x60; for the tenancy CRUD surface, on &#x60;/v1/projects/{id}/credentials&#x60; for the operator-facing OpenBao Credential Broker inventory list, on &#x60;/v1/projects/{id}/credential-assignments&#x60; and &#x60;/v1/projects/{id}/cloud-assignments&#x60; for the assignment request/list surfaces, on &#x60;/v1/projects/{id}/blueprints&#x60; for the project-scoped Blueprint offer list, and on &#x60;/v1/projects/{id}/sink-enablements&#x60; and &#x60;/v1/projects/{id}/telemetry-routes&#x60; for the sink-enablement and Telemetry Route surfaces.  | 
 
 ### Other Parameters
 
@@ -1260,7 +1832,7 @@ import (
 )
 
 func main() {
-	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface. 
+	id := "38400000-8cf0-11bd-b23e-10b96e4ef00d" // string | Cloud Credential identifier (UUIDv7). Bound on `/v1/cloud-credentials/{id}`, `/v1/cloud-credentials/{id}/revoke`, `/v1/cloud-credentials/{id}/clouds`, `/v1/cloud-credentials/{id}/credential-assignments`, and `/v1/cloud-credentials/{id}/clouds/{cloud_id}` for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface. 
 	cloudCredentialRevokeRequest := *openapiclient.NewCloudCredentialRevokeRequest("Reason_example") // CloudCredentialRevokeRequest | 
 
 	configuration := openapiclient.NewConfiguration()
@@ -1281,7 +1853,7 @@ func main() {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
 **ctx** | **context.Context** | context for authentication, logging, cancellation, deadlines, tracing, etc.
-**id** | **string** | Cloud Credential identifier (UUIDv7). Bound on &#x60;/v1/cloud-credentials/{id}&#x60;, &#x60;/v1/cloud-credentials/{id}/revoke&#x60;, &#x60;/v1/cloud-credentials/{id}/clouds&#x60;, and &#x60;/v1/cloud-credentials/{id}/clouds/{cloud_id}&#x60; for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.  | 
+**id** | **string** | Cloud Credential identifier (UUIDv7). Bound on &#x60;/v1/cloud-credentials/{id}&#x60;, &#x60;/v1/cloud-credentials/{id}/revoke&#x60;, &#x60;/v1/cloud-credentials/{id}/clouds&#x60;, &#x60;/v1/cloud-credentials/{id}/credential-assignments&#x60;, and &#x60;/v1/cloud-credentials/{id}/clouds/{cloud_id}&#x60; for the operator-facing Cloud Credentials read, revoke, and usage-Cloud attach/detach surface.  | 
 
 ### Other Parameters
 

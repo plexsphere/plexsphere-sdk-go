@@ -34,9 +34,21 @@ type CloudResponse struct {
 	RegionDefaults map[string]interface{} `json:"region_defaults"`
 	// Upstream provider account identifier (e.g. AWS account id, Azure tenant id). Combined with `provider` it must be unique across all Clouds.
 	ExternalId string `json:"external_id"`
+	// The EFFECTIVE Crossplane provider packages for this Cloud: the pinned provider bundle version's set with the Cloud's `provider_package_overrides` merged over it when `provider_bundle_id` is present, otherwise the set the Cloud declares inline. Rendered in canonical source-ascending order regardless of the order the operator stated them in. A `PATCH /v1/clouds/{id}` carrying `provider_packages` replaces the whole inline set.
+	ProviderPackages []CloudProviderPackage `json:"provider_packages"`
+	// The EFFECTIVE `<group>/<version>` every declared package serves its ProviderConfig under (e.g. `aws.m.upbound.io/v1beta1`): the referenced provider bundle's value when `provider_bundle_id` is present, otherwise the Cloud's own. The Provisioning Broker stamps this value as the rendered ProviderConfig's apiVersion.
+	ProviderConfigApiVersion string `json:"provider_config_api_version" validate:"regexp=^[a-z0-9]([a-z0-9.-]*[a-z0-9])?\\/v[0-9]+((alpha|beta)[0-9]+)?$"`
+	// Identifier of the provider bundle this Cloud takes its provider configuration from. Present only for a Cloud in bundle mode; a Cloud that declares its packages inline omits the field.
+	ProviderBundleId *string `json:"provider_bundle_id,omitempty"`
+	// Kebab-case handle of the referenced provider bundle, carried alongside the id so a client renders the reference without a second round-trip. Present only for a Cloud in bundle mode.
+	ProviderBundleSlug *string `json:"provider_bundle_slug,omitempty" validate:"regexp=^[a-z0-9]+(-[a-z0-9]+)*$"`
+	// The content version of that bundle the Cloud pins — the declaration `provider_packages` and `provider_config_api_version` above were resolved from. Present exactly when `provider_bundle_id` is; a Cloud that declares its packages inline omits all three fields. It moves only on a Cloud write, so a bundle patch that publishes a newer version leaves this value alone.
+	ProviderBundleVersion *int64 `json:"provider_bundle_version,omitempty"`
+	// The packages this Cloud runs differently from the version it pins, as the operator authored them, in canonical source-ascending order. Present exactly when `provider_bundle_id` is, and an empty array for a Cloud that states none; a Cloud that declares its packages inline omits the field.  An override whose source the pinned version carries replaces that member's version, and the merged entry reports `origin: override` under `provider_packages`. An override naming a source the pinned version does not carry joins the effective set and reports `origin: addition`. Nothing is ever removed, so the effective set is never smaller than the pinned version's.
+	ProviderPackageOverrides []CloudProviderPackage `json:"provider_package_overrides,omitempty"`
 	// Aggregate creation timestamp (UTC).
 	CreatedAt time.Time `json:"created_at"`
-	// Last-modified timestamp (UTC). Bumped by every mutator — `Rename`, `ChangeEndpoint`, `ChangeRegionDefaults`.
+	// Last-modified timestamp (UTC). Bumped by every mutator — `Rename`, `ChangeEndpoint`, `ChangeRegionDefaults`, `ChangeProviderPackages`, `ChangeProviderConfigAPIVersion`, `ReferenceProviderBundle`, `DeclareInlinePackages`.
 	UpdatedAt            time.Time `json:"updated_at"`
 	AdditionalProperties map[string]interface{}
 }
@@ -47,7 +59,7 @@ type _CloudResponse CloudResponse
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewCloudResponse(id string, displayName string, slug string, provider CloudProvider, endpoint map[string]interface{}, regionDefaults map[string]interface{}, externalId string, createdAt time.Time, updatedAt time.Time) *CloudResponse {
+func NewCloudResponse(id string, displayName string, slug string, provider CloudProvider, endpoint map[string]interface{}, regionDefaults map[string]interface{}, externalId string, providerPackages []CloudProviderPackage, providerConfigApiVersion string, createdAt time.Time, updatedAt time.Time) *CloudResponse {
 	this := CloudResponse{}
 	this.Id = id
 	this.DisplayName = displayName
@@ -56,6 +68,8 @@ func NewCloudResponse(id string, displayName string, slug string, provider Cloud
 	this.Endpoint = endpoint
 	this.RegionDefaults = regionDefaults
 	this.ExternalId = externalId
+	this.ProviderPackages = providerPackages
+	this.ProviderConfigApiVersion = providerConfigApiVersion
 	this.CreatedAt = createdAt
 	this.UpdatedAt = updatedAt
 	return &this
@@ -237,6 +251,182 @@ func (o *CloudResponse) SetExternalId(v string) {
 	o.ExternalId = v
 }
 
+// GetProviderPackages returns the ProviderPackages field value
+func (o *CloudResponse) GetProviderPackages() []CloudProviderPackage {
+	if o == nil {
+		var ret []CloudProviderPackage
+		return ret
+	}
+
+	return o.ProviderPackages
+}
+
+// GetProviderPackagesOk returns a tuple with the ProviderPackages field value
+// and a boolean to check if the value has been set.
+func (o *CloudResponse) GetProviderPackagesOk() ([]CloudProviderPackage, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return o.ProviderPackages, true
+}
+
+// SetProviderPackages sets field value
+func (o *CloudResponse) SetProviderPackages(v []CloudProviderPackage) {
+	o.ProviderPackages = v
+}
+
+// GetProviderConfigApiVersion returns the ProviderConfigApiVersion field value
+func (o *CloudResponse) GetProviderConfigApiVersion() string {
+	if o == nil {
+		var ret string
+		return ret
+	}
+
+	return o.ProviderConfigApiVersion
+}
+
+// GetProviderConfigApiVersionOk returns a tuple with the ProviderConfigApiVersion field value
+// and a boolean to check if the value has been set.
+func (o *CloudResponse) GetProviderConfigApiVersionOk() (*string, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.ProviderConfigApiVersion, true
+}
+
+// SetProviderConfigApiVersion sets field value
+func (o *CloudResponse) SetProviderConfigApiVersion(v string) {
+	o.ProviderConfigApiVersion = v
+}
+
+// GetProviderBundleId returns the ProviderBundleId field value if set, zero value otherwise.
+func (o *CloudResponse) GetProviderBundleId() string {
+	if o == nil || IsNil(o.ProviderBundleId) {
+		var ret string
+		return ret
+	}
+	return *o.ProviderBundleId
+}
+
+// GetProviderBundleIdOk returns a tuple with the ProviderBundleId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudResponse) GetProviderBundleIdOk() (*string, bool) {
+	if o == nil || IsNil(o.ProviderBundleId) {
+		return nil, false
+	}
+	return o.ProviderBundleId, true
+}
+
+// HasProviderBundleId returns a boolean if a field has been set.
+func (o *CloudResponse) HasProviderBundleId() bool {
+	if o != nil && !IsNil(o.ProviderBundleId) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderBundleId gets a reference to the given string and assigns it to the ProviderBundleId field.
+func (o *CloudResponse) SetProviderBundleId(v string) {
+	o.ProviderBundleId = &v
+}
+
+// GetProviderBundleSlug returns the ProviderBundleSlug field value if set, zero value otherwise.
+func (o *CloudResponse) GetProviderBundleSlug() string {
+	if o == nil || IsNil(o.ProviderBundleSlug) {
+		var ret string
+		return ret
+	}
+	return *o.ProviderBundleSlug
+}
+
+// GetProviderBundleSlugOk returns a tuple with the ProviderBundleSlug field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudResponse) GetProviderBundleSlugOk() (*string, bool) {
+	if o == nil || IsNil(o.ProviderBundleSlug) {
+		return nil, false
+	}
+	return o.ProviderBundleSlug, true
+}
+
+// HasProviderBundleSlug returns a boolean if a field has been set.
+func (o *CloudResponse) HasProviderBundleSlug() bool {
+	if o != nil && !IsNil(o.ProviderBundleSlug) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderBundleSlug gets a reference to the given string and assigns it to the ProviderBundleSlug field.
+func (o *CloudResponse) SetProviderBundleSlug(v string) {
+	o.ProviderBundleSlug = &v
+}
+
+// GetProviderBundleVersion returns the ProviderBundleVersion field value if set, zero value otherwise.
+func (o *CloudResponse) GetProviderBundleVersion() int64 {
+	if o == nil || IsNil(o.ProviderBundleVersion) {
+		var ret int64
+		return ret
+	}
+	return *o.ProviderBundleVersion
+}
+
+// GetProviderBundleVersionOk returns a tuple with the ProviderBundleVersion field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudResponse) GetProviderBundleVersionOk() (*int64, bool) {
+	if o == nil || IsNil(o.ProviderBundleVersion) {
+		return nil, false
+	}
+	return o.ProviderBundleVersion, true
+}
+
+// HasProviderBundleVersion returns a boolean if a field has been set.
+func (o *CloudResponse) HasProviderBundleVersion() bool {
+	if o != nil && !IsNil(o.ProviderBundleVersion) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderBundleVersion gets a reference to the given int64 and assigns it to the ProviderBundleVersion field.
+func (o *CloudResponse) SetProviderBundleVersion(v int64) {
+	o.ProviderBundleVersion = &v
+}
+
+// GetProviderPackageOverrides returns the ProviderPackageOverrides field value if set, zero value otherwise.
+func (o *CloudResponse) GetProviderPackageOverrides() []CloudProviderPackage {
+	if o == nil || IsNil(o.ProviderPackageOverrides) {
+		var ret []CloudProviderPackage
+		return ret
+	}
+	return o.ProviderPackageOverrides
+}
+
+// GetProviderPackageOverridesOk returns a tuple with the ProviderPackageOverrides field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CloudResponse) GetProviderPackageOverridesOk() ([]CloudProviderPackage, bool) {
+	if o == nil || IsNil(o.ProviderPackageOverrides) {
+		return nil, false
+	}
+	return o.ProviderPackageOverrides, true
+}
+
+// HasProviderPackageOverrides returns a boolean if a field has been set.
+func (o *CloudResponse) HasProviderPackageOverrides() bool {
+	if o != nil && !IsNil(o.ProviderPackageOverrides) {
+		return true
+	}
+
+	return false
+}
+
+// SetProviderPackageOverrides gets a reference to the given []CloudProviderPackage and assigns it to the ProviderPackageOverrides field.
+func (o *CloudResponse) SetProviderPackageOverrides(v []CloudProviderPackage) {
+	o.ProviderPackageOverrides = v
+}
+
 // GetCreatedAt returns the CreatedAt field value
 func (o *CloudResponse) GetCreatedAt() time.Time {
 	if o == nil {
@@ -302,6 +492,20 @@ func (o CloudResponse) ToMap() (map[string]interface{}, error) {
 	toSerialize["endpoint"] = o.Endpoint
 	toSerialize["region_defaults"] = o.RegionDefaults
 	toSerialize["external_id"] = o.ExternalId
+	toSerialize["provider_packages"] = o.ProviderPackages
+	toSerialize["provider_config_api_version"] = o.ProviderConfigApiVersion
+	if !IsNil(o.ProviderBundleId) {
+		toSerialize["provider_bundle_id"] = o.ProviderBundleId
+	}
+	if !IsNil(o.ProviderBundleSlug) {
+		toSerialize["provider_bundle_slug"] = o.ProviderBundleSlug
+	}
+	if !IsNil(o.ProviderBundleVersion) {
+		toSerialize["provider_bundle_version"] = o.ProviderBundleVersion
+	}
+	if !IsNil(o.ProviderPackageOverrides) {
+		toSerialize["provider_package_overrides"] = o.ProviderPackageOverrides
+	}
 	toSerialize["created_at"] = o.CreatedAt
 	toSerialize["updated_at"] = o.UpdatedAt
 
@@ -324,6 +528,8 @@ func (o *CloudResponse) UnmarshalJSON(data []byte) (err error) {
 		"endpoint",
 		"region_defaults",
 		"external_id",
+		"provider_packages",
+		"provider_config_api_version",
 		"created_at",
 		"updated_at",
 	}
@@ -362,6 +568,12 @@ func (o *CloudResponse) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "endpoint")
 		delete(additionalProperties, "region_defaults")
 		delete(additionalProperties, "external_id")
+		delete(additionalProperties, "provider_packages")
+		delete(additionalProperties, "provider_config_api_version")
+		delete(additionalProperties, "provider_bundle_id")
+		delete(additionalProperties, "provider_bundle_slug")
+		delete(additionalProperties, "provider_bundle_version")
+		delete(additionalProperties, "provider_package_overrides")
 		delete(additionalProperties, "created_at")
 		delete(additionalProperties, "updated_at")
 		o.AdditionalProperties = additionalProperties
